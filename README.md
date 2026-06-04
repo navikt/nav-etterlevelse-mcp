@@ -1,50 +1,60 @@
-# nav-etterlevelse-broker
+# nav-etterlevelse-mcp
 
-Minimal NAIS-app som eksisterer utelukkende for å få en Azure AD-appregistrering
-via NAIS, slik at den lokale etterlevelse-brokeren kan bruke OAuth2 device-code-flyt
-mot `etterlevelse-api.intern.nav.no`.
+MCP-server (Model Context Protocol) som gir Copilot CLI strukturert og schema-validert
+tilgang til [etterlevelse-api.intern.nav.no](https://etterlevelse-api.intern.nav.no) og
+[behandlingskatalog.ansatt.nav.no](https://behandlingskatalog.ansatt.nav.no).
 
-**Den faktiske broker-koden** (som kjøres lokalt) finnes i
-[navikt/dab-copilot-config](https://github.com/navikt/dab-copilot-config/tree/main/tools/etterlevelse-broker).
+Autentisering skjer via Azure AD OAuth 2.1 (PKCE) — brukeren logger inn én gang i nettleseren,
+og serveren holder tokenene i minne for sesjonen.
 
-## Hvordan det henger sammen
+## Arkitektur
 
 ```
-[Copilot CLI] → [lokal broker på localhost:9876] → [etterlevelse-api.intern.nav.no]
-                        ↑
-              bruker klient-ID fra denne NAIS-appen
-              for OAuth2 device-code-flyt mot Entra
+[Copilot CLI /mcp]
+       ↓  MCP OAuth 2.1
+[nav-etterlevelse-mcp  (NAIS, prod-gcp, namespace dab)]
+       ↓  Azure AD OBO
+[etterlevelse-api.intern.nav.no]   [behandlingskatalog.ansatt.nav.no]
 ```
 
-Denne NAIS-appen gjør ingenting annet enn å svare på helsesjekker.
-Azure AD-registreringen (og klient-IDen) holdes i live så lenge appen er deployet.
+## MCP-tools (v1 — read only)
 
-## Etter første deploy
+| Tool | API |
+|------|-----|
+| `list_etterlevelse_dokumentasjoner` | Etterlevelse |
+| `get_etterlevelse_dokumentasjon` | Etterlevelse |
+| `list_krav` | Etterlevelse |
+| `get_krav` | Etterlevelse |
+| `get_etterlevelse` | Etterlevelse |
+| `search_behandlinger` | Behandlingskatalog |
+| `get_behandling` | Behandlingskatalog |
+| `get_processor` | Behandlingskatalog |
 
-1. Hent klient-IDen:
-   ```bash
-   kubectl get secret nav-etterlevelse-broker -n dab \
-     -o jsonpath='{.data.AZURE_APP_CLIENT_ID}' | base64 -d
-   ```
+## Oppsett
 
-2. Be datajegerne (team-etterlevelse) legge til inbound-regel i `etterlevelse-backend`:
-   ```yaml
-   accessPolicy:
-     inbound:
-       rules:
-         - application: nav-etterlevelse-broker
-           namespace: dab
-   ```
-   Og aktivere «Allow public client flows» i app-registreringen i Entra-portalen.
+### 1. Autoriser repoet i NAIS Console
+Gå til [console.nav.cloud.nais.io](https://console.nav.cloud.nais.io) → team **dab** → **Repositories** → legg til `navikt/nav-etterlevelse-mcp`.
 
-3. Hardkod klient-IDen i den lokale brokeren:
-   ```bash
-   BROKER_CLIENT_ID=<klient-id> node broker.js
-   ```
+### 2. Deploy
 
-## Oppsett av repo i NAIS Console
+```bash
+gh workflow run deploy.yaml
+```
 
-Før første deploy må repoet autoriseres:
-1. Gå til [console.nav.cloud.nais.io](https://console.nav.cloud.nais.io)
-2. Velg team **dab** → **Repositories**
-3. Legg til `navikt/nav-etterlevelse-broker`
+### 3. Be datajegerne legge til inbound-regler
+
+I `etterlevelse-backend` (teamdatajegerne) og `behandlingskatalog-backend` (teamkatalog):
+
+```yaml
+accessPolicy:
+  inbound:
+    rules:
+      - application: nav-etterlevelse-mcp
+        namespace: dab
+```
+
+### 4. Bruk via Copilot CLI
+
+```bash
+gh copilot /mcp add https://nav-etterlevelse-mcp.intern.nav.no
+```
