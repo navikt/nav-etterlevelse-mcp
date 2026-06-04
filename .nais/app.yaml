@@ -6,23 +6,39 @@ metadata:
   labels:
     team: dab
 spec:
+  image: {{ image }}
   port: 8080
   replicas:
     min: 1
-    max: 1
+    max: 2
   resources:
     requests:
-      cpu: 10m
-      memory: 16Mi
+      cpu: 50m
+      memory: 128Mi
     limits:
-      memory: 32Mi
+      memory: 256Mi
   liveness:
-    path: /
-    initialDelay: 5
+    path: /health
+    initialDelay: 10
   readiness:
-    path: /
-    initialDelay: 5
+    path: /health
+    initialDelay: 10
+  ingresses:
+    - https://nav-etterlevelse-mcp.intern.nav.no
+  env:
+    - name: BASE_URL
+      value: https://nav-etterlevelse-mcp.intern.nav.no
+    - name: LOG_LEVEL
+      value: INFO
+  accessPolicy:
+    outbound:
+      external:
+        - host: etterlevelse-api.intern.nav.no
+        - host: behandlingskatalog-backend.intern.nav.no
+        - host: login.microsoftonline.com
   azure:
     application:
       enabled: true
       allowAllUsers: true
+      replyURLs:
+        - https://nav-etterlevelse-mcp.intern.nav.no/oauth/callback

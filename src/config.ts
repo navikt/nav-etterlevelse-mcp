@@ -1,0 +1,55 @@
+const ETTERLEVELSE_SCOPE = 'api://prod-gcp.teamdatajegerne.etterlevelse-backend/.default offline_access';
+const BEHANDLINGSKATALOG_SCOPE = 'api://prod-gcp.teamkatalog.behandlingskatalog-backend/.default';
+const ETTERLEVELSE_API_BASE_URL = 'https://etterlevelse-api.intern.nav.no/api';
+const BEHANDLINGSKATALOG_API_BASE_URL = 'https://behandlingskatalog-backend.intern.nav.no/api';
+
+function requireEnv(name: string): string {
+  const value = process.env[name];
+  if (!value) {
+    throw new Error(`Missing required environment variable ${name}`);
+  }
+
+  return value;
+}
+
+function stripTrailingSlash(value: string): string {
+  return value.endsWith('/') ? value.slice(0, -1) : value;
+}
+
+export const config = {
+  port: Number(process.env.PORT ?? '8080'),
+  baseUrl: stripTrailingSlash(requireEnv('BASE_URL')),
+  logLevel: process.env.LOG_LEVEL ?? 'INFO',
+  azure: {
+    clientId: requireEnv('AZURE_APP_CLIENT_ID'),
+    clientSecret: requireEnv('AZURE_APP_CLIENT_SECRET'),
+    tenantId: requireEnv('AZURE_APP_TENANT_ID'),
+    tokenEndpoint: requireEnv('AZURE_OPENID_CONFIG_TOKEN_ENDPOINT'),
+    issuer: requireEnv('AZURE_OPENID_CONFIG_ISSUER'),
+    etterlevelseScope: ETTERLEVELSE_SCOPE,
+    behandlingskatalogScope: BEHANDLINGSKATALOG_SCOPE,
+  },
+  api: {
+    etterlevelseBaseUrl: ETTERLEVELSE_API_BASE_URL,
+    behandlingskatalogBaseUrl: BEHANDLINGSKATALOG_API_BASE_URL,
+  },
+} as const;
+
+export const mcpServerInfo = {
+  name: 'nav-etterlevelse-mcp',
+  version: '0.1.0',
+} as const;
+
+export const mcpAccessTokenTtlSeconds = 60 * 60;
+export const mcpRefreshTokenTtlSeconds = 24 * 60 * 60;
+export const authCodeTtlSeconds = 10 * 60;
+export const authSessionTtlSeconds = 10 * 60;
+export const mcpScope = 'mcp';
+
+export function getAzureAuthorizeEndpoint(): string {
+  return `https://login.microsoftonline.com/${config.azure.tenantId}/oauth2/v2.0/authorize`;
+}
+
+export function getOAuthCallbackUrl(): string {
+  return `${config.baseUrl}/oauth/callback`;
+}
