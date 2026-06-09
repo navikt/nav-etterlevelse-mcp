@@ -123,6 +123,39 @@ export class EtterlevelseClient {
     return payload;
   }
 
+  private async graphql(query: string): Promise<unknown> {
+    const url = new URL(`${this.baseUrl.replace(/\/api\/?$/, '')}/graphql`);
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        Authorization: `Bearer ${this.accessToken}`,
+      },
+      body: JSON.stringify({ query }),
+    });
+
+    const bodyText = await response.text();
+    if (!response.ok) {
+      throw new Error(`Etterlevelse GraphQL svarte ${response.status}: ${bodyText}`);
+    }
+
+    let payload: unknown = null;
+    if (bodyText) {
+      try {
+        payload = JSON.parse(bodyText);
+      } catch {
+        payload = bodyText;
+      }
+    }
+
+    if (isRecord(payload) && payload['errors']) {
+      throw new Error(`GraphQL-feil: ${JSON.stringify(payload['errors'])}`);
+    }
+
+    return isRecord(payload) ? payload['data'] : payload;
+  }
+
   async listEtterlevelseDokumentasjoner(input: { search?: string; team?: string }): Promise<unknown[]> {
     const payload = await this.get('/etterlevelsedokumentasjon', {
       sistRedigert: 10,
@@ -152,10 +185,41 @@ export class EtterlevelseClient {
   }
 
   async getEtterlevelseDokumentasjon(id: string): Promise<unknown> {
-    return this.get(`/etterlevelsedokumentasjon/${id}`);
+    const data = await this.graphql(
+      `{ etterlevelseDokumentasjon(filter: {id: "${id}"}) { content {
+          id title etterlevelseNummer
+          behandlinger { id navn }
+          etterlevelser {
+            id kravNummer kravVersjon etterleves status statusBegrunnelse
+            suksesskriterieBegrunnelser {
+              suksesskriterieId begrunnelse suksesskriterieStatus
+              veiledning veiledningsTekst veiledningsTekst2
+            }
+          }
+        } } }`,
+    );
+    if (isRecord(data) && isRecord(data['etterlevelseDokumentasjon'])) {
+      const content = extractArray(data['etterlevelseDokumentasjon']['content']);
+      return content[0] ?? null;
+    }
+    return data;
   }
 
-  async listKrav(input: { relevansFor?: string; tema?: string }): Promise<unknown[]> {
+  async listKrav(input: { relevansFor?: string; tema?: string; etterlevelseDokumentasjonId?: string }): Promise<unknown[]> {
+    if (input.etterlevelseDokumentasjonId) {
+      const data = await this.graphql(
+        `{ krav(filter: {gjeldendeKrav: true, etterlevelseDokumentasjonId: "${input.etterlevelseDokumentasjonId}"}) {
+            content { kravNummer kravVersjon navn status tema relevansFor }
+          } }`,
+      );
+      if (isRecord(data) && isRecord(data['krav'])) {
+        return extractArray<Record<string, unknown>>(data['krav']['content'])
+          .filter((item) => matchesJsonFilter(item.relevansFor, input.relevansFor))
+          .filter((item) => matchesJsonFilter(item.tema, input.tema));
+      }
+      return [];
+    }
+
     const payload = await this.get('/krav', {
       status: 'AKTIV',
       pageNumber: 0,

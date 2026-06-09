@@ -56,7 +56,7 @@ export function registerEtterlevelseTools(server: McpServer, client: Etterlevels
   server.registerTool(
     'get_etterlevelse_dokumentasjon',
     {
-      description: 'Hent full etterlevelsedokumentasjon på id.',
+      description: 'Hent full etterlevelsedokumentasjon på id, inkludert alle nestede etterlevelser med suksesskriteriebegrunnelser.',
       inputSchema: {
         id: z.string().min(1).describe('UUID for etterlevelsedokumentasjonen'),
       },
@@ -74,16 +74,17 @@ export function registerEtterlevelseTools(server: McpServer, client: Etterlevels
   server.registerTool(
     'list_krav',
     {
-      description: 'List aktive krav og filtrer eventuelt på relevans eller tema.',
+      description: 'List krav. Hvis etterlevelseDokumentasjonId oppgis, returneres kun gjeldende krav for det dokumentet (anbefalt for gap-analyse). Uten id returneres alle aktive krav.',
       inputSchema: {
+        etterlevelseDokumentasjonId: z.string().optional().describe('UUID for dokumentasjonen — gir kun gjeldende krav for dette dokumentet'),
         relevansFor: z.string().optional().describe('Filtrer på relevans-for feltet'),
         tema: z.string().optional().describe('Filtrer på tema'),
       },
       annotations: readOnlyAnnotations,
     },
-    async ({ relevansFor, tema }) => {
+    async ({ etterlevelseDokumentasjonId, relevansFor, tema }) => {
       try {
-        return toolResult(await client.listKrav({ relevansFor, tema }));
+        return toolResult(await client.listKrav({ etterlevelseDokumentasjonId, relevansFor, tema }));
       } catch (error) {
         return toolError(error);
       }
