@@ -10,7 +10,11 @@ spec:
   port: 8080
   replicas:
     min: 1
-    max: 2
+    # max must stay at 1: the OAuth session store (authStore) is in-memory and
+    # not shared across pods. If multiple replicas run simultaneously, a user
+    # authenticated on pod A will get 401 on pod B. To support horizontal
+    # scaling, replace authStore with a shared store (e.g. Redis/Valkey).
+    max: 1
   resources:
     requests:
       cpu: 50m

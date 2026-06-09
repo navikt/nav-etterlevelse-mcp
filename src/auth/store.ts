@@ -53,6 +53,14 @@ interface TimedEntry<T> {
   expiresAt: number;
 }
 
+/**
+ * In-memory OAuth session store. All state lives in the Node.js process heap.
+ *
+ * Single-replica constraint: this store is not shared across pods. The
+ * deployment (`.nais/app.yaml`) must keep `replicas.max: 1` to ensure every
+ * request hits the same instance. To support horizontal scaling, replace this
+ * class with a Redis/Valkey-backed implementation.
+ */
 class InMemoryAuthStore {
   private readonly authSessions = new Map<string, TimedEntry<AuthSession>>();
   private readonly authCodes = new Map<string, TimedEntry<AuthCodeRecord>>();
