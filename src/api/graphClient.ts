@@ -70,27 +70,28 @@ export class GraphClient {
   }
 
   /**
-   * Given a list of NAIS team names and the user's group UUIDs (from the
-   * groups claim), returns the first team name that matches a group the user
-   * is a member of.
+   * Given a list of NAIS team names, returns the first team name that matches
+   * a group the user is a direct member of (via Microsoft Graph /me/memberOf).
    *
-   * Strategy: try matching by displayName first (simple, works if the Entra ID
-   * group display name equals the NAIS team slug). Falls back gracefully if no
-   * match — callers should treat a null result as "ownership not confirmed".
+   * userGroupIds (fra JWT groups-claim) brukes som en optional innsnevring:
+   * hvis claimet er populert, hopper vi over grupper som ikke er i settet.
+   * Hvis claimet er tomt (f.eks. fordi NAIS-appen ikke er konfigurert med
+   * spesifikke groups i azure.application.claims), matches mot alle grupper
+   * fra Graph API direkte.
    */
   async findMatchingTeam(
     teamNames: string[],
     userGroupIds: string[],
   ): Promise<{ teamName: string; groupId: string } | null> {
-    if (teamNames.length === 0 || userGroupIds.length === 0) {
+    if (teamNames.length === 0) {
       return null;
     }
 
     const memberOf = await this.getMemberOf();
-    const userGroupIdSet = new Set(userGroupIds);
+    const candidateIds = userGroupIds.length > 0 ? new Set(userGroupIds) : null;
 
     for (const group of memberOf) {
-      if (!userGroupIdSet.has(group.id)) {
+      if (candidateIds && !candidateIds.has(group.id)) {
         continue;
       }
       const matchingTeam = teamNames.find(

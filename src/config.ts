@@ -1,5 +1,9 @@
-const ETTERLEVELSE_SCOPE = 'api://prod-gcp.teamdatajegerne.etterlevelse-backend/.default offline_access';
-const BEHANDLINGSKATALOG_SCOPE = 'api://prod-gcp.teamkatalog.behandlingskatalog-backend/.default';
+const ETTERLEVELSE_SCOPE =
+  process.env.ETTERLEVELSE_SCOPE ??
+  'api://prod-gcp.teamdatajegerne.etterlevelse-backend/.default offline_access';
+const BEHANDLINGSKATALOG_SCOPE =
+  process.env.BEHANDLINGSKATALOG_SCOPE ??
+  'api://prod-gcp.teamdatajegerne.behandlingskatalog-backend/.default';
 // Interne Kubernetes-serviceadresser (app-navn fra Azure-scope: api://prod-gcp.{namespace}.{app}/.default).
 // Overstyr med env-variabler hvis tjenestenavnene avviker fra scope-navnene.
 const ETTERLEVELSE_API_BASE_URL =

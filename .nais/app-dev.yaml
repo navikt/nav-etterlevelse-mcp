@@ -10,10 +10,6 @@ spec:
   port: 8080
   replicas:
     min: 1
-    # max must stay at 1: the OAuth session store (authStore) is in-memory and
-    # not shared across pods. If multiple replicas run simultaneously, a user
-    # authenticated on pod A will get 401 on pod B. To support horizontal
-    # scaling, replace authStore with a shared store (e.g. Redis/Valkey).
     max: 1
   resources:
     requests:
@@ -28,16 +24,16 @@ spec:
     path: /health
     initialDelay: 10
   ingresses:
-    - https://nav-etterlevelse-mcp.intern.nav.no
+    - https://nav-etterlevelse-mcp.intern.dev.nav.no
   env:
     - name: BASE_URL
-      value: https://nav-etterlevelse-mcp.intern.nav.no
+      value: https://nav-etterlevelse-mcp.intern.dev.nav.no
     - name: LOG_LEVEL
       value: INFO
     - name: ETTERLEVELSE_SCOPE
-      value: api://prod-gcp.teamdatajegerne.etterlevelse-backend/.default offline_access
+      value: api://dev-gcp.teamdatajegerne.etterlevelse-backend/.default offline_access
     - name: BEHANDLINGSKATALOG_SCOPE
-      value: api://prod-gcp.teamdatajegerne.behandlingskatalog-backend/.default
+      value: api://dev-gcp.teamdatajegerne.behandlingskatalog-backend/.default
   accessPolicy:
     outbound:
       rules:
@@ -49,5 +45,6 @@ spec:
     application:
       enabled: true
       allowAllUsers: true
+      tenant: nav.no
       replyURLs:
-        - https://nav-etterlevelse-mcp.intern.nav.no/oauth/callback
+        - https://nav-etterlevelse-mcp.intern.dev.nav.no/oauth/callback
