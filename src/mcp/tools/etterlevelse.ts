@@ -222,6 +222,10 @@ function cleanText(value: unknown, fallback = ''): string {
   return text ? stripHtml(text).trim() : fallback;
 }
 
+function truncateText(value: string, maxLength: number): string {
+  return value.length > maxLength ? `${value.slice(0, maxLength - 1)}…` : value;
+}
+
 function formatScalar(value: unknown): string | undefined {
   if (typeof value === 'boolean') {
     return value ? 'Ja' : 'Nei';
@@ -301,11 +305,13 @@ function normalizeTiltak(raw: unknown) {
     beskrivelse: cleanText(tiltak.beskrivelse),
     ansvarlig: cleanText(tiltak.ansvarlig),
     frist: cleanText(tiltak.frist),
+    iverksatt: typeof tiltak.iverksatt === 'boolean' ? tiltak.iverksatt : undefined,
   };
 }
 
-function formatTiltakSection(raw: unknown): string {
+function formatTiltakSection(raw: unknown, index?: number): string {
   const tiltak = normalizeTiltak(raw);
+  const title = index !== undefined ? `TILTAK ${index}` : 'TILTAK';
   const lines = [
     formatField('Id', tiltak.id),
     formatField('RisikoscenarioId', tiltak.risikoscenarioId),
@@ -314,9 +320,10 @@ function formatTiltakSection(raw: unknown): string {
     formatField('Beskrivelse', tiltak.beskrivelse || '(tom)'),
     formatField('Ansvarlig', tiltak.ansvarlig),
     formatField('Frist', tiltak.frist),
+    formatField('Iverksatt', tiltak.iverksatt),
   ].filter((line): line is string => Boolean(line));
 
-  return boxSection('TILTAK', lines.join('\n'));
+  return boxSection(title, lines.join('\n'));
 }
 
 export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext): void {
@@ -372,13 +379,17 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
           .describe('UUID for dokumentasjonen — gir kun gjeldende krav for dette dokumentet'),
         relevansFor: z.string().optional().describe('Filtrer på relevans-for feltet'),
         tema: z.string().optional().describe('Filtrer på tema'),
+        tagger: z
+          .array(z.string())
+          .optional()
+          .describe('Filtrer på tagger, f.eks. ["Personvernkonsekvensvurdering"] for PVK-krav'),
       },
       annotations: readOnlyAnnotations,
     },
-    async ({ etterlevelseDokumentasjonId, relevansFor, tema }) => {
+    async ({ etterlevelseDokumentasjonId, relevansFor, tema, tagger }) => {
       try {
         return toolResult(
-          await client.listKrav({ etterlevelseDokumentasjonId, relevansFor, tema }),
+          await client.listKrav({ etterlevelseDokumentasjonId, relevansFor, tema, tagger }),
         );
       } catch (error) {
         return toolError(error);
@@ -558,6 +569,59 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
   );
 
   server.registerTool(
+    'get_behandlingens_livsloep',
+    {
+      description: 'Hent behandlingens livsløp-dokument for det låste dokumentet.',
+      inputSchema: {},
+      annotations: readOnlyAnnotations,
+    },
+    async () => {
+      const guardError = requireDocumentLock(ctx);
+      if (guardError) {
+        return guardError;
+      }
+
+      const lockedDocumentId = ctx.tokenData.lockedDocumentId as string;
+      const lockedDocumentTitle = ctx.tokenData.lockedDocumentTitle ?? lockedDocumentId;
+
+      try {
+        const behandlingensLivsloep = await client.getBehandlingensLivsloep(lockedDocumentId);
+        if (!behandlingensLivsloep || !isRecord(behandlingensLivsloep)) {
+          return toolResult({
+            preview: `Ingen behandlingens livsløp funnet for "${lockedDocumentTitle}".`,
+            found: false,
+            etterlevelseDokumentasjonId: lockedDocumentId,
+          });
+        }
+
+        const beskrivelse = cleanText(behandlingensLivsloep.beskrivelse, '(tom)');
+        const filer = extractArray(
+          behandlingensLivsloep.filer ??
+            behandlingensLivsloep.files ??
+            behandlingensLivsloep.vedlegg,
+        );
+        const summaryLines = [
+          formatField('Etterlevelsesdokument', lockedDocumentTitle),
+          formatField('Status', behandlingensLivsloep.status),
+          `Beskrivelse: ${truncateText(beskrivelse || '(tom)', 200)}`,
+          `Antall filer: ${filer.length}`,
+        ].filter((line): line is string => Boolean(line));
+
+        return toolResult({
+          preview: boxSection('BEHANDLINGENS LIVSLØP', summaryLines.join('\n')),
+          found: true,
+          etterlevelseDokumentasjonId: lockedDocumentId,
+          status: asString(behandlingensLivsloep.status) ?? null,
+          fileCount: filer.length,
+          behandlingensLivsloep,
+        });
+      } catch (error) {
+        return toolError(error);
+      }
+    },
+  );
+
+  server.registerTool(
     'list_risikoscenarioer',
     {
       description: 'List alle risikoscenarioer for det låste PVK-dokumentet.',
@@ -602,7 +666,94 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
     },
   );
 
+  server.registerTool(
+    'list_tiltak',
+    {
+      description: 'List alle tiltak for det låste PVK-dokumentet.',
+      inputSchema: {},
+      annotations: readOnlyAnnotations,
+    },
+    async () => {
+      const guardError = requireDocumentLock(ctx);
+      if (guardError) {
+        return guardError;
+      }
+
+      const { lockedPvkDokumentId } = ctx.tokenData;
+      if (!lockedPvkDokumentId) {
+        return toolError('Ingen PVK-dokument funnet. Kall lock_document først.');
+      }
+
+      try {
+        const tiltakRaw = await client.getTiltakForPvkDokument(lockedPvkDokumentId);
+        const tiltak = tiltakRaw.map((item) => normalizeTiltak(item));
+        const preview =
+          tiltak.length > 0
+            ? [
+                `PVK-dokumentId: ${lockedPvkDokumentId}`,
+                `Antall tiltak: ${tiltak.length}`,
+                '',
+                ...tiltak.map((item, index) => formatTiltakSection(item, index + 1)),
+              ].join('\n\n')
+            : `PVK-dokument ${lockedPvkDokumentId} har ingen tiltak enda.`;
+
+        return toolResult({
+          preview,
+          pvkDokumentId: lockedPvkDokumentId,
+          count: tiltak.length,
+          tiltak,
+        });
+      } catch (error) {
+        return toolError(error);
+      }
+    },
+  );
+
   // --- Write-tools ---
+
+  server.registerTool(
+    'link_krav_to_risikoscenario',
+    {
+      description:
+        'Koble et krav-nummer til ett eller flere risikoscenarioer i PVK-dokumentet. Gjør at scenariet vises under det relevante kravet i PVK-visningen.',
+      inputSchema: {
+        kravnummer: z
+          .number()
+          .int()
+          .positive()
+          .describe('Kravnummer (kun tall, ikke versjon), f.eks. 113'),
+        risikoscenarioIder: z
+          .array(z.string().uuid())
+          .min(1)
+          .describe('UUIDs for scenariene som skal knyttes til kravet'),
+      },
+      annotations: writeAnnotations,
+    },
+    async ({ kravnummer, risikoscenarioIder }) => {
+      const guardError = requireDocumentLock(ctx);
+      if (guardError) {
+        return guardError;
+      }
+
+      if (!ctx.tokenData.lockedPvkDokumentId) {
+        return toolError('Ingen PVK-dokument funnet. Kall lock_document først.');
+      }
+
+      try {
+        const result = await client.linkKravToRisikoscenarioer(kravnummer, risikoscenarioIder);
+        return toolResult({
+          success: true,
+          summary: `Krav K${kravnummer} koblet til ${risikoscenarioIder.length} risikoscenario(er)`,
+          pvkDokumentId: ctx.tokenData.lockedPvkDokumentId,
+          kravnummer,
+          risikoscenarioIder,
+          result,
+        });
+      } catch (error) {
+        return toolError(error);
+      }
+    },
+  );
 
   server.registerTool(
     'write_etterlevelse',

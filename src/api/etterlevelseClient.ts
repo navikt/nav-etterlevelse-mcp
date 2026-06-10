@@ -85,6 +85,15 @@ function matchesJsonFilter(value: unknown, filter: string | undefined): boolean 
   return JSON.stringify(value).toLowerCase().includes(filter.toLowerCase());
 }
 
+function matchesTaggerFilter(value: unknown, filter: string[] | undefined): boolean {
+  if (!filter || filter.length === 0) {
+    return true;
+  }
+
+  const normalizedValue = extractStringArray(value).map((entry) => entry.toLowerCase());
+  return filter.every((tag) => normalizedValue.includes(tag.toLowerCase()));
+}
+
 function isNotFoundError(error: unknown): boolean {
   return error instanceof Error && error.message.includes('Etterlevelse API svarte 404');
 }
@@ -259,13 +268,24 @@ export class EtterlevelseClient {
     return this.put(`/etterlevelsedokumentasjon/${id}`, body);
   }
 
-  async listKrav(input: { relevansFor?: string; tema?: string; etterlevelseDokumentasjonId?: string }): Promise<unknown[]> {
+  async listKrav(input: {
+    relevansFor?: string;
+    tema?: string;
+    etterlevelseDokumentasjonId?: string;
+    tagger?: string[];
+  }): Promise<unknown[]> {
     if (input.etterlevelseDokumentasjonId) {
-      const data = await this.graphql(
-        `{ krav(filter: {gjeldendeKrav: true, etterlevelseDokumentasjonId: "${input.etterlevelseDokumentasjonId}"}) {
-            content { kravNummer kravVersjon navn status tema relevansFor }
-          } }`,
-      );
+      const filterParts = [
+        'gjeldendeKrav: true',
+        `etterlevelseDokumentasjonId: "${input.etterlevelseDokumentasjonId}"`,
+        ...(input.tagger && input.tagger.length > 0
+          ? [`tagger: [${input.tagger.map((tag) => `"${tag}"`).join(', ')}]`]
+          : []),
+      ].join(', ');
+      const query = `{ krav(filter: {${filterParts}}) {
+          content { kravNummer kravVersjon navn status tema relevansFor }
+        } }`;
+      const data = await this.graphql(query);
       if (isRecord(data) && isRecord(data['krav'])) {
         return extractArray<Record<string, unknown>>(data['krav']['content'])
           .filter((item) => matchesJsonFilter(item.relevansFor, input.relevansFor))
@@ -282,6 +302,7 @@ export class EtterlevelseClient {
 
     const items = extractArray<Record<string, unknown>>(payload);
     return items
+      .filter((item) => matchesTaggerFilter(item.tagger, input.tagger))
       .filter((item) => matchesJsonFilter(item.relevansFor, input.relevansFor))
       .filter((item) => matchesJsonFilter(item.tema, input.tema))
       .map((item) => ({
@@ -517,6 +538,11 @@ export class EtterlevelseClient {
     return this.post(`/tiltak/risikoscenario/${risikoscenarioId}`, request);
   }
 
+  async getTiltakForPvkDokument(pvkDokumentId: string): Promise<any[]> {
+    const payload = await this.get(`/tiltak/pvkdokument/${pvkDokumentId}`, { pageSize: 200 });
+    return extractArray(payload);
+  }
+
   async updateTiltak(id: string, request: object): Promise<unknown> {
     return this.put(`/tiltak/${id}`, request);
   }
@@ -530,5 +556,9 @@ export class EtterlevelseClient {
       }
       throw error;
     }
+  }
+
+  async linkKravToRisikoscenarioer(kravnummer: number, risikoscenarioIder: string[]): Promise<any> {
+    return this.put('/risikoscenario/update/addRelevantKrav', { kravnummer, risikoscenarioIder });
   }
 }
