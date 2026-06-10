@@ -36,11 +36,11 @@ spec:
       value: INFO
   accessPolicy:
     outbound:
-      external:
-        - host: etterlevelse-api.intern.nav.no
-        - host: behandlingskatalog-backend.intern.nav.no
-        - host: login.microsoftonline.com
-        - host: graph.microsoft.com
+      rules:
+        - application: etterlevelse-backend
+          namespace: teamdatajegerne
+        - application: behandlingskatalog-backend
+          namespace: teamkatalog
   azure:
     application:
       enabled: true

@@ -2,6 +2,7 @@ import { randomBytes } from 'node:crypto';
 import {
   authCodeTtlSeconds,
   authSessionTtlSeconds,
+  deviceCodeTtlSeconds,
   mcpAccessTokenTtlSeconds,
   mcpRefreshTokenTtlSeconds,
 } from '../config.js';
@@ -12,6 +13,8 @@ export interface AuthSession {
   redirectUri: string;
   codeChallenge: string;
   codeChallengeMethod: 'S256';
+  /** Satt for device code-flyt. Etter Azure AD-callback lagres tokens under denne device_code. */
+  deviceCode?: string;
 }
 
 export interface McpTokenData {
@@ -56,6 +59,15 @@ export interface RefreshTokenRecord {
   tokenData: McpTokenData;
 }
 
+export interface DeviceAuthSession {
+  clientId: string;
+  userCode: string;
+  status: 'pending' | 'complete';
+  /** Satt når status blir 'complete' etter vellykket Azure AD-innlogging. */
+  mcpAccessToken?: string;
+  mcpRefreshToken?: string;
+}
+
 interface TimedEntry<T> {
   value: T;
   expiresAt: number;
@@ -75,6 +87,9 @@ class InMemoryAuthStore {
   private readonly mcpTokens = new Map<string, TimedEntry<McpTokenData>>();
   private readonly refreshTokens = new Map<string, TimedEntry<RefreshTokenRecord>>();
   private readonly clientRegistrations = new Map<string, ClientRegistration>();
+  private readonly deviceAuthSessions = new Map<string, TimedEntry<DeviceAuthSession>>();
+  /** user_code → device_code (hjelpeindeks for oppslag fra /device-siden) */
+  private readonly deviceUserCodeIndex = new Map<string, string>();
 
   constructor() {
     const cleanupHandle = setInterval(() => this.cleanupExpiredEntries(), 5 * 60 * 1000);
@@ -87,7 +102,7 @@ class InMemoryAuthStore {
       clientId,
       clientName: input.clientName,
       redirectUris: [...input.redirectUris],
-      grantTypes: ['authorization_code', 'refresh_token'],
+      grantTypes: ['authorization_code', 'refresh_token', 'urn:ietf:params:oauth:grant-type:device_code'],
       responseTypes: ['code'],
       tokenEndpointAuthMethod: 'none',
       clientIdIssuedAt: Math.floor(Date.now() / 1000),
@@ -155,6 +170,42 @@ class InMemoryAuthStore {
     return true;
   }
 
+  saveDeviceAuthSession(deviceCode: string, session: DeviceAuthSession): void {
+    this.deviceAuthSessions.set(deviceCode, this.withTtl(session, deviceCodeTtlSeconds));
+    this.deviceUserCodeIndex.set(session.userCode, deviceCode);
+  }
+
+  getDeviceAuthSession(deviceCode: string): DeviceAuthSession | undefined {
+    return this.getValid(this.deviceAuthSessions, deviceCode);
+  }
+
+  getDeviceCodeByUserCode(userCode: string): string | undefined {
+    const deviceCode = this.deviceUserCodeIndex.get(userCode);
+    if (!deviceCode) return undefined;
+    if (!this.getValid(this.deviceAuthSessions, deviceCode)) {
+      this.deviceUserCodeIndex.delete(userCode);
+      return undefined;
+    }
+    return deviceCode;
+  }
+
+  completeDeviceAuth(deviceCode: string, mcpAccessToken: string, mcpRefreshToken: string): void {
+    const entry = this.deviceAuthSessions.get(deviceCode);
+    if (entry && entry.expiresAt > Date.now()) {
+      entry.value.status = 'complete';
+      entry.value.mcpAccessToken = mcpAccessToken;
+      entry.value.mcpRefreshToken = mcpRefreshToken;
+    }
+  }
+
+  consumeDeviceAuth(deviceCode: string): void {
+    const entry = this.deviceAuthSessions.get(deviceCode);
+    if (entry) {
+      this.deviceUserCodeIndex.delete(entry.value.userCode);
+      this.deviceAuthSessions.delete(deviceCode);
+    }
+  }
+
   private withTtl<T>(value: T, ttlSeconds: number): TimedEntry<T> {
     return {
       value,
@@ -168,6 +219,12 @@ class InMemoryAuthStore {
     this.cleanupMap(this.authCodes, now);
     this.cleanupMap(this.mcpTokens, now);
     this.cleanupMap(this.refreshTokens, now);
+    for (const [deviceCode, entry] of this.deviceAuthSessions.entries()) {
+      if (entry.expiresAt <= now) {
+        this.deviceUserCodeIndex.delete(entry.value.userCode);
+        this.deviceAuthSessions.delete(deviceCode);
+      }
+    }
   }
 
   private cleanupMap<T>(map: Map<string, TimedEntry<T>>, now: number): void {

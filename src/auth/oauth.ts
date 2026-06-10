@@ -3,6 +3,8 @@ import type { Express, Request, Response } from 'express';
 import {
   authCodeTtlSeconds,
   config,
+  deviceCodePollIntervalSeconds,
+  deviceCodeTtlSeconds,
   getAzureAuthorizeEndpoint,
   getOAuthCallbackUrl,
   mcpAccessTokenTtlSeconds,
@@ -99,6 +101,17 @@ function randomToken(): string {
   return randomBytes(32).toString('base64url');
 }
 
+/** Genererer en menneskelig lesbar bruker-kode på formatet XXXX-XXXX (unngår tvetydige tegn). */
+function randomUserCode(): string {
+  const chars = 'BCDFGHJKLMNPQRSTVWXYZ23456789';
+  const bytes = randomBytes(8);
+  let code = '';
+  for (const byte of bytes) {
+    code += chars[byte % chars.length];
+  }
+  return `${code.slice(0, 4)}-${code.slice(4)}`;
+}
+
 function calculateAzureExpiry(expiresInSeconds?: number): number {
   return Date.now() + Math.max((expiresInSeconds ?? 3600) - 60, 60) * 1000;
 }
@@ -137,8 +150,9 @@ function buildAuthorizationServerMetadata() {
     authorization_endpoint: `${config.baseUrl}/oauth/authorize`,
     token_endpoint: `${config.baseUrl}/oauth/token`,
     registration_endpoint: `${config.baseUrl}/register`,
+    device_authorization_endpoint: `${config.baseUrl}/device_authorization`,
     response_types_supported: ['code'],
-    grant_types_supported: ['authorization_code', 'refresh_token'],
+    grant_types_supported: ['authorization_code', 'refresh_token', 'urn:ietf:params:oauth:grant-type:device_code'],
     code_challenge_methods_supported: ['S256'],
     token_endpoint_auth_methods_supported: ['none'],
     scopes_supported: [mcpScope],
@@ -256,6 +270,80 @@ export function registerOAuthRoutes(app: Express): void {
   app.get('/.well-known/oauth-protected-resource/mcp', (_req, res) => {
     setNoStore(res);
     res.json(buildProtectedResourceMetadata());
+  });
+
+  // --- Device Code flow ---
+
+  app.post('/device_authorization', (req, res) => {
+    setNoStore(res);
+    const clientId = bodyString(req.body, 'client_id');
+    if (!clientId || !authStore.getClient(clientId)) {
+      sendJsonError(res, 400, 'invalid_client', 'Unknown client_id');
+      return;
+    }
+
+    const deviceCode = randomToken();
+    const userCode = randomUserCode();
+    authStore.saveDeviceAuthSession(deviceCode, { clientId, userCode, status: 'pending' });
+
+    const verificationUri = `${config.baseUrl}/device`;
+    res.json({
+      device_code: deviceCode,
+      user_code: userCode,
+      verification_uri: verificationUri,
+      verification_uri_complete: `${verificationUri}?user_code=${encodeURIComponent(userCode)}`,
+      expires_in: deviceCodeTtlSeconds,
+      interval: deviceCodePollIntervalSeconds,
+    });
+  });
+
+  app.get('/device', (req, res) => {
+    const userCode = firstQueryValue(req.query.user_code)?.toUpperCase();
+
+    if (!userCode) {
+      res.type('html').send(`<!DOCTYPE html><html lang="no"><head><meta charset="UTF-8">
+<title>NAV Etterlevelse MCP — Innlogging</title>
+<style>body{font-family:sans-serif;max-width:400px;margin:80px auto;padding:0 20px}
+input{font-size:1.2em;padding:8px;width:100%;box-sizing:border-box;letter-spacing:.1em}
+button{margin-top:12px;padding:10px 24px;font-size:1em;cursor:pointer}</style></head>
+<body><h2>NAV Etterlevelse MCP</h2>
+<p>Skriv inn engangskoden fra terminalen:</p>
+<form method="GET" action="/device">
+<input type="text" name="user_code" placeholder="XXXX-XXXX" autocomplete="off" autofocus />
+<br/><button type="submit">Logg inn</button>
+</form></body></html>`);
+      return;
+    }
+
+    const deviceCode = authStore.getDeviceCodeByUserCode(userCode);
+    const session = deviceCode ? authStore.getDeviceAuthSession(deviceCode) : undefined;
+
+    if (!deviceCode || !session || session.status !== 'pending') {
+      res.type('html').send(`<!DOCTYPE html><html lang="no"><head><meta charset="UTF-8">
+<title>Ugyldig kode</title></head><body style="font-family:sans-serif;max-width:400px;margin:80px auto">
+<h2>⚠️ Ugyldig eller utløpt kode</h2>
+<p>Koden er ugyldig, allerede brukt eller utløpt (10 min).</p>
+<p><a href="/device">Prøv igjen</a></p></body></html>`);
+      return;
+    }
+
+    const internalState = randomToken();
+    authStore.saveAuthSession(internalState, {
+      clientId: session.clientId,
+      redirectUri: `${config.baseUrl}/device/complete`,
+      codeChallenge: '',
+      codeChallengeMethod: 'S256',
+      deviceCode,
+    });
+
+    const azureAuthorizeUrl = new URL(getAzureAuthorizeEndpoint());
+    azureAuthorizeUrl.searchParams.set('client_id', config.azure.clientId);
+    azureAuthorizeUrl.searchParams.set('response_type', 'code');
+    azureAuthorizeUrl.searchParams.set('redirect_uri', getOAuthCallbackUrl());
+    azureAuthorizeUrl.searchParams.set('scope', config.azure.etterlevelseScope);
+    azureAuthorizeUrl.searchParams.set('state', internalState);
+
+    res.redirect(302, azureAuthorizeUrl.toString());
   });
 
   app.options('/register', (_req, res) => {
@@ -401,21 +489,35 @@ export function registerOAuthRoutes(app: Express): void {
 
       const mcpAccessToken = randomToken();
       const mcpRefreshToken = randomToken();
-      const mcpAuthorizationCode = randomToken();
-
       authStore.saveMcpSession(mcpAccessToken, mcpRefreshToken, session.clientId, tokenData);
-      authStore.saveAuthCode(
-        mcpAuthorizationCode,
-        buildAuthCodeRecord(session, mcpAccessToken, mcpRefreshToken),
-      );
 
-      const redirectTarget = new URL(session.redirectUri);
-      redirectTarget.searchParams.set('code', mcpAuthorizationCode);
-      if (session.clientState) {
-        redirectTarget.searchParams.set('state', session.clientState);
+      if (session.deviceCode) {
+        // Device code flow: marker sesjonen som fullført og vis bekreftelsesside.
+        // Klienten vil plukke opp tokenet neste gang den poller /oauth/token.
+        authStore.completeDeviceAuth(session.deviceCode, mcpAccessToken, mcpRefreshToken);
+        const email = tokenData.userEmail || tokenData.userName || 'ukjent bruker';
+        res.type('html').send(`<!DOCTYPE html><html lang="no"><head><meta charset="UTF-8">
+<title>Innlogging vellykket</title>
+<style>body{font-family:sans-serif;max-width:400px;margin:80px auto;padding:0 20px}
+h2{color:#007bff}</style></head>
+<body><h2>✅ Innlogging vellykket</h2>
+<p>Innlogget som: <strong>${email}</strong></p>
+<p>Du kan lukke dette vinduet og gå tilbake til terminalen.</p></body></html>`);
+      } else {
+        // Authorization code flow: redirect tilbake til MCP-klienten.
+        const mcpAuthorizationCode = randomToken();
+        authStore.saveAuthCode(
+          mcpAuthorizationCode,
+          buildAuthCodeRecord(session, mcpAccessToken, mcpRefreshToken),
+        );
+
+        const redirectTarget = new URL(session.redirectUri);
+        redirectTarget.searchParams.set('code', mcpAuthorizationCode);
+        if (session.clientState) {
+          redirectTarget.searchParams.set('state', session.clientState);
+        }
+        res.redirect(302, redirectTarget.toString());
       }
-
-      res.redirect(302, redirectTarget.toString());
     } catch (error) {
       console.error('OAuth callback error', error);
       res.status(500).send('Kunne ikke fullføre OAuth-innloggingen');
@@ -530,6 +632,49 @@ export function registerOAuthRoutes(app: Express): void {
         token_type: 'Bearer',
         expires_in: mcpAccessTokenTtlSeconds,
         refresh_token: newRefreshToken,
+        refresh_token_expires_in: mcpRefreshTokenTtlSeconds,
+        scope: mcpScope,
+      });
+      return;
+    }
+
+    if (grantType === 'urn:ietf:params:oauth:grant-type:device_code') {
+      const deviceCode = bodyString(req.body, 'device_code');
+      if (!deviceCode) {
+        sendJsonError(res, 400, 'invalid_request', 'device_code is required');
+        return;
+      }
+
+      const deviceSession = authStore.getDeviceAuthSession(deviceCode);
+      if (!deviceSession) {
+        sendJsonError(res, 400, 'expired_token', 'The device code has expired or is invalid');
+        return;
+      }
+
+      if (deviceSession.clientId !== clientId) {
+        sendJsonError(res, 400, 'invalid_grant', 'Device code does not belong to this client');
+        return;
+      }
+
+      if (deviceSession.status === 'pending') {
+        sendJsonError(res, 400, 'authorization_pending', 'The user has not yet completed authorization');
+        return;
+      }
+
+      // status === 'complete': hent tokens og forbruk device_code (engangsbruk)
+      const { mcpAccessToken, mcpRefreshToken } = deviceSession;
+      if (!mcpAccessToken || !mcpRefreshToken) {
+        sendJsonError(res, 500, 'server_error', 'Device auth complete but tokens missing');
+        return;
+      }
+
+      authStore.consumeDeviceAuth(deviceCode);
+
+      res.json({
+        access_token: mcpAccessToken,
+        token_type: 'Bearer',
+        expires_in: mcpAccessTokenTtlSeconds,
+        refresh_token: mcpRefreshToken,
         refresh_token_expires_in: mcpRefreshTokenTtlSeconds,
         scope: mcpScope,
       });
