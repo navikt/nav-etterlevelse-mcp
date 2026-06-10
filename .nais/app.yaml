@@ -40,9 +40,15 @@ spec:
         - host: etterlevelse-api.intern.nav.no
         - host: behandlingskatalog-backend.intern.nav.no
         - host: login.microsoftonline.com
+        - host: graph.microsoft.com
   azure:
     application:
       enabled: true
       allowAllUsers: true
       replyURLs:
         - https://nav-etterlevelse-mcp.intern.nav.no/oauth/callback
+      claims:
+        extra:
+          - NAVident
+        groups:
+          - id: "*"  # alle grupper brukeren er direkte medlem av inkluderes i groups-claim

@@ -26,6 +26,7 @@ interface JwtClaims {
   email?: string;
   upn?: string;
   unique_name?: string;
+  groups?: string[];
 }
 
 function firstQueryValue(value: unknown): string | undefined {
@@ -120,12 +121,13 @@ function parseJwtClaims(token: string | undefined): JwtClaims {
   }
 }
 
-function getUserIdentity(tokenResponse: AzureTokenResponse): Pick<McpTokenData, 'userEmail' | 'userName'> {
+function getUserIdentity(tokenResponse: AzureTokenResponse): Pick<McpTokenData, 'userEmail' | 'userName' | 'userGroups'> {
   const claims = parseJwtClaims(tokenResponse.id_token ?? tokenResponse.access_token);
   return {
     userEmail:
       claims.preferred_username ?? claims.email ?? claims.upn ?? claims.unique_name ?? 'ukjent@nav.no',
     userName: claims.name ?? claims.preferred_username ?? 'Ukjent bruker',
+    userGroups: Array.isArray(claims.groups) ? claims.groups : [],
   };
 }
 

@@ -21,6 +21,12 @@ export interface McpTokenData {
   azureExpiresAt: number;
   userEmail: string;
   userName: string;
+  /** Entra ID gruppe-UUID-er fra groups-claim i Azure AD-token. Brukes for team-eiersjekk ved lock_document. */
+  userGroups: string[];
+  /** UUID for etterlevelseDokumentasjonen sesjonen er låst til for skriveoperasjoner. */
+  lockedDocumentId?: string;
+  /** Tittel på det låste dokumentet — brukes i feilmeldinger. */
+  lockedDocumentTitle?: string;
 }
 
 export interface ClientRegistration {
@@ -136,6 +142,15 @@ class InMemoryAuthStore {
 
   deleteMcpToken(accessToken: string): void {
     this.mcpTokens.delete(accessToken);
+  }
+
+  updateMcpToken(accessToken: string, updates: Partial<McpTokenData>): boolean {
+    const entry = this.mcpTokens.get(accessToken);
+    if (!entry || entry.expiresAt <= Date.now()) {
+      return false;
+    }
+    entry.value = { ...entry.value, ...updates };
+    return true;
   }
 
   private withTtl<T>(value: T, ttlSeconds: number): TimedEntry<T> {

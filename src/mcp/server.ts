@@ -3,16 +3,24 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { BehandlingskatalogClient } from '../api/behandlingskatalogClient.js';
 import { EtterlevelseClient } from '../api/etterlevelseClient.js';
+import { GraphClient } from '../api/graphClient.js';
 import { mcpServerInfo } from '../config.js';
+import { authStore, type McpTokenData } from '../auth/store.js';
 import { registerBehandlingskatalogTools } from './tools/behandlingskatalog.js';
 import { registerEtterlevelseTools } from './tools/etterlevelse.js';
 
-export function createMcpServer(etterlevelseToken: string, bkToken: string): McpServer {
-  const server = new McpServer(mcpServerInfo);
-  const etterlevelseClient = new EtterlevelseClient(etterlevelseToken);
-  const behandlingskatalogClient = new BehandlingskatalogClient(bkToken);
+export interface SessionContext {
+  tokenData: McpTokenData;
+  mcpAccessToken: string;
+  etterlevelseClient: EtterlevelseClient;
+  graphClient: GraphClient;
+}
 
-  registerEtterlevelseTools(server, etterlevelseClient);
+export function createMcpServer(ctx: SessionContext): McpServer {
+  const server = new McpServer(mcpServerInfo);
+  const behandlingskatalogClient = new BehandlingskatalogClient(ctx.tokenData.bkToken);
+
+  registerEtterlevelseTools(server, ctx);
   registerBehandlingskatalogTools(server, behandlingskatalogClient);
 
   return server;
@@ -21,9 +29,16 @@ export function createMcpServer(etterlevelseToken: string, bkToken: string): Mcp
 export async function handleMcpHttpRequest(
   req: Request,
   res: Response,
-  tokens: { etterlevelseToken: string; bkToken: string },
+  tokens: { etterlevelseToken: string; bkToken: string; tokenData: McpTokenData; mcpAccessToken: string },
 ): Promise<void> {
-  const server = createMcpServer(tokens.etterlevelseToken, tokens.bkToken);
+  const ctx: SessionContext = {
+    tokenData: tokens.tokenData,
+    mcpAccessToken: tokens.mcpAccessToken,
+    etterlevelseClient: new EtterlevelseClient(tokens.etterlevelseToken),
+    graphClient: new GraphClient(tokens.etterlevelseToken),
+  };
+
+  const server = createMcpServer(ctx);
   const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
 
   let cleanedUp = false;

@@ -16,10 +16,12 @@ app.get('/health', (_req, res) => {
 });
 
 const mcpHandler = async (req: Request, res: Response): Promise<void> => {
-  const { tokenData } = res.locals as AuthenticatedLocals;
+  const { tokenData, mcpAccessToken } = res.locals as AuthenticatedLocals;
   await handleMcpHttpRequest(req, res, {
     etterlevelseToken: tokenData.etterlevelseToken,
     bkToken: tokenData.bkToken,
+    tokenData,
+    mcpAccessToken,
   });
 };
 
