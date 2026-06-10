@@ -23,6 +23,27 @@ function extractArray<T>(payload: unknown): T[] {
   return [];
 }
 
+function asString(value: unknown): string | undefined {
+  if (typeof value === 'string') {
+    return value;
+  }
+  if (typeof value === 'number') {
+    return String(value);
+  }
+  return undefined;
+}
+
+function asNumber(value: unknown): number | undefined {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === 'string' && value.trim() !== '') {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  }
+  return undefined;
+}
+
 function toolResult(data: unknown) {
   return {
     content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }],
@@ -56,14 +77,14 @@ const writeAnnotations = {
   openWorldHint: false,
 };
 
-function requireDocumentLock(ctx: SessionContext, targetDocumentId: string) {
+function requireDocumentLock(ctx: SessionContext, targetDocumentId?: string) {
   const { lockedDocumentId, lockedDocumentTitle } = ctx.tokenData;
   if (!lockedDocumentId) {
     return toolError(
       'Ingen dokumentlås aktiv. Kall lock_document(etterlevelseDokumentasjonId) først.',
     );
   }
-  if (lockedDocumentId !== targetDocumentId) {
+  if (targetDocumentId && lockedDocumentId !== targetDocumentId) {
     return toolError(
       `Sesjonen er låst til "${lockedDocumentTitle ?? lockedDocumentId}". ` +
         'Kall lock_document på nytt hvis du vil bytte dokument.',
@@ -124,6 +145,95 @@ function boxSection(title: string, content: string, width = 76): string {
     .map((line) => `│${line.padEnd(width - 2)}│`)
     .join('\n');
   return `┌─ ${title} ${bar}┐\n${lines}\n└${'─'.repeat(width - 2)}┘`;
+}
+
+function cleanText(value: unknown, fallback = ''): string {
+  const text = asString(value);
+  return text ? stripHtml(text).trim() : fallback;
+}
+
+function formatScalar(value: unknown): string | undefined {
+  if (typeof value === 'boolean') {
+    return value ? 'Ja' : 'Nei';
+  }
+
+  const number = asNumber(value);
+  if (number !== undefined) {
+    return String(number);
+  }
+
+  const text = asString(value);
+  if (!text) {
+    return undefined;
+  }
+
+  const sanitized = stripHtml(text).trim();
+  return sanitized || undefined;
+}
+
+function formatField(label: string, value: unknown): string | null {
+  const formatted = formatScalar(value);
+  return formatted ? `${label}: ${formatted}` : null;
+}
+
+function normalizeRisikoscenario(raw: unknown) {
+  const scenario = isRecord(raw) ? raw : {};
+  return {
+    id: asString(scenario.id) ?? '',
+    navn: cleanText(scenario.navn ?? scenario.name, 'Uten navn'),
+    beskrivelse: cleanText(scenario.beskrivelse),
+    sannsynlighetsNivaa: asNumber(scenario.sannsynlighetsNivaa),
+    sannsynlighetsNivaaBegrunnelse: cleanText(scenario.sannsynlighetsNivaaBegrunnelse),
+    konsekvensNivaa: asNumber(scenario.konsekvensNivaa),
+    konsekvensNivaaBegrunnelse: cleanText(scenario.konsekvensNivaaBegrunnelse),
+    ingenTiltak: typeof scenario.ingenTiltak === 'boolean' ? scenario.ingenTiltak : undefined,
+  };
+}
+
+function formatRisikoscenarioSection(raw: unknown, index?: number): string {
+  const scenario = normalizeRisikoscenario(raw);
+  const title =
+    index !== undefined ? `RISIKOSCENARIO ${index}` : scenario.navn || 'RISIKOSCENARIO';
+  const lines = [
+    formatField('Id', scenario.id),
+    formatField('Navn', scenario.navn),
+    formatField('Beskrivelse', scenario.beskrivelse || '(tom)'),
+    formatField('Sannsynlighet', scenario.sannsynlighetsNivaa),
+    formatField('Begrunnelse sannsynlighet', scenario.sannsynlighetsNivaaBegrunnelse),
+    formatField('Konsekvens', scenario.konsekvensNivaa),
+    formatField('Begrunnelse konsekvens', scenario.konsekvensNivaaBegrunnelse),
+    formatField('Ingen tiltak', scenario.ingenTiltak),
+  ].filter((line): line is string => Boolean(line));
+
+  return boxSection(title, lines.join('\n'));
+}
+
+function normalizeTiltak(raw: unknown) {
+  const tiltak = isRecord(raw) ? raw : {};
+  return {
+    id: asString(tiltak.id) ?? '',
+    risikoscenarioId: asString(tiltak.risikoscenarioId) ?? '',
+    pvkDokumentId: asString(tiltak.pvkDokumentId) ?? '',
+    navn: cleanText(tiltak.navn ?? tiltak.name, 'Uten navn'),
+    beskrivelse: cleanText(tiltak.beskrivelse),
+    ansvarlig: cleanText(tiltak.ansvarlig),
+    frist: cleanText(tiltak.frist),
+  };
+}
+
+function formatTiltakSection(raw: unknown): string {
+  const tiltak = normalizeTiltak(raw);
+  const lines = [
+    formatField('Id', tiltak.id),
+    formatField('RisikoscenarioId', tiltak.risikoscenarioId),
+    formatField('PVK-dokumentId', tiltak.pvkDokumentId),
+    formatField('Navn', tiltak.navn),
+    formatField('Beskrivelse', tiltak.beskrivelse || '(tom)'),
+    formatField('Ansvarlig', tiltak.ansvarlig),
+    formatField('Frist', tiltak.frist),
+  ].filter((line): line is string => Boolean(line));
+
+  return boxSection('TILTAK', lines.join('\n'));
 }
 
 export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext): void {
@@ -281,8 +391,15 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
           );
         }
 
+        const pvkDokument = await client.getPvkDokument(etterlevelseDokumentasjonId);
+        const lockedPvkDokumentId =
+          pvkDokument && isRecord(pvkDokument) && typeof pvkDokument.id === 'string'
+            ? pvkDokument.id
+            : undefined;
+
         const updated = authStore.updateMcpToken(ctx.mcpAccessToken, {
           lockedDocumentId: etterlevelseDokumentasjonId,
+          lockedPvkDokumentId,
           lockedDocumentTitle: title,
         });
 
@@ -294,8 +411,107 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
           locked: true,
           documentId: etterlevelseDokumentasjonId,
           documentTitle: title,
+          pvkDokumentId: lockedPvkDokumentId ?? null,
           teamMatch: match.teamName,
           message: `Sesjonen er nå låst til "${title}". Skriveoperasjoner er begrenset til dette dokumentet.`,
+        });
+      } catch (error) {
+        return toolError(error);
+      }
+    },
+  );
+
+  server.registerTool(
+    'get_pvk_dokument',
+    {
+      description:
+        'Hent PVK-dokumentet knyttet til det låste etterlevelsesdokumentet. Returnerer pvkDokumentId, status og nøkkelfelter.',
+      inputSchema: {},
+      annotations: readOnlyAnnotations,
+    },
+    async () => {
+      const guardError = requireDocumentLock(ctx);
+      if (guardError) {
+        return guardError;
+      }
+
+      const lockedDocumentId = ctx.tokenData.lockedDocumentId as string;
+      const lockedDocumentTitle = ctx.tokenData.lockedDocumentTitle ?? lockedDocumentId;
+
+      try {
+        const pvkDokument = await client.getPvkDokument(lockedDocumentId);
+        if (!pvkDokument || !isRecord(pvkDokument)) {
+          return toolResult({
+            preview:
+              `Ingen PVK-dokument funnet for "${lockedDocumentTitle}". ` +
+              'Opprett PVK-dokument i etterlevelse.ansatt.nav.no først.',
+            found: false,
+            etterlevelseDokumentasjonId: lockedDocumentId,
+          });
+        }
+
+        const summaryLines = [
+          formatField('Etterlevelsesdokument', lockedDocumentTitle),
+          formatField('PVK-dokumentId', pvkDokument.id),
+          formatField('Status', pvkDokument.status),
+          formatField('BehandlingId', pvkDokument.behandlingId),
+          formatField('PVO involvert', pvkDokument.pvoInvolveres),
+          formatField('Har personopplysningsoversikt', pvkDokument.harPersonopplysningsoversikt),
+          formatField('Sist endret', pvkDokument.sistEndret ?? pvkDokument.sistEndretDato),
+        ].filter((line): line is string => Boolean(line));
+
+        return toolResult({
+          preview: boxSection('PVK-DOKUMENT', summaryLines.join('\n')),
+          found: true,
+          etterlevelseDokumentasjonId: lockedDocumentId,
+          pvkDokumentId: asString(pvkDokument.id) ?? null,
+          status: asString(pvkDokument.status) ?? null,
+          pvkDokument,
+        });
+      } catch (error) {
+        return toolError(error);
+      }
+    },
+  );
+
+  server.registerTool(
+    'list_risikoscenarioer',
+    {
+      description: 'List alle risikoscenarioer for det låste PVK-dokumentet.',
+      inputSchema: {},
+      annotations: readOnlyAnnotations,
+    },
+    async () => {
+      const guardError = requireDocumentLock(ctx);
+      if (guardError) {
+        return guardError;
+      }
+
+      const { lockedPvkDokumentId } = ctx.tokenData;
+      if (!lockedPvkDokumentId) {
+        return toolError(
+          'Ingen PVK-dokument funnet for dette etterlevelsesdokumentet. Opprett PVK-dokument i etterlevelse.ansatt.nav.no først.',
+        );
+      }
+
+      try {
+        const scenariosRaw = await client.getRisikoscenarioer(lockedPvkDokumentId);
+        const scenarios = scenariosRaw.map((scenario) => normalizeRisikoscenario(scenario));
+        const preview =
+          scenarios.length > 0
+            ? [
+                `PVK-dokumentId: ${lockedPvkDokumentId}`,
+                `Antall risikoscenarioer: ${scenarios.length}`,
+                '',
+                ...scenarios.map((scenario, index) => formatRisikoscenarioSection(scenario, index + 1)),
+              ].join('\n\n')
+            : `PVK-dokument ${lockedPvkDokumentId} har ingen risikoscenarioer enda.`;
+
+        return toolResult({
+          preview,
+          pvkDokumentId: lockedPvkDokumentId,
+          count: scenarios.length,
+          scenarios,
         });
       } catch (error) {
         return toolError(error);
@@ -434,32 +650,135 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
   );
 
   server.registerTool(
-    'write_pvk_risikoscenario',
+    'write_risikoscenario',
     {
       description:
-        '[IKKE AKTIVERT] Skriv/oppdater et PVK-risikoscenario. ' +
-        'Krever at lock_document er kalt først.',
+        'Opprett eller oppdater et risikoscenario i PVK-dokumentet. Krever aktiv sesjonslås (kall lock_document først).',
       inputSchema: {
-        etterlevelseDokumentasjonId: z
-          .string()
-          .min(1)
-          .describe('UUID for dokumentasjonen — må matche låst dokument'),
-        scenarioId: z.string().min(1).describe('UUID for risikoscenarioet'),
-        beskrivelse: z.string().describe('Beskrivelse av risikoscenarioet'),
-        tiltak: z.string().optional().describe('Tiltak for å redusere risikoen'),
+        scenarioId: z.string().uuid().optional().describe('UUID for risikoscenarioet ved oppdatering'),
+        navn: z.string().min(1).describe('Kort navn på risikoscenarioet'),
+        beskrivelse: z.string().min(1).describe('Beskrivelse av risikoscenarioet'),
+        sannsynlighetsNivaa: z.number().int().min(1).max(5).optional(),
+        sannsynlighetsNivaaBegrunnelse: z.string().optional(),
+        konsekvensNivaa: z.number().int().min(1).max(5).optional(),
+        konsekvensNivaaBegrunnelse: z.string().optional(),
+        ingenTiltak: z.boolean().optional(),
       },
       annotations: writeAnnotations,
     },
-    async ({ etterlevelseDokumentasjonId }) => {
-      const guardError = requireDocumentLock(ctx, etterlevelseDokumentasjonId);
+    async ({
+      scenarioId,
+      navn,
+      beskrivelse,
+      sannsynlighetsNivaa,
+      sannsynlighetsNivaaBegrunnelse,
+      konsekvensNivaa,
+      konsekvensNivaaBegrunnelse,
+      ingenTiltak,
+    }) => {
+      const guardError = requireDocumentLock(ctx);
       if (guardError) {
         return guardError;
       }
 
-      return toolError(
-        'write_pvk_risikoscenario er ikke aktivert enda. ' +
-          'PVK write-API er under kartlegging.',
-      );
+      const { lockedPvkDokumentId } = ctx.tokenData;
+      if (!lockedPvkDokumentId) {
+        return toolError(
+          'Ingen PVK-dokument funnet for dette etterlevelsesdokumentet. Opprett PVK-dokument i etterlevelse.ansatt.nav.no først.',
+        );
+      }
+
+      const request = {
+        pvkDokumentId: lockedPvkDokumentId,
+        navn,
+        beskrivelse,
+        ...(sannsynlighetsNivaa !== undefined ? { sannsynlighetsNivaa } : {}),
+        ...(sannsynlighetsNivaaBegrunnelse !== undefined
+          ? { sannsynlighetsNivaaBegrunnelse }
+          : {}),
+        ...(konsekvensNivaa !== undefined ? { konsekvensNivaa } : {}),
+        ...(konsekvensNivaaBegrunnelse !== undefined ? { konsekvensNivaaBegrunnelse } : {}),
+        ...(ingenTiltak !== undefined ? { ingenTiltak } : {}),
+      };
+
+      try {
+        const result = scenarioId
+          ? await client.updateRisikoscenario(scenarioId, { id: scenarioId, ...request })
+          : await client.createRisikoscenario(request);
+        const scenario = normalizeRisikoscenario(
+          isRecord(result) ? result : { id: scenarioId, ...request },
+        );
+
+        return toolResult({
+          preview: formatRisikoscenarioSection(scenario),
+          action: scenarioId ? 'updated' : 'created',
+          pvkDokumentId: lockedPvkDokumentId,
+          scenario,
+          result,
+        });
+      } catch (error) {
+        return toolError(error);
+      }
+    },
+  );
+
+  server.registerTool(
+    'write_tiltak',
+    {
+      description:
+        'Opprett eller oppdater et tiltak for et risikoscenario. Krever aktiv sesjonslås (kall lock_document først).',
+      inputSchema: {
+        risikoscenarioId: z.string().uuid().describe('UUID for risikoscenarioet tiltaket tilhører'),
+        tiltakId: z.string().uuid().optional().describe('UUID for tiltaket ved oppdatering'),
+        navn: z.string().min(1).describe('Kort navn på tiltaket'),
+        beskrivelse: z.string().min(1).describe('Beskrivelse av tiltaket'),
+        ansvarlig: z.string().optional().describe('NAVident for ansvarlig'),
+        frist: z
+          .string()
+          .regex(/^\d{4}-\d{2}-\d{2}$/)
+          .optional()
+          .describe('Frist på format YYYY-MM-DD'),
+      },
+      annotations: writeAnnotations,
+    },
+    async ({ risikoscenarioId, tiltakId, navn, beskrivelse, ansvarlig, frist }) => {
+      const guardError = requireDocumentLock(ctx);
+      if (guardError) {
+        return guardError;
+      }
+
+      const { lockedPvkDokumentId } = ctx.tokenData;
+      if (!lockedPvkDokumentId) {
+        return toolError(
+          'Ingen PVK-dokument funnet for dette etterlevelsesdokumentet. Opprett PVK-dokument i etterlevelse.ansatt.nav.no først.',
+        );
+      }
+
+      const request = {
+        pvkDokumentId: lockedPvkDokumentId,
+        risikoscenarioId,
+        navn,
+        beskrivelse,
+        ...(ansvarlig !== undefined ? { ansvarlig } : {}),
+        ...(frist !== undefined ? { frist } : {}),
+      };
+
+      try {
+        const result = tiltakId
+          ? await client.updateTiltak(tiltakId, { id: tiltakId, ...request })
+          : await client.createTiltak(risikoscenarioId, request);
+        const tiltak = normalizeTiltak(isRecord(result) ? result : { id: tiltakId, ...request });
+
+        return toolResult({
+          preview: formatTiltakSection(tiltak),
+          action: tiltakId ? 'updated' : 'created',
+          pvkDokumentId: lockedPvkDokumentId,
+          tiltak,
+          result,
+        });
+      } catch (error) {
+        return toolError(error);
+      }
     },
   );
 }

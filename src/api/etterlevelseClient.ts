@@ -85,6 +85,10 @@ function matchesJsonFilter(value: unknown, filter: string | undefined): boolean 
   return JSON.stringify(value).toLowerCase().includes(filter.toLowerCase());
 }
 
+function isNotFoundError(error: unknown): boolean {
+  return error instanceof Error && error.message.includes('Etterlevelse API svarte 404');
+}
+
 export class EtterlevelseClient {
   constructor(
     private readonly accessToken: string,
@@ -333,5 +337,59 @@ export class EtterlevelseClient {
     }
 
     return this.post('/etterlevelse', body);
+  }
+
+  async getPvkDokument(etterlevelseDokumentasjonId: string): Promise<unknown | null> {
+    try {
+      return await this.get(`/pvkdokument/etterlevelsedokument/${etterlevelseDokumentasjonId}`);
+    } catch (error) {
+      if (isNotFoundError(error)) {
+        return null;
+      }
+      throw error;
+    }
+  }
+
+  async getRisikoscenarioer(pvkDokumentId: string): Promise<unknown[]> {
+    const payload = await this.get(`/risikoscenario/pvkdokument/${pvkDokumentId}/ALL`);
+    return extractArray(payload);
+  }
+
+  async getRisikoscenario(id: string): Promise<unknown | null> {
+    try {
+      return await this.get(`/risikoscenario/${id}`);
+    } catch (error) {
+      if (isNotFoundError(error)) {
+        return null;
+      }
+      throw error;
+    }
+  }
+
+  async createRisikoscenario(request: object): Promise<unknown> {
+    return this.post('/risikoscenario', request);
+  }
+
+  async updateRisikoscenario(id: string, request: object): Promise<unknown> {
+    return this.put(`/risikoscenario/${id}`, request);
+  }
+
+  async createTiltak(risikoscenarioId: string, request: object): Promise<unknown> {
+    return this.post(`/tiltak/risikoscenario/${risikoscenarioId}`, request);
+  }
+
+  async updateTiltak(id: string, request: object): Promise<unknown> {
+    return this.put(`/tiltak/${id}`, request);
+  }
+
+  async getTiltak(id: string): Promise<unknown | null> {
+    try {
+      return await this.get(`/tiltak/${id}`);
+    } catch (error) {
+      if (isNotFoundError(error)) {
+        return null;
+      }
+      throw error;
+    }
   }
 }

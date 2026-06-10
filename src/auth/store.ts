@@ -25,6 +25,8 @@ export interface McpTokenData {
   userGroups: string[];
   /** UUID for etterlevelseDokumentasjonen sesjonen er låst til for skriveoperasjoner. */
   lockedDocumentId?: string;
+  /** UUID for PVK-dokumentet knyttet til låst etterlevelsesdokumentasjon, hvis det finnes. */
+  lockedPvkDokumentId?: string;
   /** Tittel på det låste dokumentet — brukes i feilmeldinger. */
   lockedDocumentTitle?: string;
 }
@@ -149,7 +151,7 @@ class InMemoryAuthStore {
     if (!entry || entry.expiresAt <= Date.now()) {
       return false;
     }
-    entry.value = { ...entry.value, ...updates };
+    Object.assign(entry.value, updates);
     return true;
   }
 

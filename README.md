@@ -27,8 +27,12 @@ og serveren holder tokenene i minne for sesjonen.
 | `get_krav` | Etterlevelse |
 | `get_etterlevelse` | Etterlevelse |
 | `lock_document` | Etterlevelse |
+| `get_pvk_dokument` | Etterlevelse |
+| `list_risikoscenarioer` | Etterlevelse |
 | `preview_etterlevelse_write` | Etterlevelse |
 | `write_etterlevelse` | Etterlevelse |
+| `write_risikoscenario` | Etterlevelse |
+| `write_tiltak` | Etterlevelse |
 | `search_behandlinger` | Behandlingskatalog |
 | `get_behandling` | Behandlingskatalog |
 | `get_processor` | Behandlingskatalog |
@@ -38,6 +42,9 @@ Skriveflyten er to-faset:
 1. `lock_document` låser dokumentet for MCP-sesjonen.
 2. `preview_etterlevelse_write` henter kravkontekst og viser formatert forhåndsvisning.
 3. `write_etterlevelse` bruker et enkeltgangstoken (15 min TTL) etter eksplisitt bekreftelse.
+
+PVK-tools bruker samme dokumentlås. `lock_document` cacher eventuelt tilknyttet PVK-dokument, og
+`write_risikoscenario` / `write_tiltak` skriver kun innenfor det låste PVK-dokumentet.
 
 `OPPFYLT` / `FERDIG` settes fortsatt manuelt i etterlevelse.ansatt.nav.no etter menneskelig gjennomgang.
 
