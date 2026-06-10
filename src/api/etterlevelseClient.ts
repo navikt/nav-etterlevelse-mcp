@@ -89,6 +89,12 @@ function isNotFoundError(error: unknown): boolean {
   return error instanceof Error && error.message.includes('Etterlevelse API svarte 404');
 }
 
+export interface BehandlingensLivsloepFil {
+  navn: string;
+  type: 'image/png' | 'image/jpeg' | 'application/pdf';
+  innhold: string;
+}
+
 export class EtterlevelseClient {
   constructor(
     private readonly accessToken: string,
@@ -348,6 +354,131 @@ export class EtterlevelseClient {
       }
       throw error;
     }
+  }
+
+  async getPvkDokumentById(pvkDokumentId: string): Promise<unknown> {
+    return this.get(`/pvkdokument/${pvkDokumentId}`);
+  }
+
+  async patchPvkDokument(pvkDokumentId: string, patch: Record<string, unknown>): Promise<unknown> {
+    const existing = await this.getPvkDokumentById(pvkDokumentId);
+    if (!isRecord(existing)) {
+      throw new Error(`Fant ikke PVK-dokument med id ${pvkDokumentId}`);
+    }
+
+    const body = {
+      ...existing,
+      ...patch,
+      id: asString(existing.id) ?? pvkDokumentId,
+      update: true,
+    };
+
+    return this.put(`/pvkdokument/${pvkDokumentId}`, body);
+  }
+
+  async getBehandlingensLivsloep(etterlevelseDokumentasjonId: string): Promise<unknown | null> {
+    try {
+      return await this.get(`/behandlingenslivslop/etterlevelsedokument/${etterlevelseDokumentasjonId}`);
+    } catch (error) {
+      if (isNotFoundError(error)) {
+        return null;
+      }
+      throw error;
+    }
+  }
+
+  async upsertBehandlingensLivsloep(
+    etterlevelseDokumentasjonId: string,
+    beskrivelse: string,
+    filer?: BehandlingensLivsloepFil[],
+  ): Promise<unknown> {
+    const existing = await this.getBehandlingensLivsloep(etterlevelseDokumentasjonId);
+    const existingId =
+      existing && isRecord(existing) && typeof existing.id === 'string' ? existing.id : undefined;
+    const isUpdate = Boolean(existingId);
+
+    const reqBody: Record<string, unknown> = {
+      etterlevelseDokumentasjonId,
+      beskrivelse,
+      update: isUpdate,
+      ...(existingId ? { id: existingId } : {}),
+    };
+
+    const formData = new FormData();
+    formData.append('request', new Blob([JSON.stringify(reqBody)], { type: 'application/json' }));
+
+    // Backend merge semantics for PUT without filer parts may require callers to resend files
+    // when existing attachments must be preserved.
+    for (const fil of filer ?? []) {
+      formData.append(
+        'filer',
+        new Blob([Buffer.from(fil.innhold, 'base64')], { type: fil.type }),
+        fil.navn,
+      );
+    }
+
+    const url = new URL(
+      isUpdate
+        ? `${this.baseUrl}/behandlingenslivslop/${existingId}`
+        : `${this.baseUrl}/behandlingenslivslop`,
+    );
+    const response = await fetch(url, {
+      method: isUpdate ? 'PUT' : 'POST',
+      headers: {
+        Accept: 'application/json',
+        Authorization: `Bearer ${this.accessToken}`,
+      },
+      body: formData,
+    });
+
+    const bodyText = await response.text();
+    if (!response.ok) {
+      throw new Error(`Etterlevelse API svarte ${response.status}: ${bodyText}`);
+    }
+
+    if (!bodyText) {
+      return null;
+    }
+
+    try {
+      return JSON.parse(bodyText) as unknown;
+    } catch {
+      return bodyText;
+    }
+  }
+
+  async getBehandlingensArtOgOmfang(etterlevelseDokumentasjonId: string): Promise<unknown | null> {
+    try {
+      return await this.get(
+        `/behandlingens-art-og-omfang/etterlevelsedokument/${etterlevelseDokumentasjonId}`,
+      );
+    } catch (error) {
+      if (isNotFoundError(error)) {
+        return null;
+      }
+      throw error;
+    }
+  }
+
+  async upsertBehandlingensArtOgOmfang(
+    etterlevelseDokumentasjonId: string,
+    data: Record<string, unknown>,
+  ): Promise<unknown> {
+    const existing = await this.getBehandlingensArtOgOmfang(etterlevelseDokumentasjonId);
+    const existingId =
+      existing && isRecord(existing) && typeof existing.id === 'string' ? existing.id : undefined;
+    const isUpdate = Boolean(existingId);
+
+    const body = {
+      etterlevelseDokumentasjonId,
+      ...data,
+      update: isUpdate,
+      ...(existingId ? { id: existingId } : {}),
+    };
+
+    return isUpdate
+      ? this.put(`/behandlingens-art-og-omfang/${existingId}`, body)
+      : this.post('/behandlingens-art-og-omfang', body);
   }
 
   async getRisikoscenarioer(pvkDokumentId: string): Promise<unknown[]> {

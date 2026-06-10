@@ -77,6 +77,21 @@ const writeAnnotations = {
   openWorldHint: false,
 };
 
+const ytterligereEgenskaperCodes = [
+  'SYSTEMATIC_PROFILING',
+  'LARGE_SCALE_PROCESSING',
+  'SYSTEMATIC_MONITORING',
+  'SENSITIVE_DATA',
+  'LARGE_SCALE_SENSITIVE_DATA',
+  'AUTOMATED_DECISIONS',
+  'VULNERABLE_GROUPS',
+  'INNOVATIVE_TECHNOLOGY',
+  'ACCESS_CONTROL_RESTRICTION',
+] as const;
+
+const ytterligereEgenskaperDescription =
+  'Ytterligere DPIA-triggere. Gyldige koder: ' + ytterligereEgenskaperCodes.join(', ');
+
 function requireDocumentLock(ctx: SessionContext, targetDocumentId?: string) {
   const { lockedDocumentId, lockedDocumentTitle } = ctx.tokenData;
   if (!lockedDocumentId) {
@@ -176,6 +191,13 @@ function formatField(label: string, value: unknown): string | null {
   return formatted ? `${label}: ${formatted}` : null;
 }
 
+function formatListField(label: string, values: Array<string | undefined> | undefined): string | null {
+  const items = (values ?? [])
+    .map((value) => value?.trim())
+    .filter((value): value is string => Boolean(value));
+  return items.length > 0 ? `${label}: ${items.join(', ')}` : null;
+}
+
 function normalizeRisikoscenario(raw: unknown) {
   const scenario = isRecord(raw) ? raw : {};
   return {
@@ -186,6 +208,9 @@ function normalizeRisikoscenario(raw: unknown) {
     sannsynlighetsNivaaBegrunnelse: cleanText(scenario.sannsynlighetsNivaaBegrunnelse),
     konsekvensNivaa: asNumber(scenario.konsekvensNivaa),
     konsekvensNivaaBegrunnelse: cleanText(scenario.konsekvensNivaaBegrunnelse),
+    sannsynlighetsNivaaEtterTiltak: asNumber(scenario.sannsynlighetsNivaaEtterTiltak),
+    konsekvensNivaaEtterTiltak: asNumber(scenario.konsekvensNivaaEtterTiltak),
+    nivaaBegrunnelseEtterTiltak: cleanText(scenario.nivaaBegrunnelseEtterTiltak),
     ingenTiltak: typeof scenario.ingenTiltak === 'boolean' ? scenario.ingenTiltak : undefined,
   };
 }
@@ -202,6 +227,9 @@ function formatRisikoscenarioSection(raw: unknown, index?: number): string {
     formatField('Begrunnelse sannsynlighet', scenario.sannsynlighetsNivaaBegrunnelse),
     formatField('Konsekvens', scenario.konsekvensNivaa),
     formatField('Begrunnelse konsekvens', scenario.konsekvensNivaaBegrunnelse),
+    formatField('Sannsynlighet etter tiltak', scenario.sannsynlighetsNivaaEtterTiltak),
+    formatField('Konsekvens etter tiltak', scenario.konsekvensNivaaEtterTiltak),
+    formatField('Begrunnelse etter tiltak', scenario.nivaaBegrunnelseEtterTiltak),
     formatField('Ingen tiltak', scenario.ingenTiltak),
   ].filter((line): line is string => Boolean(line));
 
@@ -650,6 +678,313 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
   );
 
   server.registerTool(
+    'write_behandlingens_livsloep',
+    {
+      description:
+        'Opprett eller oppdater behandlingens livsløp for det låste etterlevelsesdokumentet. ' +
+        'Bruker multipart/form-data og kan sende vedlegg som base64.',
+      inputSchema: {
+        beskrivelse: z.string().describe('Beskrivelse av behandlingens livsløp (markdown)'),
+        filer: z
+          .array(
+            z.object({
+              navn: z.string().describe('Filnavn, f.eks. livsloep.png'),
+              type: z
+                .enum(['image/png', 'image/jpeg', 'application/pdf'])
+                .describe('MIME-type'),
+              innhold: z.string().describe('Base64-kodet filinnhold'),
+            }),
+          )
+          .optional()
+          .describe('Opptil 4 filer (PDF, PNG, JPG, maks 5 MB per fil). Erstatter eksisterende filer.'),
+      },
+      annotations: writeAnnotations,
+    },
+    async ({ beskrivelse, filer }) => {
+      const guardError = requireDocumentLock(ctx);
+      if (guardError) {
+        return guardError;
+      }
+
+      const lockedDocumentId = ctx.tokenData.lockedDocumentId as string;
+      const lockedDocumentTitle = ctx.tokenData.lockedDocumentTitle ?? lockedDocumentId;
+
+      try {
+        const result = await client.upsertBehandlingensLivsloep(lockedDocumentId, beskrivelse, filer);
+        const saved = isRecord(result) ? result : {};
+        const previewLines = [
+          formatField('Etterlevelsesdokument', lockedDocumentTitle),
+          formatField('LivsløpId', saved.id),
+          formatField('Beskrivelse', saved.beskrivelse ?? beskrivelse),
+          formatField('Antall vedlegg sendt', filer?.length ?? 0),
+          formatListField(
+            'Vedlegg',
+            filer?.map((fil) => fil.navn),
+          ),
+        ].filter((line): line is string => Boolean(line));
+        const note =
+          !filer || filer.length === 0
+            ? 'Merk: Ved PUT uten nye filer kan backend kreve at eksisterende vedlegg lastes opp på nytt for å bevares.'
+            : null;
+
+        return toolResult({
+          preview: [
+            boxSection('BEHANDLINGENS LIVSLØP', previewLines.join('\n')),
+            ...(note ? [boxSection('MERK', note)] : []),
+          ].join('\n\n'),
+          etterlevelseDokumentasjonId: lockedDocumentId,
+          behandlingensLivsloep: saved,
+          result,
+        });
+      } catch (error) {
+        return toolError(error);
+      }
+    },
+  );
+
+  server.registerTool(
+    'write_behandlingens_art_og_omfang',
+    {
+      description:
+        'Opprett eller oppdater behandlingens art og omfang for det låste etterlevelsesdokumentet.',
+      inputSchema: {
+        stemmerPersonkategorier: z
+          .boolean()
+          .optional()
+          .describe('Stemmer personkategoriene fra behandlingskatalogen?'),
+        personkategoriAntallBeskrivelse: z
+          .string()
+          .optional()
+          .describe('Beskrivelse av personkategorier og antall'),
+        tilgangsBeskrivelsePersonopplysningene: z
+          .string()
+          .optional()
+          .describe('Hvem har tilgang til personopplysningene?'),
+        lagringsBeskrivelsePersonopplysningene: z
+          .string()
+          .optional()
+          .describe('Hvor lagres og videresendes personopplysningene?'),
+      },
+      annotations: writeAnnotations,
+    },
+    async ({
+      stemmerPersonkategorier,
+      personkategoriAntallBeskrivelse,
+      tilgangsBeskrivelsePersonopplysningene,
+      lagringsBeskrivelsePersonopplysningene,
+    }) => {
+      const guardError = requireDocumentLock(ctx);
+      if (guardError) {
+        return guardError;
+      }
+
+      const lockedDocumentId = ctx.tokenData.lockedDocumentId as string;
+      const lockedDocumentTitle = ctx.tokenData.lockedDocumentTitle ?? lockedDocumentId;
+      const request = {
+        ...(stemmerPersonkategorier !== undefined ? { stemmerPersonkategorier } : {}),
+        ...(personkategoriAntallBeskrivelse !== undefined ? { personkategoriAntallBeskrivelse } : {}),
+        ...(tilgangsBeskrivelsePersonopplysningene !== undefined
+          ? { tilgangsBeskrivelsePersonopplysningene }
+          : {}),
+        ...(lagringsBeskrivelsePersonopplysningene !== undefined
+          ? { lagringsBeskrivelsePersonopplysningene }
+          : {}),
+      };
+
+      try {
+        const result = await client.upsertBehandlingensArtOgOmfang(lockedDocumentId, request);
+        const saved = isRecord(result) ? { ...request, ...result } : request;
+        const previewLines = [
+          formatField('Etterlevelsesdokument', lockedDocumentTitle),
+          formatField('Art og omfangId', isRecord(result) ? result.id : undefined),
+          formatField('Stemmer personkategorier', saved.stemmerPersonkategorier),
+          formatField(
+            'Personkategorier og antall',
+            saved.personkategoriAntallBeskrivelse,
+          ),
+          formatField(
+            'Tilgang til personopplysningene',
+            saved.tilgangsBeskrivelsePersonopplysningene,
+          ),
+          formatField(
+            'Lagring og videresending',
+            saved.lagringsBeskrivelsePersonopplysningene,
+          ),
+        ].filter((line): line is string => Boolean(line));
+
+        return toolResult({
+          preview: boxSection('BEHANDLINGENS ART OG OMFANG', previewLines.join('\n')),
+          etterlevelseDokumentasjonId: lockedDocumentId,
+          behandlingensArtOgOmfang: saved,
+          result,
+        });
+      } catch (error) {
+        return toolError(error);
+      }
+    },
+  );
+
+  server.registerTool(
+    'write_pvk_involvering',
+    {
+      description:
+        'Oppdater involveringsfelter på det låste PVK-dokumentet ved å hente eksisterende dokument og sende full PUT.',
+      inputSchema: {
+        harInvolvertRepresentant: z.boolean().optional(),
+        representantInvolveringsBeskrivelse: z.string().optional(),
+        harDatabehandlerRepresentantInvolvering: z.boolean().optional(),
+        dataBehandlerRepresentantInvolveringBeskrivelse: z.string().optional(),
+      },
+      annotations: writeAnnotations,
+    },
+    async ({
+      harInvolvertRepresentant,
+      representantInvolveringsBeskrivelse,
+      harDatabehandlerRepresentantInvolvering,
+      dataBehandlerRepresentantInvolveringBeskrivelse,
+    }) => {
+      const guardError = requireDocumentLock(ctx);
+      if (guardError) {
+        return guardError;
+      }
+
+      const { lockedPvkDokumentId } = ctx.tokenData;
+      if (!lockedPvkDokumentId) {
+        return toolError(
+          'Ingen PVK-dokument funnet for dette etterlevelsesdokumentet. Opprett PVK-dokument i etterlevelse.ansatt.nav.no først.',
+        );
+      }
+
+      const patch = {
+        ...(harInvolvertRepresentant !== undefined ? { harInvolvertRepresentant } : {}),
+        ...(representantInvolveringsBeskrivelse !== undefined
+          ? { representantInvolveringsBeskrivelse }
+          : {}),
+        ...(harDatabehandlerRepresentantInvolvering !== undefined
+          ? { harDatabehandlerRepresentantInvolvering }
+          : {}),
+        ...(dataBehandlerRepresentantInvolveringBeskrivelse !== undefined
+          ? { dataBehandlerRepresentantInvolveringBeskrivelse }
+          : {}),
+      };
+
+      if (Object.keys(patch).length === 0) {
+        return toolError('Oppgi minst ett involveringsfelt som skal oppdateres.');
+      }
+
+      try {
+        const result = await client.patchPvkDokument(lockedPvkDokumentId, patch);
+        const saved = isRecord(result) ? result : patch;
+        const previewLines = [
+          formatField('PVK-dokumentId', lockedPvkDokumentId),
+          formatField('Har involvert representant', saved.harInvolvertRepresentant),
+          formatField(
+            'Beskrivelse av representantinvolvering',
+            saved.representantInvolveringsBeskrivelse,
+          ),
+          formatField(
+            'Har databehandlerrepresentant-involvering',
+            saved.harDatabehandlerRepresentantInvolvering,
+          ),
+          formatField(
+            'Beskrivelse av databehandlerrepresentant-involvering',
+            saved.dataBehandlerRepresentantInvolveringBeskrivelse,
+          ),
+        ].filter((line): line is string => Boolean(line));
+
+        return toolResult({
+          preview: boxSection('PVK INVOLVERING', previewLines.join('\n')),
+          pvkDokumentId: lockedPvkDokumentId,
+          pvkDokument: saved,
+          result,
+        });
+      } catch (error) {
+        return toolError(error);
+      }
+    },
+  );
+
+  server.registerTool(
+    'write_pvk_egenskaper',
+    {
+      description:
+        'Oppdater egenskaper på det låste PVK-dokumentet ved å hente eksisterende dokument og sende full PUT.',
+      inputSchema: {
+        dpProcessProfilering: z
+          .boolean()
+          .optional()
+          .describe('Behandlingen innebærer profilering'),
+        dpProcessHelautomatiskBehandling: z
+          .boolean()
+          .optional()
+          .describe('Behandlingen er helautomatisert'),
+        ytterligereEgenskaper: z
+          .array(z.enum(ytterligereEgenskaperCodes))
+          .optional()
+          .describe(ytterligereEgenskaperDescription),
+      },
+      annotations: writeAnnotations,
+    },
+    async ({
+      dpProcessProfilering,
+      dpProcessHelautomatiskBehandling,
+      ytterligereEgenskaper,
+    }) => {
+      const guardError = requireDocumentLock(ctx);
+      if (guardError) {
+        return guardError;
+      }
+
+      const { lockedPvkDokumentId } = ctx.tokenData;
+      if (!lockedPvkDokumentId) {
+        return toolError(
+          'Ingen PVK-dokument funnet for dette etterlevelsesdokumentet. Opprett PVK-dokument i etterlevelse.ansatt.nav.no først.',
+        );
+      }
+
+      const patch = {
+        ...(dpProcessProfilering !== undefined ? { dpProcessProfilering } : {}),
+        ...(dpProcessHelautomatiskBehandling !== undefined
+          ? { dpProcessHelautomatiskBehandling }
+          : {}),
+        ...(ytterligereEgenskaper !== undefined ? { ytterligereEgenskaper } : {}),
+      };
+
+      if (Object.keys(patch).length === 0) {
+        return toolError('Oppgi minst ett egenskapsfelt som skal oppdateres.');
+      }
+
+      try {
+        const result = await client.patchPvkDokument(lockedPvkDokumentId, patch);
+        const saved = isRecord(result) ? result : patch;
+        const previewLines = [
+          formatField('PVK-dokumentId', lockedPvkDokumentId),
+          formatField('Profilering', saved.dpProcessProfilering),
+          formatField(
+            'Helautomatisert behandling',
+            saved.dpProcessHelautomatiskBehandling,
+          ),
+          formatListField(
+            'Ytterligere egenskaper',
+            Array.isArray(saved.ytterligereEgenskaper)
+              ? saved.ytterligereEgenskaper.map((value) => asString(value))
+              : undefined,
+          ),
+        ].filter((line): line is string => Boolean(line));
+
+        return toolResult({
+          preview: boxSection('PVK EGENSKAPER', previewLines.join('\n')),
+          pvkDokumentId: lockedPvkDokumentId,
+          pvkDokument: saved,
+          result,
+        });
+      } catch (error) {
+        return toolError(error);
+      }
+    },
+  );
+
+  server.registerTool(
     'write_risikoscenario',
     {
       description:
@@ -662,6 +997,24 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
         sannsynlighetsNivaaBegrunnelse: z.string().optional(),
         konsekvensNivaa: z.number().int().min(1).max(5).optional(),
         konsekvensNivaaBegrunnelse: z.string().optional(),
+        sannsynlighetsNivaaEtterTiltak: z
+          .number()
+          .int()
+          .min(1)
+          .max(5)
+          .optional()
+          .describe('Sannsynlighetsnivå etter tiltak (1-5)'),
+        konsekvensNivaaEtterTiltak: z
+          .number()
+          .int()
+          .min(1)
+          .max(5)
+          .optional()
+          .describe('Konsekvensnivå etter tiltak (1-5)'),
+        nivaaBegrunnelseEtterTiltak: z
+          .string()
+          .optional()
+          .describe('Begrunnelse for risikonivå etter tiltak'),
         ingenTiltak: z.boolean().optional(),
       },
       annotations: writeAnnotations,
@@ -674,6 +1027,9 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
       sannsynlighetsNivaaBegrunnelse,
       konsekvensNivaa,
       konsekvensNivaaBegrunnelse,
+      sannsynlighetsNivaaEtterTiltak,
+      konsekvensNivaaEtterTiltak,
+      nivaaBegrunnelseEtterTiltak,
       ingenTiltak,
     }) => {
       const guardError = requireDocumentLock(ctx);
@@ -698,6 +1054,11 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
           : {}),
         ...(konsekvensNivaa !== undefined ? { konsekvensNivaa } : {}),
         ...(konsekvensNivaaBegrunnelse !== undefined ? { konsekvensNivaaBegrunnelse } : {}),
+        ...(sannsynlighetsNivaaEtterTiltak !== undefined
+          ? { sannsynlighetsNivaaEtterTiltak }
+          : {}),
+        ...(konsekvensNivaaEtterTiltak !== undefined ? { konsekvensNivaaEtterTiltak } : {}),
+        ...(nivaaBegrunnelseEtterTiltak !== undefined ? { nivaaBegrunnelseEtterTiltak } : {}),
         ...(ingenTiltak !== undefined ? { ingenTiltak } : {}),
       };
 
