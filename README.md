@@ -17,7 +17,7 @@ og serveren holder tokenene i minne for sesjonen.
 [etterlevelse-api.intern.nav.no]   [behandlingskatalog.ansatt.nav.no]
 ```
 
-## MCP-tools (v1 — read only)
+## MCP-tools (v2 — read + guarded write)
 
 | Tool | API |
 |------|-----|
@@ -26,9 +26,20 @@ og serveren holder tokenene i minne for sesjonen.
 | `list_krav` | Etterlevelse |
 | `get_krav` | Etterlevelse |
 | `get_etterlevelse` | Etterlevelse |
+| `lock_document` | Etterlevelse |
+| `preview_etterlevelse_write` | Etterlevelse |
+| `write_etterlevelse` | Etterlevelse |
 | `search_behandlinger` | Behandlingskatalog |
 | `get_behandling` | Behandlingskatalog |
 | `get_processor` | Behandlingskatalog |
+
+Skriveflyten er to-faset:
+
+1. `lock_document` låser dokumentet for MCP-sesjonen.
+2. `preview_etterlevelse_write` henter kravkontekst og viser formatert forhåndsvisning.
+3. `write_etterlevelse` bruker et enkeltgangstoken (15 min TTL) etter eksplisitt bekreftelse.
+
+`OPPFYLT` / `FERDIG` settes fortsatt manuelt i etterlevelse.ansatt.nav.no etter menneskelig gjennomgang.
 
 ## Oppsett
 

@@ -5,7 +5,7 @@ import { BehandlingskatalogClient } from '../api/behandlingskatalogClient.js';
 import { EtterlevelseClient } from '../api/etterlevelseClient.js';
 import { GraphClient } from '../api/graphClient.js';
 import { mcpServerInfo } from '../config.js';
-import { authStore, type McpTokenData } from '../auth/store.js';
+import { type McpTokenData } from '../auth/store.js';
 import { registerBehandlingskatalogTools } from './tools/behandlingskatalog.js';
 import { registerEtterlevelseTools } from './tools/etterlevelse.js';
 

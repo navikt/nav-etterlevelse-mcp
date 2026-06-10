@@ -123,6 +123,42 @@ export class EtterlevelseClient {
     return payload;
   }
 
+  private async post(path: string, body: unknown): Promise<unknown> {
+    const url = new URL(`${this.baseUrl}${path}`);
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        Authorization: `Bearer ${this.accessToken}`,
+      },
+      body: JSON.stringify(body),
+    });
+    const bodyText = await response.text();
+    if (!response.ok) {
+      throw new Error(`Etterlevelse API svarte ${response.status}: ${bodyText}`);
+    }
+    return bodyText ? (JSON.parse(bodyText) as unknown) : null;
+  }
+
+  private async put(path: string, body: unknown): Promise<unknown> {
+    const url = new URL(`${this.baseUrl}${path}`);
+    const response = await fetch(url, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        Authorization: `Bearer ${this.accessToken}`,
+      },
+      body: JSON.stringify(body),
+    });
+    const bodyText = await response.text();
+    if (!response.ok) {
+      throw new Error(`Etterlevelse API svarte ${response.status}: ${bodyText}`);
+    }
+    return bodyText ? (JSON.parse(bodyText) as unknown) : null;
+  }
+
   private async graphql(query: string): Promise<unknown> {
     const url = new URL(`${this.baseUrl.replace(/\/api\/?$/, '')}/graphql`);
     const response = await fetch(url, {
@@ -187,7 +223,7 @@ export class EtterlevelseClient {
   async getEtterlevelseDokumentasjon(id: string): Promise<unknown> {
     const data = await this.graphql(
       `{ etterlevelseDokumentasjon(filter: {id: "${id}"}) { content {
-          id title etterlevelseNummer
+          id title etterlevelseNummer teams
           behandlinger { id navn }
           etterlevelser {
             id kravNummer kravVersjon etterleves status statusBegrunnelse
@@ -260,5 +296,42 @@ export class EtterlevelseClient {
       kravNummer: input.kravNummer,
       kravVersjon: input.kravVersjon,
     });
+  }
+
+  async upsertEtterlevelse(input: {
+    etterlevelseDokumentasjonId: string;
+    kravNummer: number;
+    kravVersjon: number;
+    status: 'UNDER_ARBEID' | 'IKKE_RELEVANT';
+    statusBegrunnelse?: string;
+    suksesskriterieBegrunnelser: Array<{
+      suksesskriterieId: number;
+      begrunnelse: string;
+      suksesskriterieStatus: 'UNDER_ARBEID' | 'IKKE_RELEVANT' | 'IKKE_OPPFYLT';
+    }>;
+  }): Promise<unknown> {
+    const existing = await this.getEtterlevelse({
+      etterlevelseDokumentasjonId: input.etterlevelseDokumentasjonId,
+      kravNummer: input.kravNummer,
+      kravVersjon: input.kravVersjon,
+    });
+    const items = extractArray<Record<string, unknown>>(existing);
+    const existingItem = items[0];
+
+    const body = {
+      etterlevelseDokumentasjonId: input.etterlevelseDokumentasjonId,
+      kravNummer: input.kravNummer,
+      kravVersjon: input.kravVersjon,
+      etterleves: input.status !== 'IKKE_RELEVANT',
+      status: input.status,
+      statusBegrunnelse: input.statusBegrunnelse ?? '',
+      suksesskriterieBegrunnelser: input.suksesskriterieBegrunnelser,
+    };
+
+    if (existingItem && typeof existingItem.id === 'string') {
+      return this.put(`/etterlevelse/${existingItem.id}`, body);
+    }
+
+    return this.post('/etterlevelse', body);
   }
 }
