@@ -240,21 +240,28 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
       description:
         '[IKKE AKTIVERT] Skriv/oppdater en etterlevelsesbesvarelse for et krav. ' +
         'Krever at lock_document er kalt først. ' +
+        'Statusene FERDIG og IKKE_RELEVANT_FERDIG (kravnivå) samt OPPFYLT (suksesskriterienivå) ' +
+        'er ikke tilgjengelige via agenten — disse settes manuelt i UI-et etter menneskelig gjennomgang. ' +
+        'Begrunnelsen vises i confirm-steget med suksesskriterietekst og kravets hensikt som kontekst. ' +
         'Aktiveres når etterlevelse-backend implementerer team-scope tilgangsstyring (ADR-002).',
       inputSchema: {
         etterlevelseDokumentasjonId: z.string().min(1).describe('UUID for dokumentasjonen — må matche låst dokument'),
         kravNummer: z.number().int().describe('Kravnummer'),
         kravVersjon: z.number().int().describe('Kravversjon'),
+        // FERDIG og IKKE_RELEVANT_FERDIG er ekskludert — attestasjon krever manuell handling i UI
         status: z
-          .enum(['UNDER_ARBEID', 'FERDIG', 'IKKE_RELEVANT', 'IKKE_RELEVANT_FERDIG'])
-          .describe('Status for etterlevelsen'),
+          .enum(['UNDER_ARBEID', 'IKKE_RELEVANT'])
+          .describe('Status for etterlevelsen. FERDIG/IKKE_RELEVANT_FERDIG settes i UI etter gjennomgang.'),
         statusBegrunnelse: z.string().optional().describe('Begrunnelse for status'),
         suksesskriterieBegrunnelser: z
           .array(
             z.object({
               suksesskriterieId: z.number().int(),
               begrunnelse: z.string(),
-              suksesskriterieStatus: z.enum(['UNDER_ARBEID', 'OPPFYLT', 'IKKE_RELEVANT', 'IKKE_OPPFYLT']),
+              // OPPFYLT er ekskludert — krever at bruker leser suksesskriterietekst og kravets hensikt i UI
+              suksesskriterieStatus: z
+                .enum(['UNDER_ARBEID', 'IKKE_RELEVANT', 'IKKE_OPPFYLT'])
+                .describe('OPPFYLT settes i UI etter at bruker har verifisert mot suksesskriterietekst og kravets hensikt.'),
             }),
           )
           .optional()
@@ -265,6 +272,10 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
     async ({ etterlevelseDokumentasjonId }) => {
       const guardError = requireDocumentLock(ctx, etterlevelseDokumentasjonId);
       if (guardError) return guardError;
+
+      // TODO (ved aktivering): hent krav med getKrav(kravNummer, kravVersjon) og inkluder
+      // krav.hensikt, krav.beskrivelse ("mer om kravet") og suksesskriterier[n].navn i
+      // confirm-steget — brukeren ser ikke disse i CLI og trenger dem for meningsfull gjennomgang.
 
       return toolError(
         'write_etterlevelse er ikke aktivert enda. ' +
