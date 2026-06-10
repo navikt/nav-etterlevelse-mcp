@@ -6,7 +6,6 @@ metadata:
   labels:
     team: dab
 spec:
-  image: placeholder
   port: 8080
   replicas:
     min: 1
