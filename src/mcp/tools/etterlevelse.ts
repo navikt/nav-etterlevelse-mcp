@@ -1,6 +1,5 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import * as z from 'zod/v4';
-import { consumeConfirmation, storeConfirmation } from '../../api/confirmationStore.js';
 import { authStore } from '../../auth/store.js';
 import type { SessionContext } from '../server.js';
 
@@ -25,21 +24,8 @@ function extractArray<T>(payload: unknown): T[] {
 }
 
 function toolResult(data: unknown) {
-  const content: Array<{ type: 'text'; text: string }> = [];
-  if (isRecord(data) && typeof data.preview === 'string') {
-    content.push({
-      type: 'text',
-      text: data.preview,
-    });
-  }
-
-  content.push({
-    type: 'text',
-    text: JSON.stringify(data, null, 2),
-  });
-
   return {
-    content,
+    content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }],
     structuredContent:
       data && typeof data === 'object' && !Array.isArray(data)
         ? (data as Record<string, unknown>)
@@ -320,14 +306,13 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
   // --- Write-tools ---
 
   server.registerTool(
-    'preview_etterlevelse_write',
+    'write_etterlevelse',
     {
       description:
-        'Forhåndsvis en etterlevelsesbesvarelse. Henter krav med suksesskriterier og kravets hensikt, ' +
-        'og viser en formatert diff mot eksisterende begrunnelse. ' +
-        'Returnerer et bekreftelsestoken (gyldig 15 min) og en formatert tekst som MÅ vises til brukeren. ' +
-        'Be brukeren bekrefte (j/N) før write_etterlevelse kalles. ' +
-        'Krever at lock_document er kalt først.',
+        'Skriv/oppdater en etterlevelsesbesvarelse for et krav. Krever aktiv sesjonslås (kall lock_document først). ' +
+        'Henter kravets hensikt og eksisterende begrunnelse og returnerer dem i svaret for menneskelig gjennomgang. ' +
+        'OPPFYLT og FERDIG/FERDIGSTILT kan ikke settes via agenten — sett disse manuelt i etterlevelse.ansatt.nav.no ' +
+        'etter at du har lest suksesskriterieteksten og kravets hensikt.',
       inputSchema: {
         etterlevelseDokumentasjonId: z
           .string()
@@ -335,7 +320,9 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
           .describe('UUID for dokumentasjonen — må matche låst dokument'),
         kravNummer: z.number().int().describe('Kravnummer'),
         kravVersjon: z.number().int().describe('Kravversjon'),
-        status: z.enum(['UNDER_ARBEID', 'IKKE_RELEVANT']).describe('Ny status for etterlevelsen'),
+        status: z
+          .enum(['UNDER_ARBEID', 'IKKE_RELEVANT'])
+          .describe('Status. FERDIG/FERDIGSTILT settes manuelt i UI etter gjennomgang.'),
         statusBegrunnelse: z.string().optional().describe('Begrunnelse for status'),
         suksesskriterieBegrunnelser: z
           .array(
@@ -344,7 +331,7 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
               begrunnelse: z.string(),
               suksesskriterieStatus: z
                 .enum(['UNDER_ARBEID', 'IKKE_RELEVANT', 'IKKE_OPPFYLT'])
-                .describe('OPPFYLT settes i UI etter menneskelig gjennomgang'),
+                .describe('OPPFYLT settes manuelt i UI etter at suksesskriterieteksten er lest og vurdert.'),
             }),
           )
           .min(1)
@@ -361,17 +348,24 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
       suksesskriterieBegrunnelser,
     }) => {
       const guardError = requireDocumentLock(ctx, etterlevelseDokumentasjonId);
-      if (guardError) {
-        return guardError;
-      }
+      if (guardError) return guardError;
 
       try {
-        const [kravRaw, existingRaw, docRaw] = await Promise.all([
+        const [kravRaw, existingRaw] = await Promise.all([
           client.getKrav(`K${kravNummer}.${kravVersjon}`),
           client.getEtterlevelse({ etterlevelseDokumentasjonId, kravNummer, kravVersjon }),
-          client.getEtterlevelseDokumentasjon(etterlevelseDokumentasjonId),
         ]);
 
+        const writeResult = await client.upsertEtterlevelse({
+          etterlevelseDokumentasjonId,
+          kravNummer,
+          kravVersjon,
+          status,
+          statusBegrunnelse,
+          suksesskriterieBegrunnelser,
+        });
+
+        // Build summary with krav context for human review
         const krav = isRecord(kravRaw) ? kravRaw : {};
         const kravNavn = typeof krav.navn === 'string' ? krav.navn : `K${kravNummer}.${kravVersjon}`;
         const hensikt = typeof krav.hensikt === 'string' ? stripHtml(krav.hensikt) : '';
@@ -381,145 +375,57 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
           : [];
 
         const existingItems = extractArray<Record<string, unknown>>(existingRaw);
-        const existing = existingItems[0] ?? {};
-        const existingStatus = typeof existing.status === 'string' ? existing.status : '(ingen)';
-        const existingSKBs = Array.isArray(existing.suksesskriterieBegrunnelser)
-          ? (existing.suksesskriterieBegrunnelser as Record<string, unknown>[])
+        const existingSKBs = Array.isArray(existingItems[0]?.suksesskriterieBegrunnelser)
+          ? (existingItems[0].suksesskriterieBegrunnelser as Record<string, unknown>[])
           : [];
 
-        const doc = isRecord(docRaw) ? docRaw : {};
-        const docTitle = typeof doc.title === 'string' ? doc.title : etterlevelseDokumentasjonId;
-        const docNummer = typeof doc.etterlevelseNummer === 'string' ? ` (${doc.etterlevelseNummer})` : '';
-
-        const width = 76;
+        const W = 76;
         const lines: string[] = [];
-
-        lines.push(`╔${'═'.repeat(width - 2)}╗`);
-        const header = `  📝  FORHÅNDSVISNING — K${kravNummer}.${kravVersjon}`;
-        lines.push(`║${header.padEnd(width - 2)}║`);
-        lines.push(`╚${'═'.repeat(width - 2)}╝`);
-        lines.push('');
-        lines.push(`  Dokument : ${docTitle}${docNummer}`);
-        lines.push(`  Krav     : K${kravNummer}.${kravVersjon} — ${kravNavn}`);
-        lines.push(`  Status   : ${existingStatus} → ${status}`);
+        lines.push(`✅  K${kravNummer}.${kravVersjon} — ${kravNavn} er oppdatert`);
+        lines.push(`    Status: ${status}`);
 
         if (hensikt) {
           lines.push('');
-          lines.push(boxSection('KRAVETS HENSIKT', hensikt, width));
+          lines.push(boxSection('KRAVETS HENSIKT', hensikt, W));
         }
 
-        for (const [index, skb] of suksesskriterieBegrunnelser.entries()) {
-          const kriteriumDef = suksesskriterier.find(
+        for (const [i, skb] of suksesskriterieBegrunnelser.entries()) {
+          const def = suksesskriterier.find(
             (sk) => sk.id === skb.suksesskriterieId || sk.id === String(skb.suksesskriterieId),
           );
-          const kriteriumTekst =
-            kriteriumDef && typeof kriteriumDef.navn === 'string'
-              ? stripHtml(kriteriumDef.navn)
+          const tekst =
+            def && typeof def.navn === 'string'
+              ? stripHtml(def.navn)
               : `Suksesskriterium ${skb.suksesskriterieId}`;
-
-          const existingSKB = existingSKBs.find(
-            (entry) =>
-              entry.suksesskriterieId === skb.suksesskriterieId ||
-              entry.suksesskriterieId === String(skb.suksesskriterieId),
+          const oldSKB = existingSKBs.find(
+            (e) => e.suksesskriterieId === skb.suksesskriterieId,
           );
           const oldBegrunnelse =
-            existingSKB && typeof existingSKB.begrunnelse === 'string' && existingSKB.begrunnelse
-              ? existingSKB.begrunnelse
+            oldSKB && typeof oldSKB.begrunnelse === 'string' && oldSKB.begrunnelse
+              ? oldSKB.begrunnelse
               : '(tom)';
-          const oldSKStatus =
-            existingSKB && typeof existingSKB.suksesskriterieStatus === 'string'
-              ? existingSKB.suksesskriterieStatus
-              : '(ingen)';
 
           lines.push('');
-          lines.push(
-            boxSection(
-              `SUKSESSKRITERIUM ${index + 1} av ${suksesskriterieBegrunnelser.length}`,
-              kriteriumTekst,
-              width,
-            ),
-          );
-          lines.push('');
-          lines.push(`  Status         : ${oldSKStatus} → ${skb.suksesskriterieStatus}`);
-          lines.push(
-            `  Begrunnelse nå : ${wordWrap(oldBegrunnelse, width - 18, ' '.repeat(19)).trimStart()}`,
-          );
-          lines.push(
-            `  Begrunnelse ny : ${wordWrap(skb.begrunnelse, width - 18, ' '.repeat(19)).trimStart()}`,
-          );
+          lines.push(boxSection(`SUKSESSKRITERIUM ${i + 1} av ${suksesskriterieBegrunnelser.length}`, tekst, W));
+          lines.push(`  Var    : ${wordWrap(oldBegrunnelse, W - 11, ' '.repeat(11)).trimStart()}`);
+          lines.push(`  Skrevet: ${wordWrap(skb.begrunnelse, W - 11, ' '.repeat(11)).trimStart()}`);
+          lines.push(`  Status : ${skb.suksesskriterieStatus}`);
         }
 
         if (beskrivelse) {
           lines.push('');
-          lines.push(boxSection('MER OM KRAVET', beskrivelse, width));
+          lines.push(boxSection('MER OM KRAVET', beskrivelse, W));
         }
 
         lines.push('');
-        lines.push('  ⚠  OPPFYLT kan ikke settes via agenten.');
-        lines.push('     Sett OPPFYLT/FERDIG i etterlevelse.ansatt.nav.no etter gjennomgang.');
-
-        const previewText = lines.join('\n');
-        const token = storeConfirmation({
-          etterlevelseDokumentasjonId,
-          kravNummer,
-          kravVersjon,
-          status,
-          statusBegrunnelse,
-          suksesskriterieBegrunnelser,
-          previewText,
-        });
-
-        return toolResult({
-          preview: previewText,
-          confirmationToken: token,
-          expiresInMinutes: 15,
-          instruction: `Vis preview-teksten ovenfor til brukeren og be om bekreftelse (j/N). Kall write_etterlevelse(confirmationToken: "${token}") hvis brukeren bekrefter.`,
-        });
-      } catch (error) {
-        return toolError(error);
-      }
-    },
-  );
-
-  server.registerTool(
-    'write_etterlevelse',
-    {
-      description:
-        'Skriv en etterlevelsesbesvarelse. Krever at preview_etterlevelse_write er kalt og at ' +
-        'brukeren har bekreftet innholdet. Oppgi confirmationToken fra forhåndsvisningen. ' +
-        'Tokenet er enkeltgangsbruk og utløper etter 15 minutter.',
-      inputSchema: {
-        confirmationToken: z.string().uuid().describe('Token fra preview_etterlevelse_write'),
-      },
-      annotations: writeAnnotations,
-    },
-    async ({ confirmationToken }) => {
-      try {
-        const pending = consumeConfirmation(confirmationToken);
-        if (!pending) {
-          return toolError(
-            'Bekreftelsestoken er ugyldig eller utløpt. Kall preview_etterlevelse_write på nytt.',
-          );
-        }
-
-        const guardError = requireDocumentLock(ctx, pending.etterlevelseDokumentasjonId);
-        if (guardError) {
-          return guardError;
-        }
-
-        const result = await client.upsertEtterlevelse({
-          etterlevelseDokumentasjonId: pending.etterlevelseDokumentasjonId,
-          kravNummer: pending.kravNummer,
-          kravVersjon: pending.kravVersjon,
-          status: pending.status,
-          statusBegrunnelse: pending.statusBegrunnelse,
-          suksesskriterieBegrunnelser: pending.suksesskriterieBegrunnelser,
-        });
+        lines.push('⚠  OPPFYLT kan ikke settes via agenten.');
+        lines.push('   Sett OPPFYLT/FERDIG i etterlevelse.ansatt.nav.no etter at du har');
+        lines.push('   lest suksesskriterieteksten og kravets hensikt ovenfor.');
 
         return toolResult({
           success: true,
-          message: `K${pending.kravNummer}.${pending.kravVersjon} er oppdatert. Husk å sette OPPFYLT/FERDIG manuelt i etterlevelse.ansatt.nav.no etter gjennomgang.`,
-          result,
+          summary: lines.join('\n'),
+          result: writeResult,
         });
       } catch (error) {
         return toolError(error);
