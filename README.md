@@ -31,6 +31,7 @@ og serveren holder tokenene i minne for sesjonen.
 | `list_risikoscenarioer` | Etterlevelse |
 | `preview_etterlevelse_write` | Etterlevelse |
 | `write_etterlevelse` | Etterlevelse |
+| `write_etterlevelse_dokumentasjon` | Etterlevelse |
 | `write_risikoscenario` | Etterlevelse |
 | `write_tiltak` | Etterlevelse |
 | `search_behandlinger` | Behandlingskatalog |

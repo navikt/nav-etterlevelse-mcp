@@ -77,6 +77,34 @@ const writeAnnotations = {
   openWorldHint: false,
 };
 
+const irrelevansForCodes = [
+  'VEDTAKSBEHANDLING',
+  'OKONOMISYSTEM',
+  'EKSTERN_SKJERMFLATE',
+  'AUTOMATISK_BEHANDLING',
+  'INNSYN_SAKSBEHANDLING',
+] as const;
+
+const etterlevelseDokumentasjonReadOnlyFields = [
+  'changeStamp',
+  'teamsData',
+  'risikoeiereData',
+  'behandlinger',
+  'dpBehandlinger',
+  'produktOmradetData',
+  'resourcesData',
+  'hasCurrentUserAccess',
+  'versjonHistorikk',
+  'stats',
+  'sistEndretEtterlevelse',
+  'sistEndretDokumentasjon',
+  'sistEndretEtterlevelseAvMeg',
+  'sistEndretDokumentasjonAvMeg',
+  'hasCurrentUser',
+  'irrepirsibleFields',
+  'resources',
+] as const;
+
 const ytterligereEgenskaperCodes = [
   'SYSTEMATIC_PROFILING',
   'LARGE_SCALE_PROCESSING',
@@ -106,6 +134,33 @@ function requireDocumentLock(ctx: SessionContext, targetDocumentId?: string) {
     );
   }
   return null;
+}
+
+function sanitizeEtterlevelseDokumentasjonForUpdate(document: unknown): Record<string, unknown> {
+  if (!isRecord(document)) {
+    throw new Error('Etterlevelsesdokumentasjonen kunne ikke leses som et objekt.');
+  }
+
+  const cleaned: Record<string, unknown> = { ...document };
+  for (const field of etterlevelseDokumentasjonReadOnlyFields) {
+    delete cleaned[field];
+  }
+
+  if (Array.isArray(cleaned.irrelevansFor)) {
+    cleaned.irrelevansFor = cleaned.irrelevansFor
+      .map((value) => {
+        if (typeof value === 'string') {
+          return value;
+        }
+        if (isRecord(value)) {
+          return asString(value.code);
+        }
+        return undefined;
+      })
+      .filter((value): value is string => Boolean(value));
+  }
+
+  return cleaned;
 }
 
 function stripHtml(html: string): string {
@@ -670,6 +725,116 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
           success: true,
           summary: lines.join('\n'),
           result: writeResult,
+        });
+      } catch (error) {
+        return toolError(error);
+      }
+    },
+  );
+
+  server.registerTool(
+    'write_etterlevelse_dokumentasjon',
+    {
+      description:
+        'Oppdater agentrelevante felter på det låste etterlevelsesdokumentet med sikker partial update: GET, fjern read-only felt, merge oppgitte felter og send full PUT.',
+      inputSchema: {
+        beskrivelse: z
+          .string()
+          .optional()
+          .describe('Beskrivelse av etterlevelsesdokumentasjonen — kontekst, løsning og målgruppe'),
+        behandlingIds: z
+          .array(z.string())
+          .optional()
+          .describe('UUID-liste over behandlinger fra behandlingskatalogen som knyttes til dokumentet'),
+        dpBehandlingIds: z
+          .array(z.string())
+          .optional()
+          .describe('UUID-liste over databehandler-behandlinger fra behandlingskatalogen'),
+        irrelevansFor: z
+          .array(z.enum(irrelevansForCodes))
+          .optional()
+          .describe(
+            'Egenskaper som IKKE er relevante for dette systemet. ' +
+              'VEDTAKSBEHANDLING: systemet fatter ikke vedtak. ' +
+              'OKONOMISYSTEM: ingen økonomi/utbetaling. ' +
+              'EKSTERN_SKJERMFLATE: ingen ekstern brukerflate. ' +
+              'AUTOMATISK_BEHANDLING: ingen helautomatiske beslutninger. ' +
+              'INNSYN_SAKSBEHANDLING: ikke saksbehandlingsinnsyn.',
+          ),
+        Risikovurderinger: z
+          .array(z.string())
+          .optional()
+          .describe('Lenker og beskrivelser til risikovurderinger, formatert som markdown'),
+        prioritertKravNummer: z
+          .array(z.string())
+          .optional()
+          .describe(
+            'Kravnumre (uten versjon) sortert etter prioritet, f.eks. ["253", "191", "230"]',
+          ),
+      },
+      annotations: writeAnnotations,
+    },
+    async ({
+      beskrivelse,
+      behandlingIds,
+      dpBehandlingIds,
+      irrelevansFor,
+      Risikovurderinger,
+      prioritertKravNummer,
+    }) => {
+      const guardError = requireDocumentLock(ctx);
+      if (guardError) {
+        return guardError;
+      }
+
+      const lockedDocumentId = ctx.tokenData.lockedDocumentId as string;
+
+      try {
+        const current = await client.getEtterlevelseDokumentasjonRaw(lockedDocumentId);
+        const cleaned = sanitizeEtterlevelseDokumentasjonForUpdate(current);
+
+        if (beskrivelse !== undefined) cleaned.beskrivelse = beskrivelse;
+        if (behandlingIds !== undefined) cleaned.behandlingIds = behandlingIds;
+        if (dpBehandlingIds !== undefined) cleaned.dpBehandlingIds = dpBehandlingIds;
+        if (irrelevansFor !== undefined) cleaned.irrelevansFor = irrelevansFor;
+        if (Risikovurderinger !== undefined) cleaned.Risikovurderinger = Risikovurderinger;
+        if (prioritertKravNummer !== undefined) cleaned.prioritertKravNummer = prioritertKravNummer;
+
+        const result = await client.updateEtterlevelseDokumentasjon(lockedDocumentId, cleaned);
+        const saved = isRecord(result) ? result : {};
+        const title = asString(saved.title) ?? ctx.tokenData.lockedDocumentTitle ?? '';
+        const etterlevelseNummer = asString(saved.etterlevelseNummer) ?? '';
+
+        const lines: string[] = [
+          `✅ Etterlevelsesdokumentasjon oppdatert: ${title} (E${etterlevelseNummer})`,
+          '',
+        ];
+        if (beskrivelse !== undefined) {
+          lines.push(
+            `Beskrivelse: ${beskrivelse.slice(0, 80)}${beskrivelse.length > 80 ? '…' : ''}`,
+          );
+        }
+        if (behandlingIds !== undefined) {
+          lines.push(`BehandlingIds: ${behandlingIds.join(', ')}`);
+        }
+        if (dpBehandlingIds !== undefined) {
+          lines.push(`DpBehandlingIds: ${dpBehandlingIds.join(', ')}`);
+        }
+        if (irrelevansFor !== undefined) {
+          lines.push(`IrrelevansFor: ${irrelevansFor.join(', ') || '(ingen)'}`);
+        }
+        if (Risikovurderinger !== undefined) {
+          lines.push(`Risikovurderinger: ${Risikovurderinger.length} lenker`);
+        }
+        if (prioritertKravNummer !== undefined) {
+          lines.push(`Prioritert kravliste: ${prioritertKravNummer.join(', ')}`);
+        }
+
+        return toolResult({
+          success: true,
+          summary: lines.join('\n'),
+          etterlevelseDokumentasjonId: lockedDocumentId,
+          result,
         });
       } catch (error) {
         return toolError(error);

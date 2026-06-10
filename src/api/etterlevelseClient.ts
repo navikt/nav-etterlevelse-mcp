@@ -251,6 +251,14 @@ export class EtterlevelseClient {
     return data;
   }
 
+  async getEtterlevelseDokumentasjonRaw(id: string): Promise<any> {
+    return this.get(`/etterlevelsedokumentasjon/${id}`);
+  }
+
+  async updateEtterlevelseDokumentasjon(id: string, body: object): Promise<any> {
+    return this.put(`/etterlevelsedokumentasjon/${id}`, body);
+  }
+
   async listKrav(input: { relevansFor?: string; tema?: string; etterlevelseDokumentasjonId?: string }): Promise<unknown[]> {
     if (input.etterlevelseDokumentasjonId) {
       const data = await this.graphql(
