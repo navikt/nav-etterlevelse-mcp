@@ -3,7 +3,7 @@ ENV PNPM_HOME=/pnpm
 ENV PATH=$PNPM_HOME:$PATH
 RUN corepack enable
 WORKDIR /app
-COPY package.json pnpm-lock.yaml pnpm.yaml ./
+COPY package.json pnpm-lock.yaml pnpm.yaml pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile
 COPY tsconfig.json ./
 COPY src ./src
@@ -14,7 +14,7 @@ ENV PNPM_HOME=/pnpm
 ENV PATH=$PNPM_HOME:$PATH
 RUN corepack enable && addgroup -S appgroup && adduser -S appuser -G appgroup
 WORKDIR /app
-COPY package.json pnpm-lock.yaml pnpm.yaml ./
+COPY package.json pnpm-lock.yaml pnpm.yaml pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile --prod
 COPY --from=builder /app/dist ./dist
 USER appuser
