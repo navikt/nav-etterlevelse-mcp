@@ -44,6 +44,10 @@ spec:
           namespace: teamdatajegerne
         - application: behandlingskatalog-backend
           namespace: teamdatajegerne
+      external:
+        - host: dab-unleash-api.nav.cloud.nais.io
+  envFrom:
+    - secret: nav-etterlevelse-mcp-unleash-api-token
   azure:
     application:
       enabled: true

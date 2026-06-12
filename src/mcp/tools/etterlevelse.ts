@@ -2,6 +2,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import * as z from 'zod/v4';
 import { authStore } from '../../auth/store.js';
 import type { SessionContext } from '../server.js';
+import { isWriteEnabled } from '../../unleash.js';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -132,6 +133,16 @@ function requireDocumentLock(ctx: SessionContext, targetDocumentId?: string) {
     return toolError(
       `Sesjonen er låst til "${lockedDocumentTitle ?? lockedDocumentId}". ` +
         'Kall lock_document på nytt hvis du vil bytte dokument.',
+    );
+  }
+  return null;
+}
+
+function requireWriteEnabled() {
+  if (!isWriteEnabled()) {
+    return toolError(
+      'Skriveoperasjoner er deaktivert via feature-toggle (nav-etterlevelse-mcp.write-enabled). ' +
+        'Kontakt team dab for å aktivere skriving.',
     );
   }
   return null;
@@ -525,6 +536,9 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
       annotations: readOnlyAnnotations,
     },
     async () => {
+      const writeGuardError = requireWriteEnabled();
+      if (writeGuardError) return writeGuardError;
+
       const guardError = requireDocumentLock(ctx);
       if (guardError) {
         return guardError;
@@ -577,6 +591,9 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
       annotations: readOnlyAnnotations,
     },
     async () => {
+      const writeGuardError = requireWriteEnabled();
+      if (writeGuardError) return writeGuardError;
+
       const guardError = requireDocumentLock(ctx);
       if (guardError) {
         return guardError;
@@ -630,6 +647,9 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
       annotations: readOnlyAnnotations,
     },
     async () => {
+      const writeGuardError = requireWriteEnabled();
+      if (writeGuardError) return writeGuardError;
+
       const guardError = requireDocumentLock(ctx);
       if (guardError) {
         return guardError;
@@ -675,6 +695,9 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
       annotations: readOnlyAnnotations,
     },
     async () => {
+      const writeGuardError = requireWriteEnabled();
+      if (writeGuardError) return writeGuardError;
+
       const guardError = requireDocumentLock(ctx);
       if (guardError) {
         return guardError;
@@ -731,6 +754,9 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
       annotations: writeAnnotations,
     },
     async ({ kravnummer, risikoscenarioIder }) => {
+      const writeGuardError = requireWriteEnabled();
+      if (writeGuardError) return writeGuardError;
+
       const guardError = requireDocumentLock(ctx);
       if (guardError) {
         return guardError;
@@ -798,6 +824,9 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
       statusBegrunnelse,
       suksesskriterieBegrunnelser,
     }) => {
+      const writeGuardError = requireWriteEnabled();
+      if (writeGuardError) return writeGuardError;
+
       const guardError = requireDocumentLock(ctx, etterlevelseDokumentasjonId);
       if (guardError) return guardError;
 
@@ -949,6 +978,9 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
       prioritertKravNummer,
       teams,
     }) => {
+      const writeGuardError = requireWriteEnabled();
+      if (writeGuardError) return writeGuardError;
+
       const guardError = requireDocumentLock(ctx);
       if (guardError) {
         return guardError;
@@ -1037,6 +1069,9 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
       annotations: writeAnnotations,
     },
     async ({ beskrivelse, filer }) => {
+      const writeGuardError = requireWriteEnabled();
+      if (writeGuardError) return writeGuardError;
+
       const guardError = requireDocumentLock(ctx);
       if (guardError) {
         return guardError;
@@ -1109,6 +1144,9 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
       tilgangsBeskrivelsePersonopplysningene,
       lagringsBeskrivelsePersonopplysningene,
     }) => {
+      const writeGuardError = requireWriteEnabled();
+      if (writeGuardError) return writeGuardError;
+
       const guardError = requireDocumentLock(ctx);
       if (guardError) {
         return guardError;
@@ -1179,6 +1217,9 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
       harDatabehandlerRepresentantInvolvering,
       dataBehandlerRepresentantInvolveringBeskrivelse,
     }) => {
+      const writeGuardError = requireWriteEnabled();
+      if (writeGuardError) return writeGuardError;
+
       const guardError = requireDocumentLock(ctx);
       if (guardError) {
         return guardError;
@@ -1266,6 +1307,9 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
       dpProcessHelautomatiskBehandling,
       ytterligereEgenskaper,
     }) => {
+      const writeGuardError = requireWriteEnabled();
+      if (writeGuardError) return writeGuardError;
+
       const guardError = requireDocumentLock(ctx);
       if (guardError) {
         return guardError;
@@ -1368,6 +1412,9 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
       nivaaBegrunnelseEtterTiltak,
       ingenTiltak,
     }) => {
+      const writeGuardError = requireWriteEnabled();
+      if (writeGuardError) return writeGuardError;
+
       const guardError = requireDocumentLock(ctx);
       if (guardError) {
         return guardError;
@@ -1439,6 +1486,9 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
       annotations: writeAnnotations,
     },
     async ({ risikoscenarioId, tiltakId, navn, beskrivelse, ansvarlig, frist }) => {
+      const writeGuardError = requireWriteEnabled();
+      if (writeGuardError) return writeGuardError;
+
       const guardError = requireDocumentLock(ctx);
       if (guardError) {
         return guardError;
@@ -1557,6 +1607,9 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
       irrelevansFor,
       prioritertKravNummer,
     }) => {
+      const writeGuardError = requireWriteEnabled();
+      if (writeGuardError) return writeGuardError;
+
       try {
         const body = {
           title,

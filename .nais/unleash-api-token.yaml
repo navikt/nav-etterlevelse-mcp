@@ -1,0 +1,14 @@
+apiVersion: unleash.nais.io/v1
+kind: ApiToken
+metadata:
+  name: nav-etterlevelse-mcp-unleash-api-token
+  namespace: dab
+spec:
+  unleashInstance:
+    apiVersion: unleash.nais.io/v1
+    kind: RemoteUnleash
+    name: dab
+  secretName: nav-etterlevelse-mcp-unleash-api-token
+  environment: production
+  serverSideApps:
+    - nav-etterlevelse-mcp

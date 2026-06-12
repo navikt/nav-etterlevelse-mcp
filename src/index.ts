@@ -3,6 +3,9 @@ import { requireMcpBearerToken, type AuthenticatedLocals } from './auth/middlewa
 import { registerOAuthRoutes } from './auth/oauth.js';
 import { config } from './config.js';
 import { handleMcpHttpRequest } from './mcp/server.js';
+import { initUnleash } from './unleash.js';
+
+void initUnleash();
 
 const app = express();
 app.disable('x-powered-by');

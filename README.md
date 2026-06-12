@@ -19,37 +19,60 @@ og serveren holder tokenene i minne for sesjonen.
 
 ## MCP-tools
 
-| Tool | Beskrivelse | API |
-|------|-------------|-----|
-| `list_etterlevelse_dokumentasjoner` | Søk/list etterlevelsesdokumentasjoner | Etterlevelse |
-| `get_etterlevelse_dokumentasjon` | Hent ett dokument med status | Etterlevelse |
-| `create_etterlevelse_dokumentasjon` | Opprett nytt etterlevelsesdokument | Etterlevelse |
-| `write_etterlevelse_dokumentasjon` | Oppdater dokumentegenskaper (tittel, teams, behandlinger, irrelevansFor …) | Etterlevelse |
-| `lock_document` | Lås et dokument for MCP-sesjonen (påkrevd før skriving) | Etterlevelse |
-| `list_krav` | List krav, filtrer på tema/status | Etterlevelse |
-| `get_krav` | Hent ett krav med suksesskriterier | Etterlevelse |
-| `get_etterlevelse` | Hent etterlevelse for et krav | Etterlevelse |
-| `write_etterlevelse` | Svar på ett krav (statusBegrunnelse, dokumentasjon) | Etterlevelse |
-| `get_pvk_dokument` | Hent PVK-dokument for låst dokument | Etterlevelse |
-| `write_pvk_involvering` | Oppdater involveringssteg i PVK | Etterlevelse |
-| `write_pvk_egenskaper` | Oppdater egenskaper/risikovurdering i PVK | Etterlevelse |
-| `get_behandlingens_livsloep` | Hent behandlingens livsløp | Etterlevelse |
-| `write_behandlingens_livsloep` | Opprett/oppdater behandlingens livsløp | Etterlevelse |
-| `write_behandlingens_art_og_omfang` | Opprett/oppdater behandlingens art og omfang | Etterlevelse |
-| `list_risikoscenarioer` | List risikoscenarioer for låst PVK-dokument | Etterlevelse |
-| `write_risikoscenario` | Opprett/oppdater risikoscenario | Etterlevelse |
-| `list_tiltak` | List tiltak for låst PVK-dokument | Etterlevelse |
-| `write_tiltak` | Opprett/oppdater tiltak | Etterlevelse |
-| `link_krav_to_risikoscenario` | Koble krav til risikoscenario | Etterlevelse |
-| `get_my_teams` | Hent team du er medlem av (bruk for å finne team-UUID) | Etterlevelse |
-| `search_behandlinger` | Søk behandlinger på navn eller B-nummer | Behandlingskatalog |
-| `get_behandling` | Hent full behandlingsinfo (UUID eller B-nummer) | Behandlingskatalog |
-| `get_processor` | Hent databehandler-info | Behandlingskatalog |
+### Etterlevelse — les
+
+| Tool | Beskrivelse |
+|------|-------------|
+| `list_etterlevelse_dokumentasjoner` | Søk/list etterlevelsesdokumentasjoner |
+| `get_etterlevelse_dokumentasjon` | Hent ett dokument med status |
+| `list_krav` | List krav, filtrer på tema/status |
+| `get_krav` | Hent ett krav med suksesskriterier |
+| `get_etterlevelse` | Hent etterlevelse for et krav |
+| `get_behandlingens_livsloep` | Hent behandlingens livsløp for låst dokument |
+| `get_my_teams` | Hent team du er medlem av (bruk for å finne team-UUID) |
+| `lock_document` | Lås et dokument for MCP-sesjonen (påkrevd før skriving) |
+
+### Etterlevelse — skriv *(krever feature-toggle)*
+
+| Tool | Beskrivelse |
+|------|-------------|
+| `create_etterlevelse_dokumentasjon` | Opprett nytt etterlevelsesdokument |
+| `write_etterlevelse_dokumentasjon` | Oppdater dokumentegenskaper (tittel, teams, behandlinger, irrelevansFor …) |
+| `write_etterlevelse` | Svar på ett krav (statusBegrunnelse, dokumentasjon) |
+| `write_behandlingens_livsloep` | Opprett/oppdater behandlingens livsløp |
+| `write_behandlingens_art_og_omfang` | Opprett/oppdater behandlingens art og omfang |
+
+### PVK — les
+
+| Tool | Beskrivelse |
+|------|-------------|
+| `get_pvk_dokument` | Hent PVK-dokument for låst dokument |
+| `list_risikoscenarioer` | List risikoscenarioer for låst PVK-dokument |
+| `list_tiltak` | List tiltak for låst PVK-dokument |
+
+### PVK — skriv *(krever feature-toggle)*
+
+| Tool | Beskrivelse |
+|------|-------------|
+| `write_pvk_involvering` | Oppdater involveringssteg i PVK |
+| `write_pvk_egenskaper` | Oppdater egenskaper/risikovurdering i PVK |
+| `write_risikoscenario` | Opprett/oppdater risikoscenario |
+| `write_tiltak` | Opprett/oppdater tiltak |
+| `link_krav_to_risikoscenario` | Koble krav til risikoscenario |
+
+### Behandlingskatalog — les
+
+| Tool | Beskrivelse |
+|------|-------------|
+| `search_behandlinger` | Søk behandlinger på navn eller B-nummer |
+| `get_behandling` | Hent full behandlingsinfo (UUID eller B-nummer) |
+| `get_processor` | Hent databehandler-info |
 
 ### Tilgangsbegrensninger
 
 - **Teamtilgang**: Du kan kun opprette og oppdatere etterlevelsesdokumenter som eies av team du selv er medlem av. `get_my_teams` returnerer dine team med UUID-er.
 - **Dokumentlås**: Alle skriveoperasjoner krever at dokumentet er låst med `lock_document` i gjeldende sesjon. Låsen gjelder kun i minnet — ny sesjon krever ny lås.
+- **Feature-toggle**: Alle skriveoperasjoner styres av Unleash-toggle `nav-etterlevelse-mcp.write-enabled`. Toggle administreres i [dab-unleash-web.iap.nav.cloud.nais.io](https://dab-unleash-web.iap.nav.cloud.nais.io). Uten Unleash-konfigurasjon er skriving alltid tillatt (fallback).
 - **Kravstatus**: `OPPFYLT` / `FERDIG` settes manuelt i [etterlevelse.ansatt.nav.no](https://etterlevelse.ansatt.nav.no) etter menneskelig gjennomgang.
 
 Skriveflyten for kravdokumentasjon:
