@@ -922,6 +922,10 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
           .describe(
             'Kravnumre (uten versjon) sortert etter prioritet, f.eks. ["253", "191", "230"]',
           ),
+        teams: z
+          .array(z.string())
+          .optional()
+          .describe('UUID-liste over team fra teamkatalogen som eier dokumentet'),
       },
       annotations: writeAnnotations,
     },
@@ -932,6 +936,7 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
       irrelevansFor,
       Risikovurderinger,
       prioritertKravNummer,
+      teams,
     }) => {
       const guardError = requireDocumentLock(ctx);
       if (guardError) {
@@ -950,6 +955,7 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
         if (irrelevansFor !== undefined) cleaned.irrelevansFor = irrelevansFor;
         if (Risikovurderinger !== undefined) cleaned.Risikovurderinger = Risikovurderinger;
         if (prioritertKravNummer !== undefined) cleaned.prioritertKravNummer = prioritertKravNummer;
+        if (teams !== undefined) cleaned.teams = teams;
 
         const result = await client.updateEtterlevelseDokumentasjon(lockedDocumentId, cleaned);
         const saved = isRecord(result) ? result : {};
@@ -979,6 +985,9 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
         }
         if (prioritertKravNummer !== undefined) {
           lines.push(`Prioritert kravliste: ${prioritertKravNummer.join(', ')}`);
+        }
+        if (teams !== undefined) {
+          lines.push(`Teams: ${teams.join(', ')}`);
         }
 
         return toolResult({
@@ -1451,6 +1460,121 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
           action: tiltakId ? 'updated' : 'created',
           pvkDokumentId: lockedPvkDokumentId,
           tiltak,
+          result,
+        });
+      } catch (error) {
+        return toolError(error);
+      }
+    },
+  );
+
+  server.registerTool(
+    'get_my_teams',
+    {
+      description:
+        'Hent team som den innloggede brukeren er medlem av (fra teamkatalogen via etterlevelse-backend). ' +
+        'Bruk dette for å finne riktige team-UUIDer før oppretting av etterlevelsesdokumentasjon.',
+      inputSchema: {},
+      annotations: readOnlyAnnotations,
+    },
+    async () => {
+      try {
+        const teams = await client.getMyTeams();
+        if (teams.length === 0) {
+          return toolResult({ teams: [], message: 'Ingen team funnet for innlogget bruker.' });
+        }
+        return toolResult({ teams });
+      } catch (error) {
+        return toolError(error);
+      }
+    },
+  );
+
+  server.registerTool(
+    'create_etterlevelse_dokumentasjon',
+    {
+      description:
+        'Opprett ny etterlevelsesdokumentasjon. Bruk get_my_teams for å hente riktige team-UUIDer først. ' +
+        'Etter oppretting: kall lock_document med den returnerte IDen for å låse sesjonen til det nye dokumentet.',
+      inputSchema: {
+        title: z.string().min(1).describe('Tittel på etterlevelsesdokumentasjonen'),
+        beskrivelse: z
+          .string()
+          .describe('Beskrivelse av systemet/løsningen — kontekst, målgruppe og formål'),
+        teams: z
+          .array(z.string())
+          .min(1)
+          .describe('UUID-liste over team fra teamkatalogen som eier dokumentet (hentes via get_my_teams)'),
+        behandlingIds: z
+          .array(z.string())
+          .optional()
+          .describe('UUID-liste over behandlinger fra behandlingskatalogen'),
+        behandlerPersonopplysninger: z
+          .boolean()
+          .describe('Angir om systemet behandler personopplysninger'),
+        irrelevansFor: z
+          .array(z.enum(irrelevansForCodes))
+          .optional()
+          .describe(
+            'Egenskaper som IKKE er relevante for dette systemet. ' +
+              'VEDTAKSBEHANDLING: systemet fatter ikke vedtak. ' +
+              'OKONOMISYSTEM: ingen økonomi/utbetaling. ' +
+              'EKSTERN_SKJERMFLATE: ingen ekstern brukerflate. ' +
+              'AUTOMATISK_BEHANDLING: ingen helautomatiske beslutninger. ' +
+              'INNSYN_SAKSBEHANDLING: ikke saksbehandlingsinnsyn.',
+          ),
+        prioritertKravNummer: z
+          .array(z.string())
+          .optional()
+          .describe('Kravnumre (uten versjon) sortert etter prioritet'),
+      },
+      annotations: writeAnnotations,
+    },
+    async ({
+      title,
+      beskrivelse,
+      teams,
+      behandlingIds,
+      behandlerPersonopplysninger,
+      irrelevansFor,
+      prioritertKravNummer,
+    }) => {
+      try {
+        const body = {
+          title,
+          beskrivelse,
+          teams,
+          behandlingIds: behandlingIds ?? [],
+          dpBehandlingIds: [],
+          behandlerPersonopplysninger,
+          irrelevansFor: irrelevansFor ?? [],
+          prioritertKravNummer: prioritertKravNummer ?? [],
+          etterlevelseNummer: 0,
+          etterlevelseDokumentVersjon: 1,
+          resources: [],
+          risikoeiere: [],
+          varslingsadresser: [],
+          gjenbrukBeskrivelse: '',
+          tilgjengeligForGjenbruk: false,
+          forGjenbruk: false,
+          knpivotenhetIds: [],
+          knpivotenhetNavn: [],
+          status: 'UNDER_ARBEID',
+        };
+
+        const result = await client.createEtterlevelseDokumentasjon(body);
+        const saved = isRecord(result) ? result : {};
+        const id = asString(saved.id) ?? '';
+        const etterlevelseNummer = asString(saved.etterlevelseNummer) ?? '';
+
+        return toolResult({
+          success: true,
+          summary:
+            `✅ Etterlevelsesdokumentasjon opprettet: ${title} (E${etterlevelseNummer})\n` +
+            `ID: ${id}\n` +
+            `Kall lock_document("${id}") for å låse sesjonen til dette dokumentet.`,
+          etterlevelseDokumentasjonId: id,
+          etterlevelseNummer,
           result,
         });
       } catch (error) {

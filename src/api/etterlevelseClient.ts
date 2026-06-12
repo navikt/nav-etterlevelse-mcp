@@ -561,4 +561,18 @@ export class EtterlevelseClient {
   async linkKravToRisikoscenarioer(kravnummer: number, risikoscenarioIder: string[]): Promise<any> {
     return this.put('/risikoscenario/update/addRelevantKrav', { kravnummer, risikoscenarioIder });
   }
+
+  async getMyTeams(): Promise<Array<{ id: string; name: string; productAreaName?: string }>> {
+    const payload = await this.get('/team', { myTeams: 'true' });
+    const items = extractArray<Record<string, unknown>>(payload);
+    return items.map((item) => ({
+      id: asString(item.id) ?? '',
+      name: asString(item.name) ?? asString(item.navn) ?? '',
+      productAreaName: asString(item.productAreaName),
+    }));
+  }
+
+  async createEtterlevelseDokumentasjon(body: object): Promise<any> {
+    return this.post('/etterlevelsedokumentasjon', body);
+  }
 }
