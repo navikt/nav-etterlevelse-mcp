@@ -897,11 +897,17 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
         behandlingIds: z
           .array(z.string())
           .optional()
-          .describe('UUID-liste over behandlinger fra behandlingskatalogen som knyttes til dokumentet'),
+          .describe(
+            'UUID-liste over behandlinger fra behandlingskatalogen som knyttes til dokumentet. ' +
+              'Bruk search_behandlinger for å finne riktig UUID fra B-nummer eller navn.',
+          ),
         dpBehandlingIds: z
           .array(z.string())
           .optional()
-          .describe('UUID-liste over databehandler-behandlinger fra behandlingskatalogen'),
+          .describe(
+            'UUID-liste over databehandler-behandlinger fra behandlingskatalogen. ' +
+              'Bruk search_behandlinger for å finne riktig UUID fra B-nummer eller navn.',
+          ),
         irrelevansFor: z
           .array(z.enum(irrelevansForCodes))
           .optional()
@@ -1510,7 +1516,10 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
         behandlingIds: z
           .array(z.string())
           .optional()
-          .describe('UUID-liste over behandlinger fra behandlingskatalogen'),
+          .describe(
+            'UUID-liste over behandlinger fra behandlingskatalogen. ' +
+              'Bruk search_behandlinger for å finne riktig UUID fra B-nummer eller navn.',
+          ),
         behandlerPersonopplysninger: z
           .boolean()
           .describe('Angir om systemet behandler personopplysninger'),
