@@ -46,24 +46,34 @@ jobs:
       id-token: write
     steps:
       - uses: actions/checkout@v4
+      - name: Deploy Unleash API token to dev-gcp
+        uses: nais/deploy/actions/deploy@v2
+        env:
+          CLUSTER: dev-gcp
+          RESOURCE: .nais/unleash-api-token-dev.yaml
       - name: Deploy to dev-gcp
         uses: nais/deploy/actions/deploy@v2
         env:
           CLUSTER: dev-gcp
-          RESOURCE: .nais/app-dev.yaml,.nais/unleash-api-token-dev.yaml
+          RESOURCE: .nais/app-dev.yaml
           WORKLOAD_IMAGE: ${{ needs.build.outputs.image }}
 
   deploy-prod:
     name: Deploy to prod-gcp
-    needs: deploy-dev
+    needs: [build, deploy-dev]
     runs-on: ubuntu-latest
     permissions:
       id-token: write
     steps:
       - uses: actions/checkout@v4
+      - name: Deploy Unleash API token to prod-gcp
+        uses: nais/deploy/actions/deploy@v2
+        env:
+          CLUSTER: prod-gcp
+          RESOURCE: .nais/unleash-api-token.yaml
       - name: Deploy to prod-gcp
         uses: nais/deploy/actions/deploy@v2
         env:
           CLUSTER: prod-gcp
-          RESOURCE: .nais/app.yaml,.nais/unleash-api-token.yaml
+          RESOURCE: .nais/app.yaml
           WORKLOAD_IMAGE: ${{ needs.build.outputs.image }}
