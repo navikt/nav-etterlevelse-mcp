@@ -78,11 +78,12 @@ const writeAnnotations = {
 };
 
 const irrelevansForCodes = [
+  'PERSONOPPLYSNINGER',
+  'INTERN_SKJERMFLATE',
+  'EKSTERN_SKJERMFLATE',
+  'EGETUTVIKLETSYSTEM',
   'VEDTAKSBEHANDLING',
   'OKONOMISYSTEM',
-  'EKSTERN_SKJERMFLATE',
-  'AUTOMATISK_BEHANDLING',
-  'INNSYN_SAKSBEHANDLING',
 ] as const;
 
 const etterlevelseDokumentasjonReadOnlyFields = [
@@ -906,11 +907,12 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
           .optional()
           .describe(
             'Egenskaper som IKKE er relevante for dette systemet. ' +
-              'VEDTAKSBEHANDLING: systemet fatter ikke vedtak. ' +
-              'OKONOMISYSTEM: ingen økonomi/utbetaling. ' +
+              'PERSONOPPLYSNINGER: behandler ikke personopplysninger. ' +
+              'INTERN_SKJERMFLATE: ingen intern brukerflate. ' +
               'EKSTERN_SKJERMFLATE: ingen ekstern brukerflate. ' +
-              'AUTOMATISK_BEHANDLING: ingen helautomatiske beslutninger. ' +
-              'INNSYN_SAKSBEHANDLING: ikke saksbehandlingsinnsyn.',
+              'EGETUTVIKLETSYSTEM: drifter ikke egetutviklet system. ' +
+              'VEDTAKSBEHANDLING: systemet fatter ikke vedtak. ' +
+              'OKONOMISYSTEM: ingen økonomi/utbetaling.',
           ),
         Risikovurderinger: z
           .array(z.string())
@@ -1517,11 +1519,12 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
           .optional()
           .describe(
             'Egenskaper som IKKE er relevante for dette systemet. ' +
-              'VEDTAKSBEHANDLING: systemet fatter ikke vedtak. ' +
-              'OKONOMISYSTEM: ingen økonomi/utbetaling. ' +
+              'PERSONOPPLYSNINGER: behandler ikke personopplysninger. ' +
+              'INTERN_SKJERMFLATE: ingen intern brukerflate. ' +
               'EKSTERN_SKJERMFLATE: ingen ekstern brukerflate. ' +
-              'AUTOMATISK_BEHANDLING: ingen helautomatiske beslutninger. ' +
-              'INNSYN_SAKSBEHANDLING: ikke saksbehandlingsinnsyn.',
+              'EGETUTVIKLETSYSTEM: drifter ikke egetutviklet system. ' +
+              'VEDTAKSBEHANDLING: systemet fatter ikke vedtak. ' +
+              'OKONOMISYSTEM: ingen økonomi/utbetaling.',
           ),
         prioritertKravNummer: z
           .array(z.string())
