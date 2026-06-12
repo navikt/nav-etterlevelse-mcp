@@ -1467,9 +1467,14 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
       };
 
       try {
-        const result = scenarioId
-          ? await client.updateRisikoscenario(scenarioId, { id: scenarioId, ...request })
-          : await client.createRisikoscenario(request);
+        let result: unknown;
+        if (scenarioId) {
+          const existing = await client.getRisikoscenario(scenarioId);
+          const merged = { ...(isRecord(existing) ? existing : {}), id: scenarioId, ...request };
+          result = await client.updateRisikoscenario(scenarioId, merged);
+        } else {
+          result = await client.createRisikoscenario(request);
+        }
         const scenario = normalizeRisikoscenario(
           isRecord(result) ? result : { id: scenarioId, ...request },
         );
@@ -1531,9 +1536,14 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
       };
 
       try {
-        const result = tiltakId
-          ? await client.updateTiltak(tiltakId, { id: tiltakId, ...request })
-          : await client.createTiltak(risikoscenarioId, request);
+        let result: unknown;
+        if (tiltakId) {
+          const existing = await client.getTiltak(tiltakId);
+          const merged = { ...(isRecord(existing) ? existing : {}), id: tiltakId, ...request };
+          result = await client.updateTiltak(tiltakId, merged);
+        } else {
+          result = await client.createTiltak(risikoscenarioId, request);
+        }
         const tiltak = normalizeTiltak(isRecord(result) ? result : { id: tiltakId, ...request });
 
         return toolResult({
