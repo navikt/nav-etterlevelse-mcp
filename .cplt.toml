@@ -1,0 +1,3 @@
+ # Allow commit and tag signing via 1Password SSH agent (op-ssh-sign).
+[propose]
+ allow_gpg_signing = true
