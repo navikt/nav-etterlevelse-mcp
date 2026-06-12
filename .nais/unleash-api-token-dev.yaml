@@ -10,5 +10,3 @@ spec:
     name: dab
   secretName: nav-etterlevelse-mcp-unleash-api-token
   environment: development
-  serverSideApps:
-    - nav-etterlevelse-mcp
