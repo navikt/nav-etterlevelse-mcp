@@ -893,7 +893,10 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
         beskrivelse: z
           .string()
           .optional()
-          .describe('Beskrivelse av etterlevelsesdokumentasjonen — kontekst, løsning og målgruppe'),
+          .describe(
+            'Beskrivelse av etterlevelsesdokumentasjonen — kontekst, løsning og målgruppe. ' +
+              'Hvis system-context.md finnes i repoet, bruk systembeskrivelsen derfra som utgangspunkt.',
+          ),
         behandlingIds: z
           .array(z.string())
           .optional()
@@ -1508,7 +1511,10 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
         title: z.string().min(1).describe('Tittel på etterlevelsesdokumentasjonen'),
         beskrivelse: z
           .string()
-          .describe('Beskrivelse av systemet/løsningen — kontekst, målgruppe og formål'),
+          .describe(
+            'Beskrivelse av systemet/løsningen — kontekst, målgruppe og formål. ' +
+              'Hvis system-context.md finnes i repoet, bruk systembeskrivelsen derfra som utgangspunkt.',
+          ),
         teams: z
           .array(z.string())
           .min(1)
