@@ -1090,7 +1090,7 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
           formatField('Antall vedlegg sendt', filer?.length ?? 0),
           formatListField(
             'Vedlegg',
-            filer?.map((fil) => fil.navn),
+            filer?.map((fil: { navn?: string }) => fil.navn),
           ),
         ].filter((line): line is string => Boolean(line));
         const note =
