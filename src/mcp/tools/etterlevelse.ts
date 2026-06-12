@@ -45,13 +45,36 @@ function asNumber(value: unknown): number | undefined {
   return undefined;
 }
 
+const personalDataFields = new Set([
+  'changeStamp',
+  'lastModifiedBy',
+  'createdBy',
+  'navIdent',
+  'ansvarlig',
+]);
+
+function stripPersonalData(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(stripPersonalData);
+  }
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>)
+        .filter(([key]) => !personalDataFields.has(key))
+        .map(([key, val]) => [key, stripPersonalData(val)]),
+    );
+  }
+  return value;
+}
+
 function toolResult(data: unknown) {
+  const stripped = stripPersonalData(data);
   return {
-    content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }],
+    content: [{ type: 'text' as const, text: JSON.stringify(stripped, null, 2) }],
     structuredContent:
-      data && typeof data === 'object' && !Array.isArray(data)
-        ? (data as Record<string, unknown>)
-        : { data },
+      stripped && typeof stripped === 'object' && !Array.isArray(stripped)
+        ? (stripped as Record<string, unknown>)
+        : { data: stripped },
   };
 }
 
@@ -315,7 +338,6 @@ function normalizeTiltak(raw: unknown) {
     pvkDokumentId: asString(tiltak.pvkDokumentId) ?? '',
     navn: cleanText(tiltak.navn ?? tiltak.name, 'Uten navn'),
     beskrivelse: cleanText(tiltak.beskrivelse),
-    ansvarlig: cleanText(tiltak.ansvarlig),
     frist: cleanText(tiltak.frist),
     iverksatt: typeof tiltak.iverksatt === 'boolean' ? tiltak.iverksatt : undefined,
   };
@@ -330,7 +352,6 @@ function formatTiltakSection(raw: unknown, index?: number): string {
     formatField('PVK-dokumentId', tiltak.pvkDokumentId),
     formatField('Navn', tiltak.navn),
     formatField('Beskrivelse', tiltak.beskrivelse || '(tom)'),
-    formatField('Ansvarlig', tiltak.ansvarlig),
     formatField('Frist', tiltak.frist),
     formatField('Iverksatt', tiltak.iverksatt),
   ].filter((line): line is string => Boolean(line));
@@ -1470,13 +1491,13 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
     'write_tiltak',
     {
       description:
-        'Opprett eller oppdater et tiltak for et risikoscenario. Krever aktiv sesjonslås (kall lock_document først).',
+        'Opprett eller oppdater et tiltak for et risikoscenario. Krever aktiv sesjonslås (kall lock_document først). ' +
+        'Ansvarlig person settes manuelt i etterlevelse.ansatt.nav.no (NAVident behandles ikke av agenten).',
       inputSchema: {
         risikoscenarioId: z.string().uuid().describe('UUID for risikoscenarioet tiltaket tilhører'),
         tiltakId: z.string().uuid().optional().describe('UUID for tiltaket ved oppdatering'),
         navn: z.string().min(1).describe('Kort navn på tiltaket'),
         beskrivelse: z.string().min(1).describe('Beskrivelse av tiltaket'),
-        ansvarlig: z.string().optional().describe('NAVident for ansvarlig'),
         frist: z
           .string()
           .regex(/^\d{4}-\d{2}-\d{2}$/)
@@ -1485,7 +1506,7 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
       },
       annotations: writeAnnotations,
     },
-    async ({ risikoscenarioId, tiltakId, navn, beskrivelse, ansvarlig, frist }) => {
+    async ({ risikoscenarioId, tiltakId, navn, beskrivelse, frist }) => {
       const writeGuardError = requireWriteEnabled();
       if (writeGuardError) return writeGuardError;
 
@@ -1506,7 +1527,6 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
         risikoscenarioId,
         navn,
         beskrivelse,
-        ...(ansvarlig !== undefined ? { ansvarlig } : {}),
         ...(frist !== undefined ? { frist } : {}),
       };
 
