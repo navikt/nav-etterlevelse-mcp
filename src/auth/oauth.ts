@@ -22,6 +22,13 @@ interface AzureTokenResponse {
   token_type?: string;
 }
 
+class AzureConsentRequiredError extends Error {
+  constructor(public readonly claims: string) {
+    super('Azure AD consent required (Conditional Access claims challenge)');
+    this.name = 'AzureConsentRequiredError';
+  }
+}
+
 interface JwtClaims {
   name?: string;
   preferred_username?: string;
@@ -192,6 +199,14 @@ async function exchangeAzureToken(params: URLSearchParams): Promise<AzureTokenRe
   }
 
   if (!response.ok || !payload || typeof payload !== 'object') {
+    const errorObj = payload as Record<string, unknown>;
+    if (
+      typeof errorObj === 'object' &&
+      errorObj.suberror === 'consent_required' &&
+      typeof errorObj.claims === 'string'
+    ) {
+      throw new AzureConsentRequiredError(errorObj.claims);
+    }
     throw new Error(
       `Azure token exchange failed (${response.status}): ${
         typeof payload === 'string' ? payload : JSON.stringify(payload)
@@ -521,6 +536,22 @@ h2{color:#007bff}</style></head>
         res.redirect(302, redirectTarget.toString());
       }
     } catch (error) {
+      if (error instanceof AzureConsentRequiredError) {
+        // Conditional Access Policy challenge — re-initiate Azure AD auth with the claims parameter.
+        // Azure AD returns claims that must be forwarded in the next authorization request.
+        console.error('Azure AD claims challenge, retrying with claims parameter');
+        const retryState = randomToken();
+        authStore.saveAuthSession(retryState, session);
+        const retryUrl = new URL(getAzureAuthorizeEndpoint());
+        retryUrl.searchParams.set('client_id', config.azure.clientId);
+        retryUrl.searchParams.set('response_type', 'code');
+        retryUrl.searchParams.set('redirect_uri', getOAuthCallbackUrl());
+        retryUrl.searchParams.set('scope', config.azure.etterlevelseScope);
+        retryUrl.searchParams.set('state', retryState);
+        retryUrl.searchParams.set('claims', error.claims);
+        res.redirect(302, retryUrl.toString());
+        return;
+      }
       console.error('OAuth callback error', error);
       res.status(500).send('Kunne ikke fullføre OAuth-innloggingen');
     }
