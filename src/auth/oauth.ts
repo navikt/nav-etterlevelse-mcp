@@ -88,6 +88,15 @@ function sendJsonError(res: Response, status: number, error: string, errorDescri
   res.status(status).json({ error, error_description: errorDescription });
 }
 
+function isLocalhostUri(uri: string): boolean {
+  try {
+    const { hostname } = new URL(uri);
+    return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1';
+  } catch {
+    return false;
+  }
+}
+
 function redirectClientError(
   res: Response,
   redirectUri: string,
@@ -292,9 +301,12 @@ export function registerOAuthRoutes(app: Express): void {
   app.post('/device_authorization', (req, res) => {
     setNoStore(res);
     const clientId = bodyString(req.body, 'client_id');
-    if (!clientId || !authStore.getClient(clientId)) {
-      sendJsonError(res, 400, 'invalid_client', 'Unknown client_id');
+    if (!clientId) {
+      sendJsonError(res, 400, 'invalid_client', 'client_id is required');
       return;
+    }
+    if (!authStore.getClient(clientId)) {
+      authStore.registerClient({ clientId, redirectUris: [] });
     }
 
     const deviceCode = randomToken();
@@ -414,8 +426,14 @@ button{margin-top:12px;padding:10px 24px;font-size:1em;cursor:pointer}</style></
       // client_id. Auto-register as a public client — safe because PKCE provides proof of possession.
       client = authStore.registerClient({ clientId, redirectUris: [redirectUri] });
     } else if (!authStore.isRedirectUriAllowed(clientId, redirectUri)) {
-      sendJsonError(res, 400, 'invalid_client', 'Unknown client or redirect_uri');
-      return;
+      if (isLocalhostUri(redirectUri)) {
+        // Copilot CLI uses ephemeral ports — the port changes on every auth attempt.
+        // Safe to accept new localhost ports for already-known public clients.
+        authStore.addRedirectUri(clientId, redirectUri);
+      } else {
+        sendJsonError(res, 400, 'invalid_client', 'Unknown client or redirect_uri');
+        return;
+      }
     }
 
     if (responseType !== 'code') {

@@ -121,6 +121,13 @@ class InMemoryAuthStore {
     return client ? client.redirectUris.includes(redirectUri) : false;
   }
 
+  addRedirectUri(clientId: string, redirectUri: string): void {
+    const client = this.clientRegistrations.get(clientId);
+    if (client && !client.redirectUris.includes(redirectUri)) {
+      client.redirectUris.push(redirectUri);
+    }
+  }
+
   saveAuthSession(state: string, session: AuthSession): void {
     this.authSessions.set(state, this.withTtl(session, authSessionTtlSeconds));
   }
