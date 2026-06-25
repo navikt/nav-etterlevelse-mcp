@@ -74,11 +74,14 @@ function matches(value: string, query: string): boolean {
 
 export class BehandlingskatalogClient {
   constructor(
-    private readonly accessToken: string,
+    private readonly accessToken: string | null,
     private readonly baseUrl: string = config.api.behandlingskatalogBaseUrl,
   ) {}
 
   private async get(path: string, query: Record<string, string | number | undefined> = {}): Promise<unknown> {
+    if (!this.accessToken) {
+      throw new Error('Behandlingskatalog-token ikke tilgjengelig. Legg til nav-etterlevelse-mcp i inbound access policy for behandlingskatalog-backend.');
+    }
     const url = new URL(`${this.baseUrl}${path}`);
     for (const [key, value] of Object.entries(query)) {
       if (value !== undefined) {

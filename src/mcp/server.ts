@@ -29,7 +29,7 @@ export function createMcpServer(ctx: SessionContext): McpServer {
 export async function handleMcpHttpRequest(
   req: Request,
   res: Response,
-  tokens: { etterlevelseToken: string; bkToken: string; tokenData: McpTokenData; mcpAccessToken: string },
+  tokens: { etterlevelseToken: string; bkToken: string | null; tokenData: McpTokenData; mcpAccessToken: string },
 ): Promise<void> {
   const ctx: SessionContext = {
     tokenData: tokens.tokenData,
