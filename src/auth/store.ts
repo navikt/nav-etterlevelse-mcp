@@ -15,6 +15,8 @@ export interface AuthSession {
   codeChallengeMethod: 'S256';
   /** Satt for device code-flyt. Etter Azure AD-callback lagres tokens under denne device_code. */
   deviceCode?: string;
+  /** Satt når vi allerede har forsøkt claims-retry mot Azure AD, for å unngå evig løkke. */
+  claimsRetried?: boolean;
 }
 
 export interface McpTokenData {

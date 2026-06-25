@@ -554,12 +554,13 @@ h2{color:#007bff}</style></head>
         res.redirect(302, redirectTarget.toString());
       }
     } catch (error) {
-      if (error instanceof AzureConsentRequiredError) {
+      if (error instanceof AzureConsentRequiredError && !session.claimsRetried) {
         // Conditional Access Policy challenge — re-initiate Azure AD auth with the claims parameter.
         // Azure AD returns claims that must be forwarded in the next authorization request.
+        // claimsRetried prevents an infinite loop if the CAP condition still isn't satisfied.
         console.error('Azure AD claims challenge, retrying with claims parameter');
         const retryState = randomToken();
-        authStore.saveAuthSession(retryState, session);
+        authStore.saveAuthSession(retryState, { ...session, claimsRetried: true });
         const retryUrl = new URL(getAzureAuthorizeEndpoint());
         retryUrl.searchParams.set('client_id', config.azure.clientId);
         retryUrl.searchParams.set('response_type', 'code');
@@ -568,6 +569,11 @@ h2{color:#007bff}</style></head>
         retryUrl.searchParams.set('state', retryState);
         retryUrl.searchParams.set('claims', error.claims);
         res.redirect(302, retryUrl.toString());
+        return;
+      }
+      if (error instanceof AzureConsentRequiredError) {
+        console.error('Azure AD claims challenge persists after retry — Conditional Access Policy not satisfied');
+        res.status(403).send('Tilgangen ble avvist av Azure AD. Kontakt din IT-administrator dersom problemet vedvarer.');
         return;
       }
       console.error('OAuth callback error', error);
