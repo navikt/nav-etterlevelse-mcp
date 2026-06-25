@@ -231,6 +231,11 @@ export async function ensureFreshAzureTokens(tokenData: McpTokenData): Promise<v
     return;
   }
 
+  if (!tokenData.refreshToken) {
+    // No refresh token available (offline_access not granted) — tokens will expire naturally.
+    return;
+  }
+
   const etterlevelseTokenResponse = await exchangeAzureToken(
     new URLSearchParams({
       grant_type: 'refresh_token',
@@ -242,20 +247,27 @@ export async function ensureFreshAzureTokens(tokenData: McpTokenData): Promise<v
   );
 
   const latestRefreshToken = etterlevelseTokenResponse.refresh_token ?? tokenData.refreshToken;
-  const behandlingskatalogTokenResponse = await exchangeAzureToken(
-    new URLSearchParams({
-      grant_type: 'refresh_token',
-      refresh_token: latestRefreshToken,
-      client_id: config.azure.clientId,
-      client_secret: config.azure.clientSecret,
-      scope: config.azure.behandlingskatalogScope,
-    }),
-  );
-
   tokenData.etterlevelseToken = etterlevelseTokenResponse.access_token;
-  tokenData.bkToken = behandlingskatalogTokenResponse.access_token;
-  tokenData.refreshToken = behandlingskatalogTokenResponse.refresh_token ?? latestRefreshToken;
+  tokenData.refreshToken = latestRefreshToken;
   tokenData.azureExpiresAt = calculateAzureExpiry(etterlevelseTokenResponse.expires_in);
+
+  if (tokenData.bkToken) {
+    try {
+      const behandlingskatalogTokenResponse = await exchangeAzureToken(
+        new URLSearchParams({
+          grant_type: 'refresh_token',
+          refresh_token: latestRefreshToken,
+          client_id: config.azure.clientId,
+          client_secret: config.azure.clientSecret,
+          scope: config.azure.behandlingskatalogScope,
+        }),
+      );
+      tokenData.bkToken = behandlingskatalogTokenResponse.access_token;
+      tokenData.refreshToken = behandlingskatalogTokenResponse.refresh_token ?? latestRefreshToken;
+    } catch (bkError) {
+      console.error('Could not refresh behandlingskatalog token (non-fatal):', bkError);
+    }
+  }
 }
 
 function buildAuthCodeRecord(
@@ -499,25 +511,33 @@ button{margin-top:12px;padding:10px 24px;font-size:1em;cursor:pointer}</style></
         }),
       );
 
-      if (!etterlevelseTokenResponse.refresh_token) {
-        throw new Error('Azure AD did not return a refresh token');
+      // Attempt to fetch a behandlingskatalog token using the refresh token.
+      // This may fail if offline_access is not in scope or if the app is not yet
+      // added to behandlingskatalog's inbound access policy — that is non-fatal.
+      let bkToken: string | null = null;
+      let refreshToken: string | null = etterlevelseTokenResponse.refresh_token ?? null;
+      if (refreshToken) {
+        try {
+          const behandlingskatalogTokenResponse = await exchangeAzureToken(
+            new URLSearchParams({
+              grant_type: 'refresh_token',
+              refresh_token: refreshToken,
+              client_id: config.azure.clientId,
+              client_secret: config.azure.clientSecret,
+              scope: config.azure.behandlingskatalogScope,
+            }),
+          );
+          bkToken = behandlingskatalogTokenResponse.access_token;
+          refreshToken = behandlingskatalogTokenResponse.refresh_token ?? refreshToken;
+        } catch (bkError) {
+          console.error('Could not fetch behandlingskatalog token (non-fatal):', bkError);
+        }
       }
-
-      const behandlingskatalogTokenResponse = await exchangeAzureToken(
-        new URLSearchParams({
-          grant_type: 'refresh_token',
-          refresh_token: etterlevelseTokenResponse.refresh_token,
-          client_id: config.azure.clientId,
-          client_secret: config.azure.clientSecret,
-          scope: config.azure.behandlingskatalogScope,
-        }),
-      );
 
       const tokenData: McpTokenData = {
         etterlevelseToken: etterlevelseTokenResponse.access_token,
-        bkToken: behandlingskatalogTokenResponse.access_token,
-        refreshToken:
-          behandlingskatalogTokenResponse.refresh_token ?? etterlevelseTokenResponse.refresh_token,
+        bkToken,
+        refreshToken,
         azureExpiresAt: calculateAzureExpiry(etterlevelseTokenResponse.expires_in),
         ...getUserIdentity(etterlevelseTokenResponse),
       };
@@ -557,8 +577,9 @@ h2{color:#007bff}</style></head>
       if (error instanceof AzureConsentRequiredError && !session.claimsRetried) {
         // Conditional Access Policy challenge — re-initiate Azure AD auth with the claims parameter.
         // Azure AD returns claims that must be forwarded in the next authorization request.
+        // prompt=consent forces an interactive screen rather than silent SSO.
         // claimsRetried prevents an infinite loop if the CAP condition still isn't satisfied.
-        console.error('Azure AD claims challenge, retrying with claims parameter');
+        console.error('Azure AD claims challenge, retrying with claims parameter:', error.claims);
         const retryState = randomToken();
         authStore.saveAuthSession(retryState, { ...session, claimsRetried: true });
         const retryUrl = new URL(getAzureAuthorizeEndpoint());
@@ -568,11 +589,15 @@ h2{color:#007bff}</style></head>
         retryUrl.searchParams.set('scope', config.azure.etterlevelseScope);
         retryUrl.searchParams.set('state', retryState);
         retryUrl.searchParams.set('claims', error.claims);
+        retryUrl.searchParams.set('prompt', 'consent');
         res.redirect(302, retryUrl.toString());
         return;
       }
       if (error instanceof AzureConsentRequiredError) {
-        console.error('Azure AD claims challenge persists after retry — Conditional Access Policy not satisfied');
+        console.error(
+          'Azure AD claims challenge persists after retry — admin consent may be required for the app or scope. claims:',
+          error.claims,
+        );
         res.status(403).send('Tilgangen ble avvist av Azure AD. Kontakt din IT-administrator dersom problemet vedvarer.');
         return;
       }

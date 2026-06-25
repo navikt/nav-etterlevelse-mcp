@@ -21,8 +21,8 @@ export interface AuthSession {
 
 export interface McpTokenData {
   etterlevelseToken: string;
-  bkToken: string;
-  refreshToken: string;
+  bkToken: string | null;
+  refreshToken: string | null;
   azureExpiresAt: number;
   userEmail: string;
   userName: string;

@@ -1,6 +1,6 @@
 const ETTERLEVELSE_SCOPE =
   process.env.ETTERLEVELSE_SCOPE ??
-  'api://prod-gcp.teamdatajegerne.etterlevelse-backend/.default offline_access';
+  'api://prod-gcp.teamdatajegerne.etterlevelse-backend/.default';
 const BEHANDLINGSKATALOG_SCOPE =
   process.env.BEHANDLINGSKATALOG_SCOPE ??
   'api://prod-gcp.teamdatajegerne.behandlingskatalog-backend/.default';

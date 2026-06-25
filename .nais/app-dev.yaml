@@ -30,7 +30,7 @@ spec:
     - name: LOG_LEVEL
       value: INFO
     - name: ETTERLEVELSE_SCOPE
-      value: api://dev-gcp.teamdatajegerne.etterlevelse-backend/.default offline_access
+      value: api://dev-gcp.teamdatajegerne.etterlevelse-backend/.default
     - name: BEHANDLINGSKATALOG_SCOPE
       value: api://dev-gcp.teamdatajegerne.behandlingskatalog-backend/.default
   accessPolicy:
