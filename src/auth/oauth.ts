@@ -393,8 +393,12 @@ button{margin-top:12px;padding:10px 24px;font-size:1em;cursor:pointer}</style></
       return;
     }
 
-    const client = authStore.getClient(clientId);
-    if (!client || !authStore.isRedirectUriAllowed(clientId, redirectUri)) {
+    let client = authStore.getClient(clientId);
+    if (!client) {
+      // Copilot CLI and similar MCP clients may skip dynamic registration and generate their own
+      // client_id. Auto-register as a public client — safe because PKCE provides proof of possession.
+      client = authStore.registerClient({ clientId, redirectUris: [redirectUri] });
+    } else if (!authStore.isRedirectUriAllowed(clientId, redirectUri)) {
       sendJsonError(res, 400, 'invalid_client', 'Unknown client or redirect_uri');
       return;
     }

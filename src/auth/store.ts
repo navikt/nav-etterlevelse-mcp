@@ -96,8 +96,8 @@ class InMemoryAuthStore {
     cleanupHandle.unref?.();
   }
 
-  registerClient(input: { clientName?: string; redirectUris: string[] }): ClientRegistration {
-    const clientId = randomBytes(24).toString('base64url');
+  registerClient(input: { clientId?: string; clientName?: string; redirectUris: string[] }): ClientRegistration {
+    const clientId = input.clientId ?? randomBytes(24).toString('base64url');
     const client: ClientRegistration = {
       clientId,
       clientName: input.clientName,
