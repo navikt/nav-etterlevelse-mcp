@@ -428,8 +428,6 @@ button{margin-top:12px;padding:10px 24px;font-size:1em;cursor:pointer}</style></
     azureAuthorizeUrl.searchParams.set('redirect_uri', getOAuthCallbackUrl());
     azureAuthorizeUrl.searchParams.set('scope', config.azure.etterlevelseScope);
     azureAuthorizeUrl.searchParams.set('state', internalState);
-    azureAuthorizeUrl.searchParams.set('code_challenge', codeChallenge);
-    azureAuthorizeUrl.searchParams.set('code_challenge_method', 'S256');
 
     res.redirect(302, azureAuthorizeUrl.toString());
   });
