@@ -128,6 +128,7 @@ const etterlevelseDokumentasjonReadOnlyFields = [
   'hasCurrentUser',
   'irrepirsibleFields',
   'resources',
+  'prioritertKravNummer', // Strippes fra GET — settes eksplisitt av agenten hvis ønsket
 ] as const;
 
 const ytterligereEgenskaperCodes = [
@@ -850,23 +851,43 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
           client.getEtterlevelse({ etterlevelseDokumentasjonId, kravNummer, kravVersjon }),
         ]);
 
+        const krav = isRecord(kravRaw) ? kravRaw : {};
+
+        // Advar om UTGAATT-krav
+        if (krav.status === 'UTGAATT') {
+          return toolError(
+            `K${kravNummer}.${kravVersjon} har status UTGAATT. ` +
+              'Finn den aktive versjonen via list_krav og bruk den i stedet.',
+          );
+        }
+
+        // Respekter behovForBegrunnelse: fjern begrunnelsestekst for SK-er der feltet ikke vises i UI
+        const suksesskriterier = Array.isArray(krav.suksesskriterier)
+          ? (krav.suksesskriterier as Record<string, unknown>[])
+          : [];
+        const saniterteSKB = suksesskriterieBegrunnelser.map((skb) => {
+          const def = suksesskriterier.find(
+            (sk) => sk.id === skb.suksesskriterieId || sk.id === String(skb.suksesskriterieId),
+          );
+          if (def && def.behovForBegrunnelse === false) {
+            return { ...skb, begrunnelse: '' };
+          }
+          return skb;
+        });
+
         const writeResult = await client.upsertEtterlevelse({
           etterlevelseDokumentasjonId,
           kravNummer,
           kravVersjon,
           status,
           statusBegrunnelse,
-          suksesskriterieBegrunnelser,
+          suksesskriterieBegrunnelser: saniterteSKB,
         });
 
         // Build summary with krav context for human review
-        const krav = isRecord(kravRaw) ? kravRaw : {};
         const kravNavn = typeof krav.navn === 'string' ? krav.navn : `K${kravNummer}.${kravVersjon}`;
         const hensikt = typeof krav.hensikt === 'string' ? stripHtml(krav.hensikt) : '';
         const beskrivelse = typeof krav.beskrivelse === 'string' ? stripHtml(krav.beskrivelse) : '';
-        const suksesskriterier = Array.isArray(krav.suksesskriterier)
-          ? (krav.suksesskriterier as Record<string, unknown>[])
-          : [];
 
         const existingItems = extractArray<Record<string, unknown>>(existingRaw);
         const existingSKBs = Array.isArray(existingItems[0]?.suksesskriterieBegrunnelser)
@@ -883,7 +904,7 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
           lines.push(boxSection('KRAVETS HENSIKT', hensikt, W));
         }
 
-        for (const [i, skb] of suksesskriterieBegrunnelser.entries()) {
+        for (const [i, skb] of saniterteSKB.entries()) {
           const def = suksesskriterier.find(
             (sk) => sk.id === skb.suksesskriterieId || sk.id === String(skb.suksesskriterieId),
           );
