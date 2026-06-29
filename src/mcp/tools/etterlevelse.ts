@@ -1370,7 +1370,8 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
     'write_pvk_egenskaper',
     {
       description:
-        'Oppdater egenskaper på det låste PVK-dokumentet ved å hente eksisterende dokument og sende full PUT.',
+        'Oppdater egenskaper på det låste PVK-dokumentet ved å hente eksisterende dokument og sende full PUT. ' +
+        'Dekker veiviseren "Vurder behovet for PVK" i UI-et.',
       inputSchema: {
         dpProcessProfilering: z
           .boolean()
@@ -1384,6 +1385,19 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
           .array(z.enum(ytterligereEgenskaperCodes))
           .optional()
           .describe(ytterligereEgenskaperDescription),
+        pvkVurdering: z
+          .enum(['SKAL_UTFORE', 'SKAL_IKKE_UTFORE', 'ALLEREDE_UTFORT'])
+          .optional()
+          .describe(
+            'Konklusjon fra PVK-behovsvurderingen. ' +
+              'SKAL_UTFORE: PVK skal gjennomføres. ' +
+              'SKAL_IKKE_UTFORE: PVK er ikke nødvendig (oppgi pvkVurderingsBegrunnelse). ' +
+              'ALLEREDE_UTFORT: PVK er allerede gjennomført (oppgi pvkVurderingsBegrunnelse).',
+          ),
+        pvkVurderingsBegrunnelse: z
+          .string()
+          .optional()
+          .describe('Begrunnelse for pvkVurdering når denne er SKAL_IKKE_UTFORE eller ALLEREDE_UTFORT.'),
       },
       annotations: writeAnnotations,
     },
@@ -1391,6 +1405,8 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
       dpProcessProfilering,
       dpProcessHelautomatiskBehandling,
       ytterligereEgenskaper,
+      pvkVurdering,
+      pvkVurderingsBegrunnelse,
     }) => {
       const writeGuardError = requireWriteEnabled();
       if (writeGuardError) return writeGuardError;
@@ -1413,6 +1429,8 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
           ? { dpProcessHelautomatiskBehandling }
           : {}),
         ...(ytterligereEgenskaper !== undefined ? { ytterligereEgenskaper } : {}),
+        ...(pvkVurdering !== undefined ? { pvkVurdering } : {}),
+        ...(pvkVurderingsBegrunnelse !== undefined ? { pvkVurderingsBegrunnelse } : {}),
       };
 
       if (Object.keys(patch).length === 0) {
@@ -1425,16 +1443,15 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
         const previewLines = [
           formatField('PVK-dokumentId', lockedPvkDokumentId),
           formatField('Profilering', saved.dpProcessProfilering),
-          formatField(
-            'Helautomatisert behandling',
-            saved.dpProcessHelautomatiskBehandling,
-          ),
+          formatField('Helautomatisert behandling', saved.dpProcessHelautomatiskBehandling),
           formatListField(
             'Ytterligere egenskaper',
             Array.isArray(saved.ytterligereEgenskaper)
               ? saved.ytterligereEgenskaper.map((value) => asString(value))
               : undefined,
           ),
+          formatField('PVK-vurdering', saved.pvkVurdering),
+          formatField('Begrunnelse', saved.pvkVurderingsBegrunnelse),
         ].filter((line): line is string => Boolean(line));
 
         return toolResult({
