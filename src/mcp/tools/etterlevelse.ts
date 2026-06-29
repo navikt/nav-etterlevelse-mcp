@@ -1412,8 +1412,8 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
         'Opprett eller oppdater et risikoscenario i PVK-dokumentet. Krever aktiv sesjonslås (kall lock_document først).',
       inputSchema: {
         scenarioId: z.string().uuid().optional().describe('UUID for risikoscenarioet ved oppdatering'),
-        navn: z.string().min(1).describe('Kort navn på risikoscenarioet'),
-        beskrivelse: z.string().min(1).describe('Beskrivelse av risikoscenarioet'),
+        navn: z.string().min(1).describe('Kort navn på risikoscenarioet (ren tekst — markdown vises som tegn)'),
+        beskrivelse: z.string().min(1).describe('Beskrivelse av risikoscenarioet (ren tekst — markdown vises som tegn)'),
         sannsynlighetsNivaa: z.number().int().min(1).max(5).optional(),
         sannsynlighetsNivaaBegrunnelse: z.string().optional(),
         konsekvensNivaa: z.number().int().min(1).max(5).optional(),
@@ -1521,8 +1521,8 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
       inputSchema: {
         risikoscenarioId: z.string().uuid().describe('UUID for risikoscenarioet tiltaket tilhører'),
         tiltakId: z.string().uuid().optional().describe('UUID for tiltaket ved oppdatering'),
-        navn: z.string().min(1).describe('Kort navn på tiltaket'),
-        beskrivelse: z.string().min(1).describe('Beskrivelse av tiltaket'),
+        navn: z.string().min(1).describe('Kort navn på tiltaket (ren tekst — markdown vises som tegn)'),
+        beskrivelse: z.string().min(1).describe('Beskrivelse av tiltaket (ren tekst — markdown vises som tegn)'),
         frist: z
           .string()
           .regex(/^\d{4}-\d{2}-\d{2}$/)
