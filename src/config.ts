@@ -7,9 +7,9 @@ const BEHANDLINGSKATALOG_SCOPE =
 // Interne Kubernetes-serviceadresser (app-navn fra Azure-scope: api://prod-gcp.{namespace}.{app}/.default).
 // Overstyr med env-variabler hvis tjenestenavnene avviker fra scope-navnene.
 const ETTERLEVELSE_API_BASE_URL =
-  process.env.ETTERLEVELSE_API_BASE_URL ?? 'http://etterlevelse-backend.teamdatajegerne/api';
+  process.env.ETTERLEVELSE_API_BASE_URL ?? 'http://etterlevelse-backend.teamdatajegerne';
 const BEHANDLINGSKATALOG_API_BASE_URL =
-  process.env.BEHANDLINGSKATALOG_API_BASE_URL ?? 'http://behandlingskatalog-backend.teamkatalog/api';
+  process.env.BEHANDLINGSKATALOG_API_BASE_URL ?? 'http://behandlingskatalog-backend.teamdatajegerne/api';
 
 function requireEnv(name: string): string {
   const value = process.env[name];
