@@ -232,7 +232,7 @@ export async function ensureFreshAzureTokens(tokenData: McpTokenData): Promise<v
   }
 
   if (!tokenData.refreshToken) {
-    // No refresh token available — tokens will expire naturally.
+    // No refresh token available (offline_access not granted) — tokens will expire naturally.
     return;
   }
 
@@ -379,7 +379,7 @@ button{margin-top:12px;padding:10px 24px;font-size:1em;cursor:pointer}</style></
     azureAuthorizeUrl.searchParams.set('client_id', config.azure.clientId);
     azureAuthorizeUrl.searchParams.set('response_type', 'code');
     azureAuthorizeUrl.searchParams.set('redirect_uri', getOAuthCallbackUrl());
-    azureAuthorizeUrl.searchParams.set('scope', `offline_access ${config.azure.etterlevelseScope}`);
+    azureAuthorizeUrl.searchParams.set('scope', config.azure.etterlevelseScope);
     azureAuthorizeUrl.searchParams.set('state', internalState);
 
     res.redirect(302, azureAuthorizeUrl.toString());
@@ -471,7 +471,7 @@ button{margin-top:12px;padding:10px 24px;font-size:1em;cursor:pointer}</style></
     azureAuthorizeUrl.searchParams.set('client_id', config.azure.clientId);
     azureAuthorizeUrl.searchParams.set('response_type', 'code');
     azureAuthorizeUrl.searchParams.set('redirect_uri', getOAuthCallbackUrl());
-    azureAuthorizeUrl.searchParams.set('scope', `offline_access ${config.azure.etterlevelseScope}`);
+    azureAuthorizeUrl.searchParams.set('scope', config.azure.etterlevelseScope);
     azureAuthorizeUrl.searchParams.set('state', internalState);
 
     res.redirect(302, azureAuthorizeUrl.toString());
@@ -507,7 +507,7 @@ button{margin-top:12px;padding:10px 24px;font-size:1em;cursor:pointer}</style></
           redirect_uri: getOAuthCallbackUrl(),
           client_id: config.azure.clientId,
           client_secret: config.azure.clientSecret,
-           scope: `offline_access ${config.azure.etterlevelseScope}`,
+          scope: config.azure.etterlevelseScope,
         }),
       );
 
@@ -586,7 +586,7 @@ h2{color:#007bff}</style></head>
         retryUrl.searchParams.set('client_id', config.azure.clientId);
         retryUrl.searchParams.set('response_type', 'code');
         retryUrl.searchParams.set('redirect_uri', getOAuthCallbackUrl());
-        retryUrl.searchParams.set('scope', `offline_access ${config.azure.etterlevelseScope}`);
+        retryUrl.searchParams.set('scope', config.azure.etterlevelseScope);
         retryUrl.searchParams.set('state', retryState);
         retryUrl.searchParams.set('claims', error.claims);
         retryUrl.searchParams.set('prompt', 'consent');
