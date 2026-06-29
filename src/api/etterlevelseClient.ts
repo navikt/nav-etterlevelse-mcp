@@ -375,21 +375,27 @@ export class EtterlevelseClient {
       kravNummer: input.kravNummer,
       kravVersjon: input.kravVersjon,
     });
-    const items = extractArray<Record<string, unknown>>(existing);
-    const existingItem = items[0];
 
-    const body = {
+    // Etterlevelse-status: UNDER_REDIGERING er gyldig for det øverste statusfeltet.
+    // UNDER_ARBEID er kun gyldig for suksesskriterieStatus.
+    const etterlevelseStatus = input.status === 'UNDER_ARBEID' ? 'UNDER_REDIGERING' : input.status;
+
+    const body: Record<string, unknown> = {
       etterlevelseDokumentasjonId: input.etterlevelseDokumentasjonId,
       kravNummer: input.kravNummer,
       kravVersjon: input.kravVersjon,
       etterleves: input.status !== 'IKKE_RELEVANT',
-      status: input.status,
+      status: etterlevelseStatus,
       statusBegrunnelse: input.statusBegrunnelse ?? '',
       suksesskriterieBegrunnelser: input.suksesskriterieBegrunnelser,
     };
 
-    if (existingItem && typeof existingItem.id === 'string') {
-      return this.put(`/etterlevelse/${existingItem.id}`, body);
+    if (isRecord(existing) && typeof existing.id === 'string') {
+      // Inkluder version for optimistisk låsing — uten dette får vi 403 Forbidden
+      if (typeof existing.version === 'number') {
+        body.version = existing.version;
+      }
+      return this.put(`/etterlevelse/${existing.id}`, body);
     }
 
     return this.post('/etterlevelse', body);
