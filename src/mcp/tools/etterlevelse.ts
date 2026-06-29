@@ -720,7 +720,7 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
 
       const { lockedPvkDokumentId } = ctx.tokenData;
       if (!lockedPvkDokumentId) {
-        return toolError('Ingen PVK-dokument funnet. Kall lock_document først.');
+        return toolError('Ingen PVK-dokument funnet for dette etterlevelsesdokumentet. Opprett PVK-dokument i etterlevelse.ansatt.nav.no først.');
       }
 
       try {
@@ -778,7 +778,7 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
       }
 
       if (!ctx.tokenData.lockedPvkDokumentId) {
-        return toolError('Ingen PVK-dokument funnet. Kall lock_document først.');
+        return toolError('Ingen PVK-dokument funnet for dette etterlevelsesdokumentet. Opprett PVK-dokument i etterlevelse.ansatt.nav.no først.');
       }
 
       try {
