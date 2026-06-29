@@ -34,10 +34,11 @@ export async function requireMcpBearerToken(
     await ensureFreshAzureTokens(tokenData);
   } catch (error) {
     console.error('Failed to refresh Azure tokens for MCP request', error);
-    if (tokenData.azureExpiresAt <= Date.now()) {
-      unauthorized(res, 'Azure access token has expired');
-      return;
-    }
+  }
+
+  if (tokenData.azureExpiresAt <= Date.now()) {
+    unauthorized(res, 'Azure access token has expired — please re-authenticate');
+    return;
   }
 
   (res.locals as AuthenticatedLocals).tokenData = tokenData;
