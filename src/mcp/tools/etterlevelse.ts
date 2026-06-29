@@ -492,18 +492,19 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
     },
     async ({ etterlevelseDokumentasjonId }) => {
       try {
-        const doc = await client.getEtterlevelseDokumentasjon(etterlevelseDokumentasjonId);
+        // Bruk REST for å få hasCurrentUserAccess (ikke tilgjengelig i GraphQL)
+        const docRaw = await client.getEtterlevelseDokumentasjonRaw(etterlevelseDokumentasjonId);
 
-        if (!isRecord(doc)) {
+        if (!isRecord(docRaw)) {
           return toolError(`Fant ikke etterlevelsesdokumentasjon med id ${etterlevelseDokumentasjonId}`);
         }
 
-        const title = typeof doc.title === 'string' ? doc.title : etterlevelseDokumentasjonId;
-        const teams = Array.isArray(doc.teams)
-          ? doc.teams.filter((team): team is string => typeof team === 'string')
+        const title = typeof docRaw.title === 'string' ? docRaw.title : etterlevelseDokumentasjonId;
+        const teams = Array.isArray(docRaw.teams)
+          ? docRaw.teams.filter((team): team is string => typeof team === 'string')
           : [];
 
-        if (doc.hasCurrentUserAccess === false) {
+        if (docRaw.hasCurrentUserAccess === false) {
           return toolError(
             `Du har ikke tilgang til å redigere "${title}". ` +
               `Dokumentet eies av team: ${teams.join(', ')}. ` +
