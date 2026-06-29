@@ -503,17 +503,10 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
           ? doc.teams.filter((team): team is string => typeof team === 'string')
           : [];
 
-        if (teams.length === 0) {
+        if (doc.hasCurrentUserAccess === false) {
           return toolError(
-            `Dokumentet "${title}" har ingen registrerte team. Kan ikke verifisere eierskap.`,
-          );
-        }
-
-        const match = await ctx.graphClient.findMatchingTeam(teams, ctx.tokenData.userGroups);
-
-        if (!match) {
-          return toolError(
-            `Du er ikke medlem av noen av teamene som eier "${title}": ${teams.join(', ')}. ` +
+            `Du har ikke tilgang til å redigere "${title}". ` +
+              `Dokumentet eies av team: ${teams.join(', ')}. ` +
               'Kun teammedlemmer kan låse sesjonen til dette dokumentet.',
           );
         }
@@ -539,7 +532,6 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
           documentId: etterlevelseDokumentasjonId,
           documentTitle: title,
           pvkDokumentId: lockedPvkDokumentId ?? null,
-          teamMatch: match.teamName,
           message: `Sesjonen er nå låst til "${title}". Skriveoperasjoner er begrenset til dette dokumentet.`,
         });
       } catch (error) {

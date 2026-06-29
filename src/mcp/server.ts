@@ -3,7 +3,6 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { BehandlingskatalogClient } from '../api/behandlingskatalogClient.js';
 import { EtterlevelseClient } from '../api/etterlevelseClient.js';
-import { GraphClient } from '../api/graphClient.js';
 import { mcpServerInfo } from '../config.js';
 import { type McpTokenData } from '../auth/store.js';
 import { registerBehandlingskatalogTools } from './tools/behandlingskatalog.js';
@@ -13,7 +12,6 @@ export interface SessionContext {
   tokenData: McpTokenData;
   mcpAccessToken: string;
   etterlevelseClient: EtterlevelseClient;
-  graphClient: GraphClient;
 }
 
 export function createMcpServer(ctx: SessionContext): McpServer {
@@ -35,7 +33,6 @@ export async function handleMcpHttpRequest(
     tokenData: tokens.tokenData,
     mcpAccessToken: tokens.mcpAccessToken,
     etterlevelseClient: new EtterlevelseClient(tokens.etterlevelseToken),
-    graphClient: new GraphClient(tokens.etterlevelseToken),
   };
 
   const server = createMcpServer(ctx);
