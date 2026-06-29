@@ -698,6 +698,15 @@ h2{color:#007bff}</style></head>
         return;
       }
 
+      // Hvis Azure AD-tokenet fortsatt er utløpt etter forsøk på refresh (f.eks. fordi
+      // offline_access ikke er tilgjengelig), avvis MCP-refresh slik at klienten
+      // tvinges til full PKCE re-autentisering med browser.
+      if (refreshTokenRecord.tokenData.azureExpiresAt <= Date.now()) {
+        authStore.deleteRefreshToken(refreshToken);
+        sendJsonError(res, 400, 'invalid_grant', 'Azure access token has expired — full re-authentication required');
+        return;
+      }
+
       authStore.deleteRefreshToken(refreshToken);
 
       const newAccessToken = randomToken();
