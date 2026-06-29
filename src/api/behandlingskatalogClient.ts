@@ -114,26 +114,23 @@ export class BehandlingskatalogClient {
   }
 
   async searchBehandlinger(search: string): Promise<unknown[]> {
-    const payload = await this.get('/process', {
-      pageSize: 50,
-      pageNumber: 0,
-    });
+    // Skill-gotcha: bruk dedikert søkeendepunkt — ikke hent alle og filtrer client-side
+    const payload = await this.get(`/process/search/${encodeURIComponent(search)}`);
 
     const items = extractArray<Record<string, unknown>>(payload);
-    return items
-      .map((item) => ({
-        id: asString(item.id) ?? '',
-        number: asString(item.number) ?? '',
-        name: asString(item.name) ?? asString(item.navn) ?? 'Uten navn',
-        purposes: extractStringArray(item.purposes ?? item.formaal),
-        status: asString(item.status) ?? '',
-      }))
-      .filter((item) => matches(`${item.number} ${item.name}`, search));
+    return items.map((item) => ({
+      id: asString(item.id) ?? '',
+      number: asString(item.number) ?? '',
+      name: asString(item.name) ?? asString(item.navn) ?? 'Uten navn',
+      purposes: extractStringArray(item.purposes ?? item.formaal),
+      status: asString(item.status) ?? '',
+    }));
   }
 
   async getBehandling(id: string): Promise<unknown> {
     if (/^B\d+$/i.test(id.trim())) {
-      const payload = await this.get('/process', { pageSize: 200, pageNumber: 0 });
+      // Skill-gotcha: bruk søkeendepunkt for B-nummer-oppslag — ikke hent alle og filtrer
+      const payload = await this.get(`/process/search/${encodeURIComponent(id.trim())}`);
       const items = extractArray<Record<string, unknown>>(payload);
       const match = items.find((item) => asString(item.number)?.toLowerCase() === id.toLowerCase());
       if (!match) {
