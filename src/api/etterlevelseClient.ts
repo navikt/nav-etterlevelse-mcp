@@ -82,7 +82,7 @@ function matchesJsonFilter(value: unknown, filter: string | undefined): boolean 
     return true;
   }
 
-  return JSON.stringify(value).toLowerCase().includes(filter.toLowerCase());
+  return JSON.stringify(value ?? '').toLowerCase().includes(filter.toLowerCase());
 }
 
 function matchesTaggerFilter(value: unknown, filter: string[] | undefined): boolean {
@@ -304,13 +304,12 @@ export class EtterlevelseClient {
           : []),
       ].join(', ');
       const query = `{ krav(filter: {${filterParts}}) {
-          content { kravNummer kravVersjon navn status tema relevansFor }
+          content { kravNummer kravVersjon navn status tagger relevansFor { code shortName } }
         } }`;
       const data = await this.graphql(query);
       if (isRecord(data) && isRecord(data['krav'])) {
         return extractArray<Record<string, unknown>>(data['krav']['content'])
-          .filter((item) => matchesJsonFilter(item.relevansFor, input.relevansFor))
-          .filter((item) => matchesJsonFilter(item.tema, input.tema));
+          .filter((item) => matchesJsonFilter(item.relevansFor, input.relevansFor));
       }
       return [];
     }
@@ -351,11 +350,12 @@ export class EtterlevelseClient {
     kravNummer: number;
     kravVersjon: number;
   }): Promise<unknown> {
-    return this.get('/etterlevelse', {
-      etterlevelseDokumentasjonId: input.etterlevelseDokumentasjonId,
-      kravNummer: input.kravNummer,
-      kravVersjon: input.kravVersjon,
-    });
+    const payload = await this.get(
+      `/etterlevelse/etterlevelseDokumentasjon/${input.etterlevelseDokumentasjonId}/${input.kravNummer}`,
+    );
+    // Filter client-side på kravVersjon
+    const items = extractArray<Record<string, unknown>>(payload);
+    return items.find((item) => Number(item.kravVersjon) === input.kravVersjon) ?? null;
   }
 
   async upsertEtterlevelse(input: {
