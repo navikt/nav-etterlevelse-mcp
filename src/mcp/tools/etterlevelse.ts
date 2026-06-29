@@ -568,7 +568,7 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
           return toolResult({
             preview:
               `Ingen PVK-dokument funnet for "${lockedDocumentTitle}". ` +
-              'Opprett PVK-dokument i etterlevelse.ansatt.nav.no først.',
+              'Kall create_pvk_dokument for å opprette det.',
             found: false,
             etterlevelseDokumentasjonId: lockedDocumentId,
           });
@@ -591,6 +591,50 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
           pvkDokumentId: asString(pvkDokument.id) ?? null,
           status: asString(pvkDokument.status) ?? null,
           pvkDokument,
+        });
+      } catch (error) {
+        return toolError(error);
+      }
+    },
+  );
+
+  server.registerTool(
+    'create_pvk_dokument',
+    {
+      description:
+        'Opprett PVK-dokument for det låste etterlevelsesdokumentet. ' +
+        'Kall dette i stedet for å be brukeren opprette det manuelt i UI-et. ' +
+        'Etter oppretting oppdateres sesjonen automatisk med pvkDokumentId.',
+      inputSchema: {},
+      annotations: writeAnnotations,
+    },
+    async () => {
+      const writeGuardError = requireWriteEnabled();
+      if (writeGuardError) return writeGuardError;
+
+      const guardError = requireDocumentLock(ctx);
+      if (guardError) return guardError;
+
+      const lockedDocumentId = ctx.tokenData.lockedDocumentId as string;
+      const lockedDocumentTitle = ctx.tokenData.lockedDocumentTitle ?? lockedDocumentId;
+
+      try {
+        const result = await client.createPvkDokument(lockedDocumentId);
+        if (!isRecord(result)) {
+          return toolError('Uventet svar fra API ved opprettelse av PVK-dokument.');
+        }
+
+        const pvkDokumentId = asString(result.id);
+        if (!pvkDokumentId) {
+          return toolError('PVK-dokument ble opprettet men mangler ID i responsen.');
+        }
+
+        authStore.updateMcpToken(ctx.mcpAccessToken, { lockedPvkDokumentId: pvkDokumentId });
+
+        return toolResult({
+          message: `✅ PVK-dokument opprettet for "${lockedDocumentTitle}".`,
+          pvkDokumentId,
+          status: asString(result.status) ?? null,
         });
       } catch (error) {
         return toolError(error);

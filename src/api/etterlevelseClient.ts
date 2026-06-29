@@ -412,6 +412,10 @@ export class EtterlevelseClient {
     }
   }
 
+  async createPvkDokument(etterlevelseDokumentasjonId: string): Promise<unknown> {
+    return this.post('/pvkdokument', { etterlevelseDokumentId: etterlevelseDokumentasjonId });
+  }
+
   async getPvkDokumentById(pvkDokumentId: string): Promise<unknown> {
     return this.get(`/pvkdokument/${pvkDokumentId}`);
   }
