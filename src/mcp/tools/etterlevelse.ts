@@ -1555,12 +1555,26 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
         ...(frist !== undefined ? { frist } : {}),
       };
 
-      try {
-        let result: unknown;
-        if (tiltakId) {
-          const existing = await client.getTiltak(tiltakId);
-          const merged = { ...(isRecord(existing) ? existing : {}), id: tiltakId, ...request };
-          result = await client.updateTiltak(tiltakId, merged);
+        try {
+          let result: unknown;
+          if (tiltakId) {
+            const existing = await client.getTiltak(tiltakId);
+            const existingRecord = isRecord(existing) ? existing : {};
+
+            // Skill-gotcha: ansvarlig og ansvarligTeam returneres som objekter fra GET
+            // men MÅ sendes som strenger i PUT — send dem ikke med (settes manuelt i UI)
+            // Strip også changeStamp, version og risikoscenarioIds (read-only i PUT)
+            const {
+              changeStamp: _cs,
+              version: _v,
+              risikoscenarioIds: _rs,
+              ansvarlig: _a,
+              ansvarligTeam: _at,
+              ...cleanedExisting
+            } = existingRecord;
+
+            const merged = { ...cleanedExisting, id: tiltakId, ...request };
+            result = await client.updateTiltak(tiltakId, merged);
         } else {
           result = await client.createTiltak(risikoscenarioId, request);
         }
