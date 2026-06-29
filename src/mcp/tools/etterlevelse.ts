@@ -980,6 +980,10 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
           .array(z.string())
           .optional()
           .describe('UUID-liste over team fra teamkatalogen som eier dokumentet'),
+        behandlerPersonopplysninger: z
+          .boolean()
+          .optional()
+          .describe('Angir om systemet behandler personopplysninger'),
       },
       annotations: writeAnnotations,
     },
@@ -991,6 +995,7 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
       Risikovurderinger,
       prioritertKravNummer,
       teams,
+      behandlerPersonopplysninger,
     }) => {
       const writeGuardError = requireWriteEnabled();
       if (writeGuardError) return writeGuardError;
@@ -1013,6 +1018,7 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
         if (Risikovurderinger !== undefined) cleaned.Risikovurderinger = Risikovurderinger;
         if (prioritertKravNummer !== undefined) cleaned.prioritertKravNummer = prioritertKravNummer;
         if (teams !== undefined) cleaned.teams = teams;
+        if (behandlerPersonopplysninger !== undefined) cleaned.behandlerPersonopplysninger = behandlerPersonopplysninger;
 
         const result = await client.updateEtterlevelseDokumentasjon(lockedDocumentId, cleaned);
         const saved = isRecord(result) ? result : {};
