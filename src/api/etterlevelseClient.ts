@@ -473,6 +473,8 @@ export class EtterlevelseClient {
       etterlevelseDokumentasjonId,
       beskrivelse,
       update: isUpdate,
+      // Skill-gotcha: backend krasjer med NullPointerException hvis filer er null/undefined
+      filer: [],
       ...(existingId ? { id: existingId } : {}),
     };
 
