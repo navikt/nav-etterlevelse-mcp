@@ -422,8 +422,24 @@ export class EtterlevelseClient {
       throw new Error(`Fant ikke PVK-dokument med id ${pvkDokumentId}`);
     }
 
+    // Skill-gotcha: strip read-only-felter som backend avviser i PUT
+    const { changeStamp: _cs, currentEtterlevelseDokumentVersjon: _cev, ...cleaned } = existing;
+
+    // Skill-gotcha: ytterligereEgenskaper returneres som [{code, ...}] fra GET
+    // men MÅ sendes som ['KODE1', 'KODE2'] — ellers 400 deserialization-feil
+    if (Array.isArray(cleaned.ytterligereEgenskaper)) {
+      cleaned.ytterligereEgenskaper = cleaned.ytterligereEgenskaper.map((e: unknown) =>
+        isRecord(e) ? asString(e.code) : e,
+      ).filter(Boolean);
+    }
+
+    // Skill-gotcha: antallInnsendingTilPvo MÅ være 0, ikke null
+    if (cleaned.antallInnsendingTilPvo === null || cleaned.antallInnsendingTilPvo === undefined) {
+      cleaned.antallInnsendingTilPvo = 0;
+    }
+
     const body = {
-      ...existing,
+      ...cleaned,
       ...patch,
       id: asString(existing.id) ?? pvkDokumentId,
       update: true,
