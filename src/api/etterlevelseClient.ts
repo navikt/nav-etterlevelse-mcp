@@ -212,11 +212,33 @@ export class EtterlevelseClient {
   }
 
   async listEtterlevelseDokumentasjoner(input: { search?: string; team?: string }): Promise<unknown[]> {
-    const payload = await this.get('/etterlevelsedokumentasjon', {
-      sistRedigert: 10,
-      pageNumber: 0,
-      pageSize: 50,
-    });
+    let payload: unknown;
+
+    if (input.team) {
+      // Slå opp team-UUID fra navn, deretter bruk dedikert team-søk-endepunkt
+      const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      let teamId: string;
+      if (UUID_PATTERN.test(input.team)) {
+        teamId = input.team;
+      } else {
+        const teamSearch = await this.get(`/team/search/${encodeURIComponent(input.team)}`);
+        const teamItems = extractArray<Record<string, unknown>>(teamSearch);
+        if (teamItems.length === 0) {
+          return [];
+        }
+        teamId = asString(teamItems[0]!['id']) ?? '';
+      }
+      payload = await this.get(`/etterlevelsedokumentasjon/search/team/${teamId}`, {
+        pageNumber: 0,
+        pageSize: 200,
+      });
+    } else {
+      payload = await this.get('/etterlevelsedokumentasjon', {
+        sistRedigert: 10,
+        pageNumber: 0,
+        pageSize: 50,
+      });
+    }
 
     const items = extractArray<Record<string, unknown>>(payload);
     return items
@@ -234,8 +256,7 @@ export class EtterlevelseClient {
       })
       .filter((item) => {
         const searchHaystack = `${item.id} ${item.title} ${item.etterlevelseNummer}`;
-        const teamHaystack = item.teams.join(' ');
-        return matchesFilter(searchHaystack, input.search) && matchesFilter(teamHaystack, input.team);
+        return matchesFilter(searchHaystack, input.search);
       });
   }
 
