@@ -1467,7 +1467,7 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
   );
 
   server.registerTool(
-    'write_risikoscenario',
+     'write_risikoscenario',
     {
       description:
         'Opprett eller oppdater et risikoscenario i PVK-dokumentet. Krever aktiv sesjonslås (kall lock_document først).',
@@ -1475,6 +1475,13 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
         scenarioId: z.string().uuid().optional().describe('UUID for risikoscenarioet ved oppdatering'),
         navn: z.string().min(1).describe('Kort navn på risikoscenarioet (ren tekst — markdown vises som tegn)'),
         beskrivelse: z.string().min(1).describe('Beskrivelse av risikoscenarioet (ren tekst — markdown vises som tegn)'),
+        generelScenario: z
+          .boolean()
+          .optional()
+          .describe(
+            'Sett til true for å opprette et øvrig risikoscenario (ikke koblet til et spesifikt krav). ' +
+              'Standard er false (krav-koblet scenario).',
+          ),
         sannsynlighetsNivaa: z.number().int().min(1).max(5).optional(),
         sannsynlighetsNivaaBegrunnelse: z.string().optional(),
         konsekvensNivaa: z.number().int().min(1).max(5).optional(),
@@ -1505,6 +1512,7 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
       scenarioId,
       navn,
       beskrivelse,
+      generelScenario,
       sannsynlighetsNivaa,
       sannsynlighetsNivaaBegrunnelse,
       konsekvensNivaa,
@@ -1533,6 +1541,7 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
         pvkDokumentId: lockedPvkDokumentId,
         navn,
         beskrivelse,
+        generelScenario: generelScenario ?? false,
         ...(sannsynlighetsNivaa !== undefined ? { sannsynlighetsNivaa } : {}),
         ...(sannsynlighetsNivaaBegrunnelse !== undefined
           ? { sannsynlighetsNivaaBegrunnelse }
