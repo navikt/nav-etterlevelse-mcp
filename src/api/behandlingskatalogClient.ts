@@ -132,7 +132,8 @@ export class BehandlingskatalogClient {
       // Skill-gotcha: bruk søkeendepunkt for B-nummer-oppslag — ikke hent alle og filtrer
       const payload = await this.get(`/process/search/${encodeURIComponent(id.trim())}`);
       const items = extractArray<Record<string, unknown>>(payload);
-      const match = items.find((item) => asString(item.number)?.toLowerCase() === id.toLowerCase());
+      const numericId = id.replace(/^B/i, '');
+      const match = items.find((item) => asString(item.number) === numericId);
       if (!match) {
         throw new Error(`Fant ikke behandling med nummer ${id}`);
       }
