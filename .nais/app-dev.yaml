@@ -35,6 +35,8 @@ spec:
       value: api://dev-gcp.teamdatajegerne.behandlingskatalog-backend/.default
     - name: NAV_ETTERLEVELSE_MCP_SCOPE
       value: api://dev-gcp.dab.nav-etterlevelse-mcp/.default
+    - name: BEHANDLINGSKATALOG_API_BASE_URL
+      value: https://behandlingskatalog.intern.dev.nav.no/api
   accessPolicy:
     outbound:
       rules:
@@ -44,6 +46,7 @@ spec:
           namespace: teamdatajegerne
       external:
         - host: dab-unleash-api.nav.cloud.nais.io
+        - host: behandlingskatalog.intern.dev.nav.no
   envFrom:
     - secret: nav-etterlevelse-mcp-unleash-api-token
   azure:
