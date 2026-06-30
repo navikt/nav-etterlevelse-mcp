@@ -1670,6 +1670,10 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
           pvkDokumentId: lockedPvkDokumentId,
           tiltak,
           result,
+          reminder:
+            'Husk å oppdatere scenarioets antatte risikonivå etter tiltak: kall write_risikoscenario med ' +
+            'sannsynlighetsNivaaEtterTiltak, konsekvensNivaaEtterTiltak og nivaaBegrunnelseEtterTiltak ' +
+            'når alle tiltak for scenarioet er lagt inn.',
         });
       } catch (error) {
         return toolError(error);
