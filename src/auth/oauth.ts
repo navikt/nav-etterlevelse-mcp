@@ -503,6 +503,7 @@ button{margin-top:12px;padding:10px 24px;font-size:1em;cursor:pointer}</style></
     }
 
     try {
+      console.error('OAuth callback: exchanging authorization code for tokens');
       const etterlevelseTokenResponse = await exchangeAzureToken(
         new URLSearchParams({
           grant_type: 'authorization_code',

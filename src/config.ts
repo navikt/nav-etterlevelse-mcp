@@ -6,7 +6,7 @@ const BEHANDLINGSKATALOG_SCOPE =
   'api://prod-gcp.teamdatajegerne.behandlingskatalog-backend/.default';
 // Texas token-exchange sidecar (NAIS-injisert, kun tilgjengelig i cluster)
 const TEXAS_TOKEN_EXCHANGE_URL =
-  process.env.TEXAS_TOKEN_EXCHANGE_URL ?? 'http://localhost:7164/api/v1/token/exchange';
+  process.env.NAIS_TOKEN_EXCHANGE_ENDPOINT ?? 'http://localhost:7164/api/v1/token/exchange';
 // Overstyr med env-variabler hvis tjenestenavnene avviker fra scope-navnene.
 const ETTERLEVELSE_API_BASE_URL =
   process.env.ETTERLEVELSE_API_BASE_URL ?? 'http://etterlevelse-backend.teamdatajegerne';
