@@ -4,7 +4,9 @@ const ETTERLEVELSE_SCOPE =
 const BEHANDLINGSKATALOG_SCOPE =
   process.env.BEHANDLINGSKATALOG_SCOPE ??
   'api://prod-gcp.teamdatajegerne.behandlingskatalog-backend/.default';
-// Interne Kubernetes-serviceadresser (app-navn fra Azure-scope: api://prod-gcp.{namespace}.{app}/.default).
+// Texas token-exchange sidecar (NAIS-injisert, kun tilgjengelig i cluster)
+const TEXAS_TOKEN_EXCHANGE_URL =
+  process.env.TEXAS_TOKEN_EXCHANGE_URL ?? 'http://localhost:7164/api/v1/token/exchange';
 // Overstyr med env-variabler hvis tjenestenavnene avviker fra scope-navnene.
 const ETTERLEVELSE_API_BASE_URL =
   process.env.ETTERLEVELSE_API_BASE_URL ?? 'http://etterlevelse-backend.teamdatajegerne';
@@ -40,6 +42,7 @@ export const config = {
   api: {
     etterlevelseBaseUrl: ETTERLEVELSE_API_BASE_URL,
     behandlingskatalogBaseUrl: BEHANDLINGSKATALOG_API_BASE_URL,
+    texasTokenExchangeUrl: TEXAS_TOKEN_EXCHANGE_URL,
   },
 } as const;
 
