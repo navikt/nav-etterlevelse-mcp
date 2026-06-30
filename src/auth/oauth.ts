@@ -251,22 +251,21 @@ export async function ensureFreshAzureTokens(tokenData: McpTokenData): Promise<v
   tokenData.refreshToken = latestRefreshToken;
   tokenData.azureExpiresAt = calculateAzureExpiry(etterlevelseTokenResponse.expires_in);
 
-  if (tokenData.bkToken) {
-    try {
-      const behandlingskatalogTokenResponse = await exchangeAzureToken(
-        new URLSearchParams({
-          grant_type: 'refresh_token',
-          refresh_token: latestRefreshToken,
-          client_id: config.azure.clientId,
-          client_secret: config.azure.clientSecret,
-          scope: config.azure.behandlingskatalogScope,
-        }),
-      );
-      tokenData.bkToken = behandlingskatalogTokenResponse.access_token;
-      tokenData.refreshToken = behandlingskatalogTokenResponse.refresh_token ?? latestRefreshToken;
-    } catch (bkError) {
-      console.error('Could not refresh behandlingskatalog token (non-fatal):', bkError);
-    }
+  // Forny bkToken via OBO — krever ikke refresh token
+  try {
+    const behandlingskatalogTokenResponse = await exchangeAzureToken(
+      new URLSearchParams({
+        grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+        assertion: etterlevelseTokenResponse.access_token,
+        requested_token_use: 'on_behalf_of',
+        client_id: config.azure.clientId,
+        client_secret: config.azure.clientSecret,
+        scope: config.azure.behandlingskatalogScope,
+      }),
+    );
+    tokenData.bkToken = behandlingskatalogTokenResponse.access_token;
+  } catch (bkError) {
+    console.error('Could not refresh behandlingskatalog token via OBO (non-fatal):', bkError);
   }
 }
 
@@ -511,27 +510,25 @@ button{margin-top:12px;padding:10px 24px;font-size:1em;cursor:pointer}</style></
         }),
       );
 
-      // Attempt to fetch a behandlingskatalog token using the refresh token.
-      // This may fail if offline_access is not in scope or if the app is not yet
-      // added to behandlingskatalog's inbound access policy — that is non-fatal.
+      // Attempt to fetch a behandlingskatalog token via OBO (on-behalf-of) using the etterlevelse token.
+      // OBO krever ikke offline_access og fungerer så lenge nav-etterlevelse-mcp er i inbound access policy
+      // på behandlingskatalog-backend. Non-fatal ved feil.
       let bkToken: string | null = null;
-      let refreshToken: string | null = etterlevelseTokenResponse.refresh_token ?? null;
-      if (refreshToken) {
-        try {
-          const behandlingskatalogTokenResponse = await exchangeAzureToken(
-            new URLSearchParams({
-              grant_type: 'refresh_token',
-              refresh_token: refreshToken,
-              client_id: config.azure.clientId,
-              client_secret: config.azure.clientSecret,
-              scope: config.azure.behandlingskatalogScope,
-            }),
-          );
-          bkToken = behandlingskatalogTokenResponse.access_token;
-          refreshToken = behandlingskatalogTokenResponse.refresh_token ?? refreshToken;
-        } catch (bkError) {
-          console.error('Could not fetch behandlingskatalog token (non-fatal):', bkError);
-        }
+      const refreshToken: string | null = etterlevelseTokenResponse.refresh_token ?? null;
+      try {
+        const behandlingskatalogTokenResponse = await exchangeAzureToken(
+          new URLSearchParams({
+            grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+            assertion: etterlevelseTokenResponse.access_token,
+            requested_token_use: 'on_behalf_of',
+            client_id: config.azure.clientId,
+            client_secret: config.azure.clientSecret,
+            scope: config.azure.behandlingskatalogScope,
+          }),
+        );
+        bkToken = behandlingskatalogTokenResponse.access_token;
+      } catch (bkError) {
+        console.error('Could not fetch behandlingskatalog token via OBO (non-fatal):', bkError);
       }
 
       const tokenData: McpTokenData = {
