@@ -19,7 +19,7 @@ const TEXAS_TOKEN_URL =
 const ETTERLEVELSE_API_BASE_URL =
   process.env.ETTERLEVELSE_API_BASE_URL ?? 'http://etterlevelse-backend.teamdatajegerne';
 const BEHANDLINGSKATALOG_API_BASE_URL =
-  process.env.BEHANDLINGSKATALOG_API_BASE_URL ?? 'http://behandlingskatalog-backend.teamdatajegerne/api';
+  process.env.BEHANDLINGSKATALOG_API_BASE_URL ?? 'http://behandlingskatalog-backend.teamdatajegerne';
 
 function requireEnv(name: string): string {
   const value = process.env[name];
