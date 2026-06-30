@@ -415,6 +415,9 @@ export class EtterlevelseClient {
     return this.post('/etterlevelse', body);
   }
 
+  async deleteEtterlevelse(id: string): Promise<void> {
+    await this.delete(`/etterlevelse/${id}`);
+  }
   async getPvkDokument(etterlevelseDokumentasjonId: string): Promise<unknown | null> {
     try {
       return await this.get(`/pvkdokument/etterlevelsedokument/${etterlevelseDokumentasjonId}`);
@@ -428,6 +431,10 @@ export class EtterlevelseClient {
 
   async createPvkDokument(etterlevelseDokumentasjonId: string): Promise<unknown> {
     return this.post('/pvkdokument', { etterlevelseDokumentId: etterlevelseDokumentasjonId });
+  }
+
+  async deletePvkDokument(pvkDokumentId: string): Promise<void> {
+    await this.delete(`/pvkdokument/${pvkDokumentId}`);
   }
 
   async getPvkDokumentById(pvkDokumentId: string): Promise<unknown> {
@@ -475,6 +482,10 @@ export class EtterlevelseClient {
       }
       throw error;
     }
+  }
+
+  async deleteBehandlingensLivsloep(livsloepId: string): Promise<void> {
+    await this.delete(`/behandlingenslivslop/${livsloepId}`);
   }
 
   async upsertBehandlingensLivsloep(
@@ -603,6 +614,10 @@ export class EtterlevelseClient {
 
   async removeTiltakFromRisikoscenario(scenarioId: string, tiltakId: string): Promise<void> {
     await this.put(`/risikoscenario/${scenarioId}/removeTiltak/${tiltakId}`, {});
+  }
+
+  async removeKravFromRisikoscenario(scenarioId: string, kravnummer: number): Promise<void> {
+    await this.put(`/risikoscenario/${scenarioId}/removeKrav/${kravnummer}`, {});
   }
 
   async createTiltak(risikoscenarioId: string, request: object): Promise<unknown> {
