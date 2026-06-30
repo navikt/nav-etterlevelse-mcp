@@ -551,9 +551,6 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
       annotations: readOnlyAnnotations,
     },
     async () => {
-      const writeGuardError = requireWriteEnabled();
-      if (writeGuardError) return writeGuardError;
-
       const guardError = requireDocumentLock(ctx);
       if (guardError) {
         return guardError;
@@ -650,9 +647,6 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
       annotations: readOnlyAnnotations,
     },
     async () => {
-      const writeGuardError = requireWriteEnabled();
-      if (writeGuardError) return writeGuardError;
-
       const guardError = requireDocumentLock(ctx);
       if (guardError) {
         return guardError;
@@ -706,9 +700,6 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
       annotations: readOnlyAnnotations,
     },
     async () => {
-      const writeGuardError = requireWriteEnabled();
-      if (writeGuardError) return writeGuardError;
-
       const guardError = requireDocumentLock(ctx);
       if (guardError) {
         return guardError;
@@ -754,9 +745,6 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
       annotations: readOnlyAnnotations,
     },
     async () => {
-      const writeGuardError = requireWriteEnabled();
-      if (writeGuardError) return writeGuardError;
-
       const guardError = requireDocumentLock(ctx);
       if (guardError) {
         return guardError;
