@@ -258,7 +258,7 @@ export async function ensureFreshAzureTokens(tokenData: McpTokenData): Promise<v
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         target: config.azure.behandlingskatalogScope,
-        identity_provider: 'azuread',
+        identity_provider: 'entra_id',
         user_token: etterlevelseTokenResponse.access_token,
       }),
     });
@@ -525,7 +525,7 @@ button{margin-top:12px;padding:10px 24px;font-size:1em;cursor:pointer}</style></
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             target: config.azure.behandlingskatalogScope,
-            identity_provider: 'azuread',
+            identity_provider: 'entra_id',
             user_token: etterlevelseTokenResponse.access_token,
           }),
         });
