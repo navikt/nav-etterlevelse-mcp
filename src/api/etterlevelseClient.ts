@@ -178,6 +178,20 @@ export class EtterlevelseClient {
     return bodyText ? (JSON.parse(bodyText) as unknown) : null;
   }
 
+  private async delete(path: string): Promise<void> {
+    const url = new URL(`${this.baseUrl}${path}`);
+    const response = await fetch(url, {
+      method: 'DELETE',
+      headers: {
+        Authorization: `Bearer ${this.accessToken}`,
+      },
+    });
+    if (!response.ok) {
+      const bodyText = await response.text();
+      throw new Error(`Etterlevelse API svarte ${response.status}: ${bodyText}`);
+    }
+  }
+
   private async graphql(query: string): Promise<unknown> {
     const url = new URL(`${this.baseUrl.replace(/\/api\/?$/, '')}/graphql`);
     const response = await fetch(url, {
@@ -581,6 +595,10 @@ export class EtterlevelseClient {
 
   async updateRisikoscenario(id: string, request: object): Promise<unknown> {
     return this.put(`/risikoscenario/${id}`, request);
+  }
+
+  async deleteRisikoscenario(id: string): Promise<void> {
+    await this.delete(`/risikoscenario/${id}`);
   }
 
   async createTiltak(risikoscenarioId: string, request: object): Promise<unknown> {

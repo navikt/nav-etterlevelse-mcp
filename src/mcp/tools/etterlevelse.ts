@@ -1597,6 +1597,34 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
   );
 
   server.registerTool(
+    'delete_risikoscenario',
+    {
+      description: 'Slett et risikoscenario fra PVK-dokumentet. Krever aktiv sesjonslås.',
+      inputSchema: {
+        scenarioId: z.string().uuid().describe('UUID for risikoscenarioet som skal slettes'),
+      },
+      annotations: writeAnnotations,
+    },
+    async ({ scenarioId }) => {
+      const writeGuardError = requireWriteEnabled();
+      if (writeGuardError) return writeGuardError;
+
+      const guardError = requireDocumentLock(ctx);
+      if (guardError) return guardError;
+
+      try {
+        await client.deleteRisikoscenario(scenarioId);
+        return toolResult({
+          message: `Risikoscenario ${scenarioId} er slettet.`,
+          scenarioId,
+        });
+      } catch (error) {
+        return toolError(error);
+      }
+    },
+  );
+
+  server.registerTool(
     'write_tiltak',
     {
       description:
