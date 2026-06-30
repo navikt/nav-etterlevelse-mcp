@@ -1483,9 +1483,15 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
               'Standard er false (krav-koblet scenario).',
           ),
         sannsynlighetsNivaa: z.number().int().min(1).max(5).optional(),
-        sannsynlighetsNivaaBegrunnelse: z.string().optional(),
+        sannsynlighetsNivaaBegrunnelse: z
+          .string()
+          .optional()
+          .describe('Begrunnelse for sannsynlighetsvurderingen. Påkrevd når sannsynlighetsNivaa er satt.'),
         konsekvensNivaa: z.number().int().min(1).max(5).optional(),
-        konsekvensNivaaBegrunnelse: z.string().optional(),
+        konsekvensNivaaBegrunnelse: z
+          .string()
+          .optional()
+          .describe('Begrunnelse for konsekvensvurderingen. Påkrevd når konsekvensNivaa er satt.'),
         sannsynlighetsNivaaEtterTiltak: z
           .number()
           .int()
@@ -1535,6 +1541,14 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
         return toolError(
           'Ingen PVK-dokument funnet for dette etterlevelsesdokumentet. Opprett PVK-dokument i etterlevelse.ansatt.nav.no først.',
         );
+      }
+
+      // UI-et krever begrunnelse når nivå er satt — valider før kall til backend
+      if (sannsynlighetsNivaa !== undefined && !sannsynlighetsNivaaBegrunnelse?.trim()) {
+        return toolError('sannsynlighetsNivaaBegrunnelse er påkrevd når sannsynlighetsNivaa er satt.');
+      }
+      if (konsekvensNivaa !== undefined && !konsekvensNivaaBegrunnelse?.trim()) {
+        return toolError('konsekvensNivaaBegrunnelse er påkrevd når konsekvensNivaa er satt.');
       }
 
       const request = {
