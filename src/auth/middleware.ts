@@ -33,7 +33,7 @@ export async function requireMcpBearerToken(
   try {
     await ensureFreshAzureTokens(tokenData);
   } catch (error) {
-    console.error('Failed to refresh Azure tokens for MCP request', error);
+    console.log('Failed to refresh Azure tokens for MCP request', error);
   }
 
   if (tokenData.azureExpiresAt <= Date.now()) {

@@ -45,7 +45,7 @@ app.use((req, res) => {
 });
 
 app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
-  console.error('Unhandled application error', error);
+  console.log('Unhandled application error', error);
   if (res.headersSent) {
     return;
   }
@@ -57,5 +57,5 @@ app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
 });
 
 app.listen(config.port, () => {
-  console.error(`nav-etterlevelse-mcp listening on :${config.port}`);
+  console.log(`nav-etterlevelse-mcp listening on :${config.port}`);
 });

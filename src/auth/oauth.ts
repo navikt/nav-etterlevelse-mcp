@@ -266,10 +266,10 @@ export async function ensureFreshAzureTokens(tokenData: McpTokenData): Promise<v
       const texasData = await texasResponse.json() as { access_token?: string };
       tokenData.bkToken = texasData.access_token ?? null;
     } else {
-      console.error('Texas bkToken refresh failed (non-fatal):', texasResponse.status, await texasResponse.text());
+      console.log('Texas bkToken refresh failed (non-fatal):', texasResponse.status, await texasResponse.text());
     }
   } catch (bkError) {
-    console.error('Could not refresh behandlingskatalog token via Texas (non-fatal):', bkError);
+    console.log('Could not refresh behandlingskatalog token via Texas (non-fatal):', bkError);
   }
 }
 
@@ -503,7 +503,7 @@ button{margin-top:12px;padding:10px 24px;font-size:1em;cursor:pointer}</style></
     }
 
     try {
-      console.error('OAuth callback: exchanging authorization code for tokens');
+      console.log('OAuth callback: exchanging authorization code for tokens');
       const etterlevelseTokenResponse = await exchangeAzureToken(
         new URLSearchParams({
           grant_type: 'authorization_code',
@@ -534,10 +534,10 @@ button{margin-top:12px;padding:10px 24px;font-size:1em;cursor:pointer}</style></
           bkToken = texasData.access_token ?? null;
         } else {
           const err = await texasResponse.text();
-          console.error('Texas bkToken exchange failed (non-fatal):', texasResponse.status, err);
+          console.log('Texas bkToken exchange failed (non-fatal):', texasResponse.status, err);
         }
       } catch (bkError) {
-        console.error('Could not fetch behandlingskatalog token via Texas (non-fatal):', bkError);
+        console.log('Could not fetch behandlingskatalog token via Texas (non-fatal):', bkError);
       }
 
       const tokenData: McpTokenData = {
@@ -585,7 +585,7 @@ h2{color:#007bff}</style></head>
         // Azure AD returns claims that must be forwarded in the next authorization request.
         // prompt=consent forces an interactive screen rather than silent SSO.
         // claimsRetried prevents an infinite loop if the CAP condition still isn't satisfied.
-        console.error('Azure AD claims challenge, retrying with claims parameter:', error.claims);
+        console.log('Azure AD claims challenge, retrying with claims parameter:', error.claims);
         const retryState = randomToken();
         authStore.saveAuthSession(retryState, { ...session, claimsRetried: true });
         const retryUrl = new URL(getAzureAuthorizeEndpoint());
@@ -600,14 +600,14 @@ h2{color:#007bff}</style></head>
         return;
       }
       if (error instanceof AzureConsentRequiredError) {
-        console.error(
+        console.log(
           'Azure AD claims challenge persists after retry — admin consent may be required for the app or scope. claims:',
           error.claims,
         );
         res.status(403).send('Tilgangen ble avvist av Azure AD. Kontakt din IT-administrator dersom problemet vedvarer.');
         return;
       }
-      console.error('OAuth callback error', error);
+      console.log('OAuth callback error', error);
       res.status(500).send('Kunne ikke fullføre OAuth-innloggingen');
     }
   });
@@ -699,7 +699,7 @@ h2{color:#007bff}</style></head>
       try {
         await ensureFreshAzureTokens(refreshTokenRecord.tokenData);
       } catch (error) {
-        console.error('Failed to refresh Azure tokens during MCP refresh', error);
+        console.log('Failed to refresh Azure tokens during MCP refresh', error);
         sendJsonError(res, 502, 'server_error', 'Could not refresh upstream Azure tokens');
         return;
       }
