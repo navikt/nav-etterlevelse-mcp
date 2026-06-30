@@ -601,6 +601,10 @@ export class EtterlevelseClient {
     await this.delete(`/risikoscenario/${id}`);
   }
 
+  async removeTiltakFromRisikoscenario(scenarioId: string, tiltakId: string): Promise<void> {
+    await this.put(`/risikoscenario/${scenarioId}/removeTiltak/${tiltakId}`, {});
+  }
+
   async createTiltak(risikoscenarioId: string, request: object): Promise<unknown> {
     return this.post(`/tiltak/risikoscenario/${risikoscenarioId}`, request);
   }
