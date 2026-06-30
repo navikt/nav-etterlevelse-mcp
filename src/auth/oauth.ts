@@ -251,15 +251,14 @@ export async function ensureFreshAzureTokens(tokenData: McpTokenData): Promise<v
   tokenData.refreshToken = latestRefreshToken;
   tokenData.azureExpiresAt = calculateAzureExpiry(etterlevelseTokenResponse.expires_in);
 
-  // Forny bkToken via Texas token-exchange
+  // Hent bkToken via Texas M2M (machine-to-machine) — bruker maskinidentiteten til nav-etterlevelse-mcp
   try {
-    const texasResponse = await fetch(config.api.texasTokenExchangeUrl, {
+    const texasResponse = await fetch(config.api.texasTokenUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         target: config.azure.behandlingskatalogScope,
         identity_provider: 'entra_id',
-        user_token: etterlevelseTokenResponse.access_token,
       }),
     });
     if (texasResponse.ok) {
@@ -515,18 +514,17 @@ button{margin-top:12px;padding:10px 24px;font-size:1em;cursor:pointer}</style></
         }),
       );
 
-      // Hent bkToken via Texas token-exchange (NAIS OBO-sidecar).
-      // Krever ikke offline_access og fungerer så lenge inbound access policy er konfigurert.
+      // Hent bkToken via Texas M2M (machine-to-machine) — maskinidentiteten til nav-etterlevelse-mcp.
+      // OBO fungerer ikke her siden assertion-tokenet har feil audience (etterlevelse-backend, ikke nav-etterlevelse-mcp).
       let bkToken: string | null = null;
       const refreshToken: string | null = etterlevelseTokenResponse.refresh_token ?? null;
       try {
-        const texasResponse = await fetch(config.api.texasTokenExchangeUrl, {
+        const texasResponse = await fetch(config.api.texasTokenUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             target: config.azure.behandlingskatalogScope,
             identity_provider: 'entra_id',
-            user_token: etterlevelseTokenResponse.access_token,
           }),
         });
         if (texasResponse.ok) {

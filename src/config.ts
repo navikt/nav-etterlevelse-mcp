@@ -7,6 +7,9 @@ const BEHANDLINGSKATALOG_SCOPE =
 // Texas token-exchange sidecar (NAIS-injisert, kun tilgjengelig i cluster)
 const TEXAS_TOKEN_EXCHANGE_URL =
   process.env.NAIS_TOKEN_EXCHANGE_ENDPOINT ?? 'http://localhost:7164/api/v1/token/exchange';
+// Texas machine-to-machine token endpoint
+const TEXAS_TOKEN_URL =
+  process.env.NAIS_TOKEN_ENDPOINT ?? 'http://localhost:7164/api/v1/token';
 // Overstyr med env-variabler hvis tjenestenavnene avviker fra scope-navnene.
 const ETTERLEVELSE_API_BASE_URL =
   process.env.ETTERLEVELSE_API_BASE_URL ?? 'http://etterlevelse-backend.teamdatajegerne';
@@ -43,6 +46,7 @@ export const config = {
     etterlevelseBaseUrl: ETTERLEVELSE_API_BASE_URL,
     behandlingskatalogBaseUrl: BEHANDLINGSKATALOG_API_BASE_URL,
     texasTokenExchangeUrl: TEXAS_TOKEN_EXCHANGE_URL,
+    texasTokenUrl: TEXAS_TOKEN_URL,
   },
 } as const;
 
