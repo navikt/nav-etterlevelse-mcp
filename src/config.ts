@@ -4,6 +4,11 @@ const ETTERLEVELSE_SCOPE =
 const BEHANDLINGSKATALOG_SCOPE =
   process.env.BEHANDLINGSKATALOG_SCOPE ??
   'api://prod-gcp.teamdatajegerne.behandlingskatalog-backend/.default';
+// Appens eget scope — brukes som login-scope i PKCE slik at userToken får aud=nav-etterlevelse-mcp,
+// og kan deretter brukes som assertion for Texas OBO mot downstream APIer.
+const NAV_ETTERLEVELSE_MCP_SCOPE =
+  process.env.NAV_ETTERLEVELSE_MCP_SCOPE ??
+  'api://prod-gcp.dab.nav-etterlevelse-mcp/.default';
 // Texas token-exchange sidecar (NAIS-injisert, kun tilgjengelig i cluster)
 const TEXAS_TOKEN_EXCHANGE_URL =
   process.env.NAIS_TOKEN_EXCHANGE_ENDPOINT ?? 'http://localhost:7164/api/v1/token/exchange';
@@ -41,6 +46,7 @@ export const config = {
     issuer: requireEnv('AZURE_OPENID_CONFIG_ISSUER'),
     etterlevelseScope: ETTERLEVELSE_SCOPE,
     behandlingskatalogScope: BEHANDLINGSKATALOG_SCOPE,
+    navEtterlevelseMcpScope: NAV_ETTERLEVELSE_MCP_SCOPE,
   },
   api: {
     etterlevelseBaseUrl: ETTERLEVELSE_API_BASE_URL,

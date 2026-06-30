@@ -20,8 +20,8 @@ export interface AuthSession {
 }
 
 export interface McpTokenData {
-  etterlevelseToken: string;
-  bkToken: string | null;
+  /** Brukerens token med aud=nav-etterlevelse-mcp — brukes som assertion for Texas OBO */
+  userToken: string;
   refreshToken: string | null;
   azureExpiresAt: number;
   userEmail: string;

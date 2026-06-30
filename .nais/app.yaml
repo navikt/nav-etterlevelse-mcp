@@ -37,6 +37,8 @@ spec:
       value: api://prod-gcp.teamdatajegerne.etterlevelse-backend/.default
     - name: BEHANDLINGSKATALOG_SCOPE
       value: api://prod-gcp.teamdatajegerne.behandlingskatalog-backend/.default
+    - name: NAV_ETTERLEVELSE_MCP_SCOPE
+      value: api://prod-gcp.dab.nav-etterlevelse-mcp/.default
   accessPolicy:
     outbound:
       rules:

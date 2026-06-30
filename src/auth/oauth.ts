@@ -242,34 +242,16 @@ export async function ensureFreshAzureTokens(tokenData: McpTokenData): Promise<v
       refresh_token: tokenData.refreshToken,
       client_id: config.azure.clientId,
       client_secret: config.azure.clientSecret,
-      scope: config.azure.etterlevelseScope,
+      scope: `openid ${config.azure.navEtterlevelseMcpScope}`,
     }),
   );
 
   const latestRefreshToken = etterlevelseTokenResponse.refresh_token ?? tokenData.refreshToken;
-  tokenData.etterlevelseToken = etterlevelseTokenResponse.access_token;
+  tokenData.userToken = etterlevelseTokenResponse.access_token;
   tokenData.refreshToken = latestRefreshToken;
   tokenData.azureExpiresAt = calculateAzureExpiry(etterlevelseTokenResponse.expires_in);
 
-  // Hent bkToken via Texas M2M (machine-to-machine) — bruker maskinidentiteten til nav-etterlevelse-mcp
-  try {
-    const texasResponse = await fetch(config.api.texasTokenUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        target: config.azure.behandlingskatalogScope,
-        identity_provider: 'entra_id',
-      }),
-    });
-    if (texasResponse.ok) {
-      const texasData = await texasResponse.json() as { access_token?: string };
-      tokenData.bkToken = texasData.access_token ?? null;
-    } else {
-      console.log('Texas bkToken refresh failed (non-fatal):', texasResponse.status, await texasResponse.text());
-    }
-  } catch (bkError) {
-    console.log('Could not refresh behandlingskatalog token via Texas (non-fatal):', bkError);
-  }
+  // userToken er fornyet — downstream tokens hentes via Texas OBO ved behov (ingen caching her)
 }
 
 function buildAuthCodeRecord(
@@ -381,7 +363,7 @@ button{margin-top:12px;padding:10px 24px;font-size:1em;cursor:pointer}</style></
     azureAuthorizeUrl.searchParams.set('client_id', config.azure.clientId);
     azureAuthorizeUrl.searchParams.set('response_type', 'code');
     azureAuthorizeUrl.searchParams.set('redirect_uri', getOAuthCallbackUrl());
-    azureAuthorizeUrl.searchParams.set('scope', config.azure.etterlevelseScope);
+    azureAuthorizeUrl.searchParams.set('scope', `openid ${config.azure.navEtterlevelseMcpScope}`);
     azureAuthorizeUrl.searchParams.set('state', internalState);
 
     res.redirect(302, azureAuthorizeUrl.toString());
@@ -473,7 +455,7 @@ button{margin-top:12px;padding:10px 24px;font-size:1em;cursor:pointer}</style></
     azureAuthorizeUrl.searchParams.set('client_id', config.azure.clientId);
     azureAuthorizeUrl.searchParams.set('response_type', 'code');
     azureAuthorizeUrl.searchParams.set('redirect_uri', getOAuthCallbackUrl());
-    azureAuthorizeUrl.searchParams.set('scope', config.azure.etterlevelseScope);
+    azureAuthorizeUrl.searchParams.set('scope', `openid ${config.azure.navEtterlevelseMcpScope}`);
     azureAuthorizeUrl.searchParams.set('state', internalState);
 
     res.redirect(302, azureAuthorizeUrl.toString());
@@ -510,37 +492,14 @@ button{margin-top:12px;padding:10px 24px;font-size:1em;cursor:pointer}</style></
           redirect_uri: getOAuthCallbackUrl(),
           client_id: config.azure.clientId,
           client_secret: config.azure.clientSecret,
-          scope: config.azure.etterlevelseScope,
+          scope: `openid ${config.azure.navEtterlevelseMcpScope}`,
         }),
       );
 
-      // Hent bkToken via Texas M2M (machine-to-machine) — maskinidentiteten til nav-etterlevelse-mcp.
-      // OBO fungerer ikke her siden assertion-tokenet har feil audience (etterlevelse-backend, ikke nav-etterlevelse-mcp).
-      let bkToken: string | null = null;
       const refreshToken: string | null = etterlevelseTokenResponse.refresh_token ?? null;
-      try {
-        const texasResponse = await fetch(config.api.texasTokenUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            target: config.azure.behandlingskatalogScope,
-            identity_provider: 'entra_id',
-          }),
-        });
-        if (texasResponse.ok) {
-          const texasData = await texasResponse.json() as { access_token?: string };
-          bkToken = texasData.access_token ?? null;
-        } else {
-          const err = await texasResponse.text();
-          console.log('Texas bkToken exchange failed (non-fatal):', texasResponse.status, err);
-        }
-      } catch (bkError) {
-        console.log('Could not fetch behandlingskatalog token via Texas (non-fatal):', bkError);
-      }
 
       const tokenData: McpTokenData = {
-        etterlevelseToken: etterlevelseTokenResponse.access_token,
-        bkToken,
+        userToken: etterlevelseTokenResponse.access_token,
         refreshToken,
         azureExpiresAt: calculateAzureExpiry(etterlevelseTokenResponse.expires_in),
         ...getUserIdentity(etterlevelseTokenResponse),
@@ -590,7 +549,7 @@ h2{color:#007bff}</style></head>
         retryUrl.searchParams.set('client_id', config.azure.clientId);
         retryUrl.searchParams.set('response_type', 'code');
         retryUrl.searchParams.set('redirect_uri', getOAuthCallbackUrl());
-        retryUrl.searchParams.set('scope', config.azure.etterlevelseScope);
+        retryUrl.searchParams.set('scope', `openid ${config.azure.navEtterlevelseMcpScope}`);
         retryUrl.searchParams.set('state', retryState);
         retryUrl.searchParams.set('claims', error.claims);
         retryUrl.searchParams.set('prompt', 'consent');
