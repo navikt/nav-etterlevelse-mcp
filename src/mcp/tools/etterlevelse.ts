@@ -640,6 +640,35 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
   );
 
   server.registerTool(
+    'delete_pvk_dokument',
+    {
+      description: 'Slett PVK-dokumentet for det låste etterlevelsesdokumentet. Krever aktiv sesjonslås.',
+      inputSchema: {},
+      annotations: writeAnnotations,
+    },
+    async () => {
+      const writeGuardError = requireWriteEnabled();
+      if (writeGuardError) return writeGuardError;
+
+      const guardError = requireDocumentLock(ctx);
+      if (guardError) return guardError;
+
+      const { lockedPvkDokumentId } = ctx.tokenData;
+      if (!lockedPvkDokumentId) {
+        return toolError('Ingen PVK-dokument funnet for dette etterlevelsesdokumentet.');
+      }
+
+      try {
+        await client.deletePvkDokument(lockedPvkDokumentId);
+        authStore.updateMcpToken(ctx.mcpAccessToken, { lockedPvkDokumentId: undefined });
+        return toolResult({ message: `PVK-dokument ${lockedPvkDokumentId} er slettet.`, pvkDokumentId: lockedPvkDokumentId });
+      } catch (error) {
+        return toolError(error);
+      }
+    },
+  );
+
+  server.registerTool(
     'get_behandlingens_livsloep',
     {
       description: 'Hent behandlingens livsløp-dokument for det låste dokumentet.',
@@ -830,6 +859,36 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
   );
 
   server.registerTool(
+    'unlink_krav_from_risikoscenario',
+    {
+      description: 'Fjern koblingen mellom et kravnummer og et risikoscenario i PVK-dokumentet. Krever aktiv sesjonslås.',
+      inputSchema: {
+        scenarioId: z.string().uuid().describe('UUID for risikoscenarioet'),
+        kravnummer: z.number().int().positive().describe('Kravnummer (kun tall, ikke versjon), f.eks. 113'),
+      },
+      annotations: writeAnnotations,
+    },
+    async ({ scenarioId, kravnummer }) => {
+      const writeGuardError = requireWriteEnabled();
+      if (writeGuardError) return writeGuardError;
+
+      const guardError = requireDocumentLock(ctx);
+      if (guardError) return guardError;
+
+      try {
+        await client.removeKravFromRisikoscenario(scenarioId, kravnummer);
+        return toolResult({
+          message: `Krav K${kravnummer} er fjernet fra risikoscenario ${scenarioId}.`,
+          scenarioId,
+          kravnummer,
+        });
+      } catch (error) {
+        return toolError(error);
+      }
+    },
+  );
+
+  server.registerTool(
     'write_etterlevelse',
     {
       description:
@@ -974,6 +1033,31 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
           summary: lines.join('\n'),
           result: writeResult,
         });
+      } catch (error) {
+        return toolError(error);
+      }
+    },
+  );
+
+  server.registerTool(
+    'delete_etterlevelse',
+    {
+      description: 'Slett en etterlevelsesbesvarelse for et krav. Krever aktiv sesjonslås.',
+      inputSchema: {
+        etterlevelseId: z.string().uuid().describe('UUID for etterlevelsen som skal slettes'),
+      },
+      annotations: writeAnnotations,
+    },
+    async ({ etterlevelseId }) => {
+      const writeGuardError = requireWriteEnabled();
+      if (writeGuardError) return writeGuardError;
+
+      const guardError = requireDocumentLock(ctx);
+      if (guardError) return guardError;
+
+      try {
+        await client.deleteEtterlevelse(etterlevelseId);
+        return toolResult({ message: `Etterlevelse ${etterlevelseId} er slettet.`, etterlevelseId });
       } catch (error) {
         return toolError(error);
       }
@@ -1180,6 +1264,35 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
           behandlingensLivsloep: saved,
           result,
         });
+      } catch (error) {
+        return toolError(error);
+      }
+    },
+  );
+
+  server.registerTool(
+    'delete_behandlingens_livsloep',
+    {
+      description: 'Slett behandlingens livsløp-dokument for det låste etterlevelsesdokumentet. Krever aktiv sesjonslås.',
+      inputSchema: {},
+      annotations: writeAnnotations,
+    },
+    async () => {
+      const writeGuardError = requireWriteEnabled();
+      if (writeGuardError) return writeGuardError;
+
+      const guardError = requireDocumentLock(ctx);
+      if (guardError) return guardError;
+
+      const lockedDocumentId = ctx.tokenData.lockedDocumentId as string;
+
+      try {
+        const existing = await client.getBehandlingensLivsloep(lockedDocumentId);
+        if (!existing || !isRecord(existing) || typeof existing.id !== 'string') {
+          return toolError('Ingen behandlingens livsløp funnet for dette dokumentet.');
+        }
+        await client.deleteBehandlingensLivsloep(existing.id);
+        return toolResult({ message: `Behandlingens livsløp ${existing.id} er slettet.`, livsloepId: existing.id });
       } catch (error) {
         return toolError(error);
       }
