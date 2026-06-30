@@ -13,11 +13,15 @@ This repository contains GitHub Copilot agent configurations in `.github/agents/
 
 ## Project context
 
-**nav-etterlevelse-mcp** is a TypeScript MCP server (Model Context Protocol) that gives GitHub Copilot CLI structured, schema-validated access to:
-- [etterlevelse-api.intern.nav.no](https://etterlevelse-api.intern.nav.no) — Nav's compliance documentation system
-- [behandlingskatalog.ansatt.nav.no](https://behandlingskatalog.ansatt.nav.no) — Nav's data processing catalogue
+**nav-etterlevelse-mcp** is a TypeScript MCP server (Model Context Protocol) that gives AI agents
+(GitHub Copilot CLI, OpenCode) structured, schema-validated access to:
+- `etterlevelse-backend.teamdatajegerne` — Nav's compliance documentation system
+- `behandlingskatalog-backend.teamdatajegerne` — Nav's data processing catalogue
 
-Authentication: Azure AD OAuth 2.1 PKCE — users log in once in the browser, and the server holds tokens in memory for the session.
+Authentication: Azure AD OAuth 2.1 PKCE — users log in via browser, the server holds
+the user's token (`aud=nav-etterlevelse-mcp`) in memory. On each MCP request, downstream
+tokens are obtained via NAIS Texas OBO (on-behalf-of) sidecar, preserving user identity
+for auditing in both downstream systems.
 
 Stack: **TypeScript · Node.js 22 · Express · MCP SDK · Unleash**
-Deployed on: **Nais prod-gcp, namespace `dab`**
+Deployed on: **Nais prod-gcp and dev-gcp, namespace `dab`**
