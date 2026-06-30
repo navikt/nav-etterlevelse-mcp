@@ -1624,6 +1624,35 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
     },
   );
 
+
+  server.registerTool(
+    'delete_tiltak',
+    {
+      description: 'Slett et tiltak fra PVK-dokumentet. Krever aktiv sesjonslås. Tiltak må slettes før tilknyttet risikoscenario kan slettes.',
+      inputSchema: {
+        tiltakId: z.string().uuid().describe('UUID for tiltaket som skal slettes'),
+      },
+      annotations: writeAnnotations,
+    },
+    async ({ tiltakId }) => {
+      const writeGuardError = requireWriteEnabled();
+      if (writeGuardError) return writeGuardError;
+
+      const guardError = requireDocumentLock(ctx);
+      if (guardError) return guardError;
+
+      try {
+        await client.deleteTiltak(tiltakId);
+        return toolResult({
+          message: `Tiltak ${tiltakId} er slettet.`,
+          tiltakId,
+        });
+      } catch (error) {
+        return toolError(error);
+      }
+    },
+  );
+
   server.registerTool(
     'write_tiltak',
     {

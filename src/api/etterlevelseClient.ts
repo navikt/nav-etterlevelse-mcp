@@ -614,6 +614,10 @@ export class EtterlevelseClient {
     return this.put(`/tiltak/${id}`, request);
   }
 
+  async deleteTiltak(id: string): Promise<void> {
+    await this.delete(`/tiltak/${id}`);
+  }
+
   async getTiltak(id: string): Promise<unknown | null> {
     try {
       return await this.get(`/tiltak/${id}`);
