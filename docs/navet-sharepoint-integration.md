@@ -64,7 +64,21 @@ allerede via `/.well-known/nais-texas`-endepunktet.
 1. Legg til `Sites.Selected` (application permission) på nav-etterlevelse-mcp sin
    app-registrering i Entra ID. Krever admin-consent.
 
-2. Grant lesetilgang til relevante Navet-siter via Graph API eller PowerShell:
+2. **Sjekk først om Navet bruker hub sites eller subsite-arv:**
+
+   ```http
+   GET https://graph.microsoft.com/v1.0/sites/navno.sharepoint.com:/sites/fag-og-ytelser
+   ```
+
+   - Hvis `isHubSite: true` → separate site collections, tilgang må gis per site (mest sannsynlig)
+   - Hvis vanlig site med subsites → ett grant til rot-siten kan være tilstrekkelig
+
+   Basert på URL-mønsteret (`/sites/fag-og-ytelser-arbeid-*`) er separate site collections
+   mest sannsynlig — dette er moderne SharePoint Online-arkitektur.
+
+3. Grant lesetilgang til relevante Navet-siter via Graph API eller PowerShell.
+   Start med de fagområdene som er aktuelle for teamene som bruker nav-etterlevelse-mcp
+   — det er enkelt å legge til flere siter senere:
 
 ```powershell
 # PowerShell (PnP-modul)
