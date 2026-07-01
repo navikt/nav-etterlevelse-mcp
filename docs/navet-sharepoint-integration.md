@@ -95,9 +95,12 @@ Relevante Navet-siter å gi tilgang til:
 | Fagområde | URL |
 |-----------|-----|
 | Arbeidsrettet oppfølging | `/sites/fag-og-ytelser-arbeid-arbeidsrettet-brukeroppfolging` |
-| Sykefraværsoppfølging | `/sites/fag-og-ytelser-arbeid-sykefravarsoppfolging-og-sykepenger` |
+| Arbeidsavklaringspenger (AAP) | `/sites/fag-og-ytelser-arbeid-arbeidsavklaringspenger` |
+| Dagpenger | `/sites/fag-og-ytelser-arbeid-dagpenger` |
+| Sykefraværsoppfølging og sykepenger | `/sites/fag-og-ytelser-arbeid-sykefravarsoppfolging-og-sykepenger` |
 | Sosiale tjenester | `/sites/fag-og-ytelser-sosiale-tjenester` |
 | Tiltak og virkemidler | `/sites/fag-og-ytelser-arbeid-tiltak-og-virkemidler` |
+| Alderspensjon | `/sites/fag-og-ytelser-pensjon-alderspensjon` |
 | Markedsarbeid | `/sites/fag-og-ytelser-arbeid-markedsarbeid` |
 
 ### Steg 2: NavetClient i kildekoden
@@ -191,9 +194,12 @@ server.registerTool('list_navet_pages', {
   inputSchema: {
     fagomrade: z.enum([
       'arbeidsrettet-brukeroppfolging',
+      'arbeidsavklaringspenger',
+      'dagpenger',
       'sykefravarsoppfolging-og-sykepenger',
       'sosiale-tjenester',
       'tiltak-og-virkemidler',
+      'pensjon-alderspensjon',
       'markedsarbeid',
     ]).describe('Fagområde å liste sider for'),
     filter: z.string().optional()
