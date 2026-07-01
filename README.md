@@ -59,6 +59,7 @@ bevart for auditing.
 | `delete_pvk_dokument` | Slett PVK-dokumentet |
 | `write_pvk_egenskaper` | Oppdater DPIA-egenskaper og PVK-behovsvurdering (veiviser) |
 | `write_pvk_involvering` | Oppdater involveringsfelt i PVK |
+| `write_pvk_risikoeier` | Skriv merknad til risikoeier (lederrettet oppsummering for godkjenning) |
 | `write_risikoscenario` | Opprett/oppdater risikoscenario (krav-koblet eller øvrig) |
 | `delete_risikoscenario` | Slett risikoscenario (cascade-sletter tilknyttede tiltak) |
 | `write_tiltak` | Opprett/oppdater tiltak |

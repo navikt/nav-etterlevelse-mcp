@@ -1468,6 +1468,64 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
   );
 
   server.registerTool(
+    'write_pvk_risikoeier',
+    {
+      description:
+        'Oppdater merknad til risikoeier på det låste PVK-dokumentet. ' +
+        'Brukes når PVK skal sendes til risikoeier for godkjenning etter at PVO har vurdert. ' +
+        'Feltet rendres som markdown i UI-et — bruk **fet**, ## overskrifter og - lister. ' +
+        'Tonen bør være lederrettet og ikke-teknisk: hva behandlingen er, hovedkonklusjon, ' +
+        'hvordan PVOs bemerkninger er håndtert, og hva som gjenstår. ' +
+        'Agenten setter ALDRI status til TRENGER_GODKJENNING eller GODKJENT_AV_RISIKOEIER — gjøres manuelt i UI.',
+      inputSchema: {
+        merknadTilRisikoeier: z
+          .string()
+          .min(1)
+          .describe(
+            'Lederrettet oppsummering til risikoeier. Rendres som markdown i UI-et.',
+          ),
+      },
+      annotations: writeAnnotations,
+    },
+    async ({ merknadTilRisikoeier }) => {
+      const writeGuardError = requireWriteEnabled();
+      if (writeGuardError) return writeGuardError;
+
+      const guardError = requireDocumentLock(ctx);
+      if (guardError) {
+        return guardError;
+      }
+
+      const { lockedPvkDokumentId } = ctx.tokenData;
+      if (!lockedPvkDokumentId) {
+        return toolError(
+          'Ingen PVK-dokument funnet for dette etterlevelsesdokumentet. Opprett PVK-dokument i etterlevelse.ansatt.nav.no først.',
+        );
+      }
+
+      try {
+        const result = await client.patchPvkDokument(lockedPvkDokumentId, {
+          merknadTilRisikoeier,
+        });
+        const saved = isRecord(result) ? result : { merknadTilRisikoeier };
+        const previewLines = [
+          formatField('PVK-dokumentId', lockedPvkDokumentId),
+          formatField('Merknad til risikoeier', saved.merknadTilRisikoeier),
+        ].filter((line): line is string => Boolean(line));
+
+        return toolResult({
+          preview: boxSection('PVK MERKNAD TIL RISIKOEIER', previewLines.join('\n')),
+          pvkDokumentId: lockedPvkDokumentId,
+          pvkDokument: saved,
+          result,
+        });
+      } catch (error) {
+        return toolError(error);
+      }
+    },
+  );
+
+  server.registerTool(
     'write_pvk_egenskaper',
     {
       description:
