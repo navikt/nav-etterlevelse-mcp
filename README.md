@@ -135,3 +135,9 @@ håndterer automatisk fornyelse av downstream-tokens innenfor denne perioden.
 
 In-memory sesjonsstoren betyr at ett token per pod er gyldige. Av den grunn er
 `replicas.max: 1` i NAIS-manifestet — se kommentar i `.nais/app.yaml` for detaljer.
+
+## Planlagte utvidelser
+
+| Utvidelse | Beskrivelse | Status |
+|-----------|-------------|--------|
+| [Navet (SharePoint) integrasjon](docs/navet-sharepoint-integration.md) | Les fagretningslinjer og personvernsider fra Navet via Microsoft Graph API med `Sites.Selected`-tilgang. Gjør at nav-context-skillen kan hente domenekontekst automatisk. | Avventer admin-consent for `Sites.Selected` i Entra ID |
