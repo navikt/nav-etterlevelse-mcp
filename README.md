@@ -97,7 +97,6 @@ bevart for auditing.
 gh workflow run deploy.yaml
 ```
 
-
 ### 2. Bruk via OpenCode / Copilot CLI
 
 Legg til MCP-serveren:
@@ -127,11 +126,23 @@ I copilot autentiserer du automatisk inne i agent sesjonen.
 
 Ingen `.cplt.toml` er nødvendig — agenten kaller kun MCP-serveren direkte.
 
+### 3. Installer etterlevelse-skills
+
+MCP-serveren brukes av skillene i [navikt/dab-copilot-config](https://github.com/navikt/dab-copilot-config).
+Se README der for oppsett av symlinker til `~/.copilot/skills/` og `~/.config/opencode/skills/`.
+
 ## Sesjonshåndtering
 
-MCP-tokenet lever i **1 time**. Når det utløper vil `opencode mcp auth` åpne nettleseren
-for re-autentisering. Azure AD Entra-sesjonen lever i **10 timer** — Texas-sidekaren
-håndterer automatisk fornyelse av downstream-tokens innenfor denne perioden.
+MCP-tokenet lever i **1 time**, men klienten fornyer det automatisk ved hjelp av et
+refresh-token som lever i **24 timer** — full re-autentisering via nettleser er normalt
+kun nødvendig én gang per dag.
+
+Azure AD Entra-sesjonen lever i **10 timer** — Texas-sidekaren håndterer automatisk
+fornyelse av downstream-tokens innenfor denne perioden.
+
+Hvis en agentsesjon feiler med autentiseringsfeil:
+- **OpenCode:** Kjør `opencode mcp auth nav-etterlevelse-mcp` i et nytt terminalvindu
+- **Copilot CLI:** Prøv `/mcp`-kommandoen i chat-vinduet for å re-autentisere
 
 In-memory sesjonsstoren betyr at ett token per pod er gyldige. Av den grunn er
 `replicas.max: 1` i NAIS-manifestet — se kommentar i `.nais/app.yaml` for detaljer.
