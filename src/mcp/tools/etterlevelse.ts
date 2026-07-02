@@ -1121,6 +1121,11 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
           .boolean()
           .optional()
           .describe('Angir om systemet behandler personopplysninger'),
+        title: z
+          .string()
+          .min(1)
+          .optional()
+          .describe('Tittel på etterlevelsesdokumentasjonen'),
       },
       annotations: writeAnnotations,
     },
@@ -1133,6 +1138,7 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
       prioritertKravNummer,
       teams,
       behandlerPersonopplysninger,
+      title,
     }) => {
       const writeGuardError = requireWriteEnabled();
       if (writeGuardError) return writeGuardError;
@@ -1156,14 +1162,15 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
         if (prioritertKravNummer !== undefined) cleaned.prioritertKravNummer = prioritertKravNummer;
         if (teams !== undefined) cleaned.teams = teams;
         if (behandlerPersonopplysninger !== undefined) cleaned.behandlerPersonopplysninger = behandlerPersonopplysninger;
+        if (title !== undefined) cleaned.title = title;
 
         const result = await client.updateEtterlevelseDokumentasjon(lockedDocumentId, cleaned);
         const saved = isRecord(result) ? result : {};
-        const title = asString(saved.title) ?? ctx.tokenData.lockedDocumentTitle ?? '';
+        const savedTitle = asString(saved.title) ?? ctx.tokenData.lockedDocumentTitle ?? '';
         const etterlevelseNummer = asString(saved.etterlevelseNummer) ?? '';
 
         const lines: string[] = [
-          `✅ Etterlevelsesdokumentasjon oppdatert: ${title} (E${etterlevelseNummer})`,
+          `✅ Etterlevelsesdokumentasjon oppdatert: ${savedTitle} (E${etterlevelseNummer})`,
           '',
         ];
         if (beskrivelse !== undefined) {
@@ -1188,6 +1195,9 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
         }
         if (teams !== undefined) {
           lines.push(`Teams: ${teams.join(', ')}`);
+        }
+        if (title !== undefined) {
+          lines.push(`Tittel: ${title}`);
         }
 
         return toolResult({
