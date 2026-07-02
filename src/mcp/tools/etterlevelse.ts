@@ -1768,7 +1768,10 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
   server.registerTool(
     'delete_risikoscenario',
     {
-      description: 'Slett et risikoscenario fra PVK-dokumentet. Krever aktiv sesjonslås. Tiltak bør slettes eksplisitt med delete_tiltak før scenarioet slettes — cascade-sletting skjer automatisk hvis tiltak gjenstår, men anbefalt flyt er eksplisitt sletting.',
+      description:
+        'Slett et risikoscenario fra PVK-dokumentet. Krever aktiv sesjonslås. ' +
+        'Feiler med feilmelding hvis scenarioet har tilknyttede tiltak — disse må slettes ' +
+        'eksplisitt med delete_tiltak først. Dette sikrer bevisst bekreftelse fra bruker.',
       inputSchema: {
         scenarioId: z.string().uuid().describe('UUID for risikoscenarioet som skal slettes'),
       },
@@ -1782,23 +1785,24 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
       if (guardError) return guardError;
 
       try {
-        // Hent scenariet for å finne tilknyttede tiltak
+        // Sjekk om scenarioet har tilknyttede tiltak — i så fall feiler vi
         const scenario = await client.getRisikoscenario(scenarioId);
         const tiltakIds = isRecord(scenario) && Array.isArray(scenario.tiltakIds)
           ? (scenario.tiltakIds as string[])
           : [];
 
-        // Koble fra og slett hvert tiltak
-        for (const tiltakId of tiltakIds) {
-          await client.removeTiltakFromRisikoscenario(scenarioId, tiltakId);
-          await client.deleteTiltak(tiltakId);
+        if (tiltakIds.length > 0) {
+          return toolError(
+            `Risikoscenarioet har ${tiltakIds.length} tilknyttet${tiltakIds.length === 1 ? '' : 'e'} tiltak som må slettes først.\n` +
+            `Slett følgende tiltak med delete_tiltak, og slett deretter scenarioet på nytt:\n` +
+            tiltakIds.map((id) => `  - ${id}`).join('\n'),
+          );
         }
 
         await client.deleteRisikoscenario(scenarioId);
         return toolResult({
-          message: `Risikoscenario ${scenarioId} er slettet${tiltakIds.length > 0 ? ` sammen med ${tiltakIds.length} tiltak` : ''}.`,
+          message: `Risikoscenario ${scenarioId} er slettet.`,
           scenarioId,
-          deletedTiltakIds: tiltakIds,
         });
       } catch (error) {
         return toolError(error);
