@@ -1768,7 +1768,7 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
   server.registerTool(
     'delete_risikoscenario',
     {
-      description: 'Slett et risikoscenario fra PVK-dokumentet. Krever aktiv sesjonslås. Cascade-sletter alle tilknyttede tiltak automatisk.',
+      description: 'Slett et risikoscenario fra PVK-dokumentet. Krever aktiv sesjonslås. Tiltak bør slettes eksplisitt med delete_tiltak før scenarioet slettes — cascade-sletting skjer automatisk hvis tiltak gjenstår, men anbefalt flyt er eksplisitt sletting.',
       inputSchema: {
         scenarioId: z.string().uuid().describe('UUID for risikoscenarioet som skal slettes'),
       },
