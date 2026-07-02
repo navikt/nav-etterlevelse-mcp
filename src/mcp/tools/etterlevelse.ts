@@ -1814,7 +1814,7 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
   server.registerTool(
     'delete_tiltak',
     {
-      description: 'Slett et tiltak fra PVK-dokumentet. Krever aktiv sesjonslås. Tiltak må slettes før tilknyttet risikoscenario kan slettes.',
+      description: 'Slett et tiltak fra PVK-dokumentet. Krever aktiv sesjonslås. Fjerner automatisk koblingen til tilknyttede risikoscenarioer før sletting.',
       inputSchema: {
         tiltakId: z.string().uuid().describe('UUID for tiltaket som skal slettes'),
       },
@@ -1828,6 +1828,16 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
       if (guardError) return guardError;
 
       try {
+        // Fjern koblingen til alle tilknyttede risikoscenarioer før sletting
+        const tiltak = await client.getTiltak(tiltakId);
+        const risikoscenarioIds = isRecord(tiltak) && Array.isArray(tiltak.risikoscenarioIds)
+          ? (tiltak.risikoscenarioIds as string[])
+          : [];
+
+        for (const scenarioId of risikoscenarioIds) {
+          await client.removeTiltakFromRisikoscenario(scenarioId, tiltakId);
+        }
+
         await client.deleteTiltak(tiltakId);
         return toolResult({
           message: `Tiltak ${tiltakId} er slettet.`,
