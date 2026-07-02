@@ -61,24 +61,66 @@ allerede via `/.well-known/nais-texas`-endepunktet.
 
 ### Steg 1: Entra ID og SharePoint-konfigurasjon (admin-oppgave)
 
-1. Legg til `Sites.Selected` (application permission) på nav-etterlevelse-mcp sin
-   app-registrering i Entra ID. Krever admin-consent.
+#### 1a: Legg til `Sites.Selected` i Azure-portalen
 
-2. **Sjekk først om Navet bruker hub sites eller subsite-arv:**
+1. Gå til [portal.azure.com](https://portal.azure.com)
+2. Søk på **«Microsoft Entra ID»** → **App registrations**
+3. Søk etter **`nav-etterlevelse-mcp`**
+4. Klikk appen → **API permissions** i venstremenyen
+5. **Add a permission** → **Microsoft Graph** → **Application permissions**
+6. Søk på `Sites.Selected`, huk av → **Add permissions**
+7. Klikk **Grant admin consent for NAV** og bekreft
 
-   ```http
-   GET https://graph.microsoft.com/v1.0/sites/navno.sharepoint.com:/sites/fag-og-ytelser
-   ```
+Client ID-en til appen finnes under appen → **Overview** → **Application (client) ID**.
+Denne brukes i steg 1b.
 
-   - Hvis `isHubSite: true` → separate site collections, tilgang må gis per site (mest sannsynlig)
-   - Hvis vanlig site med subsites → ett grant til rot-siten kan være tilstrekkelig
+#### 1b: Sjekk om Navet bruker hub sites eller subsite-arv
 
-   Basert på URL-mønsteret (`/sites/fag-og-ytelser-arbeid-*`) er separate site collections
-   mest sannsynlig — dette er moderne SharePoint Online-arkitektur.
+```http
+GET https://graph.microsoft.com/v1.0/sites/navno.sharepoint.com:/sites/fag-og-ytelser
+```
 
-3. Grant lesetilgang til relevante Navet-siter via Graph API eller PowerShell.
-   Start med de fagområdene som er aktuelle for teamene som bruker nav-etterlevelse-mcp
-   — det er enkelt å legge til flere siter senere:
+- Hvis `isHubSite: true` → separate site collections, tilgang må gis per site (mest sannsynlig)
+- Hvis vanlig site med subsites → ett grant til rot-siten kan være tilstrekkelig
+
+#### 1c: Gi appen lesetilgang til relevante Navet-siter
+
+Dette gjøres mot SharePoint — enkleste vei er **Microsoft Graph Explorer**
+([developer.microsoft.com/en-us/graph/graph-explorer](https://developer.microsoft.com/en-us/graph/graph-explorer)).
+
+Finn site-ID for hver site:
+```http
+GET https://graph.microsoft.com/v1.0/sites/navno.sharepoint.com:/sites/{site-path}
+```
+Responsen inneholder `"id": "navno.sharepoint.com,{guid},{guid}"`.
+
+Gi deretter appen lesetilgang:
+```http
+POST https://graph.microsoft.com/v1.0/sites/{site-id}/permissions
+Content-Type: application/json
+
+{
+  "roles": ["read"],
+  "grantedToIdentities": [{
+    "application": {
+      "id": "<nav-etterlevelse-mcp client ID>",
+      "displayName": "nav-etterlevelse-mcp"
+    }
+  }]
+}
+```
+
+Alternativt via PowerShell (PnP-modul):
+```powershell
+Connect-PnPOnline -Url "https://navno.sharepoint.com" -Interactive
+Grant-PnPAzureADAppSitePermission `
+  -AppId "<nav-etterlevelse-mcp client ID>" `
+  -DisplayName "nav-etterlevelse-mcp" `
+  -Site "https://navno.sharepoint.com/sites/{site-path}" `
+  -Permissions Read
+```
+
+Start med de fagområdene som er aktuelle — det er enkelt å legge til flere siter senere:
 
 ```powershell
 # PowerShell (PnP-modul)
