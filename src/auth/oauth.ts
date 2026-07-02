@@ -77,10 +77,16 @@ function setNoStore(res: Response): void {
   res.setHeader('Pragma', 'no-cache');
 }
 
-function setCors(res: Response): void {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Headers', 'authorization, content-type');
-  res.setHeader('Access-Control-Allow-Methods', 'OPTIONS, POST');
+function setCors(req: Request, res: Response): void {
+  const origin = req.headers.origin;
+  if (origin && isLocalhostUri(origin)) {
+    // Tillat kun localhost-opprinnelse (MCP-klienter bruker localhost redirect URI i PKCE-flyten)
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Headers', 'authorization, content-type');
+    res.setHeader('Access-Control-Allow-Methods', 'OPTIONS, POST');
+    res.setHeader('Vary', 'Origin');
+  }
+  // Ingen CORS-headere for andre opprinnelser — avviser cross-origin fra ikke-localhost
 }
 
 function sendJsonError(res: Response, status: number, error: string, errorDescription: string): void {
@@ -369,13 +375,13 @@ button{margin-top:12px;padding:10px 24px;font-size:1em;cursor:pointer}</style></
     res.redirect(302, azureAuthorizeUrl.toString());
   });
 
-  app.options('/register', (_req, res) => {
-    setCors(res);
+  app.options('/register', (req, res) => {
+    setCors(req, res);
     res.sendStatus(204);
   });
 
   app.post('/register', (req, res) => {
-    setCors(res);
+    setCors(req, res);
     setNoStore(res);
 
     const redirectUris = bodyStringArray(req.body, 'redirect_uris');
@@ -569,13 +575,13 @@ h2{color:#007bff}</style></head>
     }
   });
 
-  app.options('/oauth/token', (_req, res) => {
-    setCors(res);
+  app.options('/oauth/token', (req, res) => {
+    setCors(req, res);
     res.sendStatus(204);
   });
 
   app.post('/oauth/token', async (req, res) => {
-    setCors(res);
+    setCors(req, res);
     setNoStore(res);
 
     const grantType = bodyString(req.body, 'grant_type');
