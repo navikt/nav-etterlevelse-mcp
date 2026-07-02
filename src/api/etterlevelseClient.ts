@@ -405,6 +405,8 @@ export class EtterlevelseClient {
     };
 
     if (isRecord(existing) && typeof existing.id === 'string') {
+      // id må være i body — API-et validerer at path-id og body-id stemmer overens
+      body.id = existing.id;
       // Inkluder version for optimistisk låsing — uten dette får vi 403 Forbidden
       if (typeof existing.version === 'number') {
         body.version = existing.version;
