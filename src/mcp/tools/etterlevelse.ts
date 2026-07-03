@@ -1905,10 +1905,14 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
           .regex(/^\d{4}-\d{2}-\d{2}$/)
           .optional()
           .describe('Frist på format YYYY-MM-DD'),
+        iverksatt: z
+          .boolean()
+          .optional()
+          .describe('Sett til true når tiltaket er gjennomført'),
       },
       annotations: writeAnnotations,
     },
-    async ({ risikoscenarioId, tiltakId, navn, beskrivelse, frist }) => {
+    async ({ risikoscenarioId, tiltakId, navn, beskrivelse, frist, iverksatt }) => {
       const writeGuardError = requireWriteEnabled();
       if (writeGuardError) return writeGuardError;
 
@@ -1930,6 +1934,7 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
         navn,
         beskrivelse,
         ...(frist !== undefined ? { frist } : {}),
+        ...(iverksatt !== undefined ? { iverksatt } : {}),
       };
 
         try {
