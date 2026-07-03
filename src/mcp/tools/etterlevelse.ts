@@ -1256,20 +1256,34 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
                existing.filer ?? existing.files ?? existing.vedlegg,
              );
              if (existingFiler.length > 0) {
-               const filnavn = existingFiler
-                 .map((f) => (isRecord(f) ? asString(f.filnavn ?? f.navn ?? f.name) : null))
-                 .filter(Boolean)
-                 .map((n) => `  - ${n}`)
-                 .join('\n');
-               return toolError(
-                 `Livsløpet har ${existingFiler.length} eksisterende fil(er) som vil slettes hvis du oppdaterer uten å sende med filer.\n` +
-                 `Eksisterende filer:\n${filnavn || '  (navn ikke tilgjengelig)'}\n\n` +
-                 `Alternativene er:\n` +
-                 `  A) Send med filene på nytt som base64 i filer-parameteren for å bevare dem\n` +
-                 `  B) Oppdater kun beskrivelsen ved å legge ved de samme filene\n` +
-                 `  C) Bekreft at du ønsker å fjerne filene ved å kalle write_behandlingens_livsloep ` +
-                 `med beskrivelseOnly: true (ikke støttet — bruk delete_behandlingens_livsloep og opprett på nytt)`,
+               // fil-feltet i responsen er base64-kodet innhold — re-upload automatisk
+               const canReuse = existingFiler.every(
+                 (f) => isRecord(f) && typeof f.fil === 'string' && f.fil.length > 0,
                );
+               if (canReuse) {
+                 const reusedfiler = existingFiler
+                   .filter((f): f is Record<string, unknown> => isRecord(f))
+                   .map((f) => ({
+                     navn: asString(f.filnavn ?? f.navn ?? f.name) ?? 'ukjent',
+                     type: (asString(f.filtype ?? f.type) ?? 'application/octet-stream') as
+                       | 'image/png'
+                       | 'image/jpeg'
+                       | 'application/pdf',
+                     innhold: asString(f.fil) ?? '',
+                   }));
+                 filer = reusedfiler;
+               } else {
+                 const filnavn = existingFiler
+                   .map((f) => (isRecord(f) ? asString(f.filnavn ?? f.navn ?? f.name) : null))
+                   .filter(Boolean)
+                   .map((n) => `  - ${n}`)
+                   .join('\n');
+                 return toolError(
+                   `Livsløpet har ${existingFiler.length} eksisterende fil(er) som ikke kan hentes automatisk.\n` +
+                   `Eksisterende filer:\n${filnavn || '  (navn ikke tilgjengelig)'}\n\n` +
+                   `Send filene på nytt som base64 i filer-parameteren for å bevare dem.`,
+                 );
+               }
              }
            }
          }
