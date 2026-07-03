@@ -100,8 +100,9 @@ function extractCanvasText(layout: unknown): string {
             .replace(/<[^>]+>/g, '')
             .replace(/&nbsp;/g, ' ')
             .replace(/&amp;/g, '&')
-            .replace(/&lt;/g, '<')
-            .replace(/&gt;/g, '>')
+            .replace(/&lt;/g, '«')
+            .replace(/&gt;/g, '»')
+            .replace(/&quot;/g, '"')
             .replace(/\n{3,}/g, '\n\n')
             .trim();
           if (text) parts.push(text);
