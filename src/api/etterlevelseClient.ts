@@ -593,29 +593,10 @@ export class EtterlevelseClient {
 
   async getRisikoscenarioer(pvkDokumentId: string): Promise<unknown[]> {
     const payload = await this.get(`/risikoscenario/pvkdokument/${pvkDokumentId}/ALL`);
-    const scenarios = extractArray(payload);
-
-    // Liste-endepunktet returnerer forenklet DTO uten relevanteKravNummer populert.
-    // Hent enkeltscenarioer for krav-spesifikke scenarioer (generelScenario=false)
-    // slik at kravkoblingene er synlige.
-    const enriched = await Promise.all(
-      scenarios.map(async (s) => {
-        if (!isRecord(s)) return s;
-        const isGeneral = s.generelScenario === true;
-        const hasKrav =
-          Array.isArray(s.relevanteKravNummer) && s.relevanteKravNummer.length > 0;
-        if (!isGeneral && !hasKrav && typeof s.id === 'string') {
-          try {
-            const full = await this.getRisikoscenario(s.id);
-            return full ?? s;
-          } catch {
-            return s;
-          }
-        }
-        return s;
-      }),
-    );
-    return enriched;
+    // Merk: backend-GET-endepunktet populerer ikke relevanteKravNummer (kravkoblinger).
+    // Kravkoblinger er synlige i responsen fra addRelevantKrav (link_krav_to_risikoscenario),
+    // men ikke fra list- eller enkelt-GET-endepunktene.
+    return extractArray(payload);
   }
 
   async getRisikoscenario(id: string): Promise<unknown | null> {

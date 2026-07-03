@@ -309,7 +309,14 @@ function normalizeRisikoscenario(raw: unknown) {
     nivaaBegrunnelseEtterTiltak: cleanText(scenario.nivaaBegrunnelseEtterTiltak),
     ingenTiltak: typeof scenario.ingenTiltak === 'boolean' ? scenario.ingenTiltak : undefined,
     relevanteKravNummer: Array.isArray(scenario.relevanteKravNummer)
-      ? (scenario.relevanteKravNummer as unknown[]).map((k) => asNumber(k) ?? asString(k)).filter(Boolean)
+      ? (scenario.relevanteKravNummer as unknown[])
+          .map((k) => {
+            // API returnerer IKravReference-objekter: { kravNummer, navn }
+            if (isRecord(k) && k.kravNummer !== undefined) return asNumber(k.kravNummer);
+            // Fallback: tall eller streng direkte
+            return asNumber(k) ?? (typeof k === 'string' ? parseInt(k, 10) || k : null);
+          })
+          .filter((k): k is number | string => k !== null && k !== undefined)
       : [],
     tiltakIds: Array.isArray(scenario.tiltakIds)
       ? (scenario.tiltakIds as unknown[]).map((id) => asString(id)).filter(Boolean)
@@ -338,7 +345,9 @@ function formatRisikoscenarioSection(raw: unknown, index?: number): string {
     formatField('Ingen tiltak', scenario.ingenTiltak),
     scenario.relevanteKravNummer.length > 0
       ? formatField('Relevante krav', scenario.relevanteKravNummer.join(', '))
-      : null,
+      : scenario.generelScenario === false
+        ? formatField('Relevante krav', '(ikke tilgjengelig via GET — synlig i link_krav_to_risikoscenario-respons)')
+        : null,
     scenario.tiltakIds.length > 0
       ? formatField('Tiltak', scenario.tiltakIds.join(', '))
       : null,
