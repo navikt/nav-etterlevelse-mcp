@@ -7,7 +7,62 @@ hentes automatisk.
 
 **Status:** Implementert i `feat/navet-sharepoint`. Dev-tilgang innvilget for `fag-og-ytelser` hub-siten av #tech-azure.
 
-**Testresultat:** Hub-siten returnerer 200 sider blandet på tvers av alle fagområder. Innholdet er ikke strukturert per fagområde, og tittelfiltrering er for lite presist. Den fagområdespesifikke konteksten (personvernregler, retningslinjer) ligger på sub-sitene. **Sub-site-tilgang nødvendig for å gjøre verktøyet nyttig.** Be om tilgang til spesifikke sub-siter, f.eks.:`fag-og-ytelser-arbeid-arbeidsrettet-brukeroppfolging` som første prioritet.
+**Testresultat og funn:**
+- Autentisering og Graph API-oppslag fungerer teknisk
+- Hub-siten `fag-og-ytelser` returnerer 200 sider, men innholdet er blandet på tvers av alle fagområder uten enkel kategorisering
+- Navet-innholdet er distribuert på tvers av mange separate site collections — hub-siten er kun et navigasjonslag
+- SharePoint `Sites.Selected` kan ikke enumerere hub-assosierte sites — vi kan ikke finne de riktige sitene programmatisk
+- **Konklusjon:** Vi trenger tilgang til de spesifikke innholds-sitene, ikke hub-siten
+
+## Forespørsel til Leif (#tech-azure)
+
+Be om `Sites.Selected` lesetilgang for `nav-etterlevelse-mcp` på følgende site collections.
+Start med dev, og utvid til prod når MCP-serveren er godkjent i mcp-registry.
+
+### Prioritet 1 — fagområder relevant for DAB
+
+| Fagområde | Site URL |
+|-----------|----------|
+| Arbeidsrettet oppfølging | `https://navno.sharepoint.com/sites/fag-og-ytelser-arbeid-arbeidsrettet-brukeroppfolging` |
+| Arbeidsavklaringspenger (AAP) | `https://navno.sharepoint.com/sites/fag-og-ytelser-arbeid-arbeidsavklaringspenger` |
+| Dagpenger | `https://navno.sharepoint.com/sites/fag-og-ytelser-arbeid-dagpenger` |
+| Stønadsøkonomi/utbetaling | `https://navno.sharepoint.com/sites/fag-og-ytelser-stonadsokonomi` |
+
+### Prioritet 2 — øvrige fagområder
+
+| Fagområde | Site URL |
+|-----------|----------|
+| Sykefraværsoppfølging og sykepenger | `https://navno.sharepoint.com/sites/fag-og-ytelser-arbeid-sykefravarsoppfolging-og-sykepenger` |
+| Sosiale tjenester | `https://navno.sharepoint.com/sites/fag-og-ytelser-sosiale-tjenester` |
+| Tiltak og virkemidler | `https://navno.sharepoint.com/sites/fag-og-ytelser-arbeid-tiltak-og-virkemidler` |
+| Alderspensjon | `https://navno.sharepoint.com/sites/fag-og-ytelser-pensjon-alderspensjon` |
+| Markedsarbeid | `https://navno.sharepoint.com/sites/fag-og-ytelser-arbeid-markedsarbeid` |
+
+### Mal for forespørsel til Leif
+
+> Hei Leif,
+>
+> Takk for hub-site-tilgangen til `fag-og-ytelser`. Etter testing viser det seg at
+> innholdet vi trenger ligger på de spesifikke innholds-sitene, ikke på hub-siten.
+> Vi kan dessverre ikke enumerere assosierte sites med `Sites.Selected`-tilgangen vi har.
+>
+> Kan du gi `nav-etterlevelse-mcp` (dev-appen) lesetilgang på disse site collections
+> (samme fremgangsmåte som sist, én `Sites.Selected`-grant per site)?
+>
+> Prioritet 1 (fagområder mest relevante for DAB):
+> - `fag-og-ytelser-arbeid-arbeidsrettet-brukeroppfolging`
+> - `fag-og-ytelser-arbeid-arbeidsavklaringspenger`
+> - `fag-og-ytelser-arbeid-dagpenger`
+> - `fag-og-ytelser-stonadsokonomi`
+>
+> Prioritet 2 (øvrige fagområder i nav-etterlevelse/nav-pvk-skillene):
+> - `fag-og-ytelser-arbeid-sykefravarsoppfolging-og-sykepenger`
+> - `fag-og-ytelser-sosiale-tjenester`
+> - `fag-og-ytelser-arbeid-tiltak-og-virkemidler`
+> - `fag-og-ytelser-pensjon-alderspensjon`
+> - `fag-og-ytelser-arbeid-markedsarbeid`
+>
+> Referanse: https://github.com/navikt/nav-etterlevelse-mcp/blob/main/docs/navet-sharepoint-integration.md
 
 ---
 
