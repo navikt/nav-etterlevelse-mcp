@@ -1235,45 +1235,64 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
       },
       annotations: writeAnnotations,
     },
-    async ({ beskrivelse, filer }) => {
-      const writeGuardError = requireWriteEnabled();
-      if (writeGuardError) return writeGuardError;
+     async ({ beskrivelse, filer }) => {
+       const writeGuardError = requireWriteEnabled();
+       if (writeGuardError) return writeGuardError;
 
-      const guardError = requireDocumentLock(ctx);
-      if (guardError) {
-        return guardError;
-      }
+       const guardError = requireDocumentLock(ctx);
+       if (guardError) {
+         return guardError;
+       }
 
-      const lockedDocumentId = ctx.tokenData.lockedDocumentId as string;
-      const lockedDocumentTitle = ctx.tokenData.lockedDocumentTitle ?? lockedDocumentId;
+       const lockedDocumentId = ctx.tokenData.lockedDocumentId as string;
+       const lockedDocumentTitle = ctx.tokenData.lockedDocumentTitle ?? lockedDocumentId;
 
-      try {
-        const result = await client.upsertBehandlingensLivsloep(lockedDocumentId, beskrivelse, filer);
-        const saved = isRecord(result) ? result : {};
-        const previewLines = [
-          formatField('Etterlevelsesdokument', lockedDocumentTitle),
-          formatField('LivsløpId', saved.id),
-          formatField('Beskrivelse', saved.beskrivelse ?? beskrivelse),
-          formatField('Antall vedlegg sendt', filer?.length ?? 0),
-          formatListField(
-            'Vedlegg',
-            filer?.map((fil: { navn?: string }) => fil.navn),
-          ),
-        ].filter((line): line is string => Boolean(line));
-        const note =
-          !filer || filer.length === 0
-            ? 'Merk: Ved PUT uten nye filer kan backend kreve at eksisterende vedlegg lastes opp på nytt for å bevares.'
-            : null;
+       try {
+         // Sjekk om det finnes eksisterende filer som vil gå tapt ved oppdatering uten vedlegg
+         if (!filer || filer.length === 0) {
+           const existing = await client.getBehandlingensLivsloep(lockedDocumentId);
+           if (isRecord(existing)) {
+             const existingFiler = extractArray(
+               existing.filer ?? existing.files ?? existing.vedlegg,
+             );
+             if (existingFiler.length > 0) {
+               const filnavn = existingFiler
+                 .map((f) => (isRecord(f) ? asString(f.filnavn ?? f.navn ?? f.name) : null))
+                 .filter(Boolean)
+                 .map((n) => `  - ${n}`)
+                 .join('\n');
+               return toolError(
+                 `Livsløpet har ${existingFiler.length} eksisterende fil(er) som vil slettes hvis du oppdaterer uten å sende med filer.\n` +
+                 `Eksisterende filer:\n${filnavn || '  (navn ikke tilgjengelig)'}\n\n` +
+                 `Alternativene er:\n` +
+                 `  A) Send med filene på nytt som base64 i filer-parameteren for å bevare dem\n` +
+                 `  B) Oppdater kun beskrivelsen ved å legge ved de samme filene\n` +
+                 `  C) Bekreft at du ønsker å fjerne filene ved å kalle write_behandlingens_livsloep ` +
+                 `med beskrivelseOnly: true (ikke støttet — bruk delete_behandlingens_livsloep og opprett på nytt)`,
+               );
+             }
+           }
+         }
 
-        return toolResult({
-          preview: [
-            boxSection('BEHANDLINGENS LIVSLØP', previewLines.join('\n')),
-            ...(note ? [boxSection('MERK', note)] : []),
-          ].join('\n\n'),
-          etterlevelseDokumentasjonId: lockedDocumentId,
-          behandlingensLivsloep: saved,
-          result,
-        });
+         const result = await client.upsertBehandlingensLivsloep(lockedDocumentId, beskrivelse, filer);
+         const saved = isRecord(result) ? result : {};
+         const previewLines = [
+           formatField('Etterlevelsesdokument', lockedDocumentTitle),
+           formatField('LivsløpId', saved.id),
+           formatField('Beskrivelse', saved.beskrivelse ?? beskrivelse),
+           formatField('Antall vedlegg sendt', filer?.length ?? 0),
+           formatListField(
+             'Vedlegg',
+             filer?.map((fil: { navn?: string }) => fil.navn),
+           ),
+         ].filter((line): line is string => Boolean(line));
+
+         return toolResult({
+           preview: boxSection('BEHANDLINGENS LIVSLØP', previewLines.join('\n')),
+           etterlevelseDokumentasjonId: lockedDocumentId,
+           behandlingensLivsloep: saved,
+           result,
+         });
       } catch (error) {
         return toolError(error);
       }
