@@ -1158,7 +1158,7 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
         if (behandlingIds !== undefined) cleaned.behandlingIds = behandlingIds;
         if (dpBehandlingIds !== undefined) cleaned.dpBehandlingIds = dpBehandlingIds;
         if (irrelevansFor !== undefined) cleaned.irrelevansFor = irrelevansFor;
-        if (Risikovurderinger !== undefined) cleaned.Risikovurderinger = Risikovurderinger;
+        if (Risikovurderinger !== undefined) cleaned.risikovurderinger = Risikovurderinger;
         if (prioritertKravNummer !== undefined) cleaned.prioritertKravNummer = prioritertKravNummer;
         if (teams !== undefined) cleaned.teams = teams;
         if (behandlerPersonopplysninger !== undefined) cleaned.behandlerPersonopplysninger = behandlerPersonopplysninger;
