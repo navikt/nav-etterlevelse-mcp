@@ -359,6 +359,9 @@ function normalizeTiltak(raw: unknown) {
   return {
     id: asString(tiltak.id) ?? '',
     risikoscenarioId,
+    risikoscenarioIds: Array.isArray(tiltak.risikoscenarioIds)
+      ? (tiltak.risikoscenarioIds as unknown[]).map((id) => asString(id)).filter(Boolean)
+      : risikoscenarioId ? [risikoscenarioId] : [],
     pvkDokumentId: asString(tiltak.pvkDokumentId) ?? '',
     navn: cleanText(tiltak.navn ?? tiltak.name, 'Uten navn'),
     beskrivelse: cleanText(tiltak.beskrivelse),
@@ -372,7 +375,9 @@ function formatTiltakSection(raw: unknown, index?: number): string {
   const title = index !== undefined ? `TILTAK ${index}` : 'TILTAK';
   const lines = [
     formatField('Id', tiltak.id),
-    formatField('RisikoscenarioId', tiltak.risikoscenarioId),
+    tiltak.risikoscenarioIds.length > 1
+      ? formatField('Scenario-IDer', tiltak.risikoscenarioIds.join(', '))
+      : formatField('RisikoscenarioId', tiltak.risikoscenarioId),
     formatField('PVK-dokumentId', tiltak.pvkDokumentId),
     formatField('Navn', tiltak.navn),
     formatField('Beskrivelse', tiltak.beskrivelse || '(tom)'),
@@ -598,9 +603,16 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
           formatField('Etterlevelsesdokument', lockedDocumentTitle),
           formatField('PVK-dokumentId', pvkDokument.id),
           formatField('Status', pvkDokument.status),
+          formatField('PVK-vurdering', pvkDokument.pvkVurdering),
+          formatField('PVK-vurdering begrunnelse', pvkDokument.pvkVurderingsBegrunnelse),
+          Array.isArray(pvkDokument.ytterligereEgenskaper) && (pvkDokument.ytterligereEgenskaper as unknown[]).length > 0
+            ? formatField('Ytterligere egenskaper', (pvkDokument.ytterligereEgenskaper as unknown[]).map((e) => isRecord(e) ? asString(e.code) : asString(e)).filter(Boolean).join(', '))
+            : null,
+          formatField('Profilering', pvkDokument.dpProcessProfilering),
+          formatField('Helautomatisert', pvkDokument.dpProcessHelautomatiskBehandling),
+          formatField('Har involvert representant', pvkDokument.harInvolvertRepresentant),
+          formatField('Har databehandlerrepresentant', pvkDokument.harDatabehandlerRepresentantInvolvering),
           formatField('BehandlingId', pvkDokument.behandlingId),
-          formatField('PVO involvert', pvkDokument.pvoInvolveres),
-          formatField('Har personopplysningsoversikt', pvkDokument.harPersonopplysningsoversikt),
           formatField('Sist endret', pvkDokument.sistEndret ?? pvkDokument.sistEndretDato),
         ].filter((line): line is string => Boolean(line));
 
@@ -1003,15 +1015,17 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
         const hensikt = typeof krav.hensikt === 'string' ? stripHtml(krav.hensikt) : '';
         const beskrivelse = typeof krav.beskrivelse === 'string' ? stripHtml(krav.beskrivelse) : '';
 
-        const existingItems = extractArray<Record<string, unknown>>(existingRaw);
-        const existingSKBs = Array.isArray(existingItems[0]?.suksesskriterieBegrunnelser)
-          ? (existingItems[0].suksesskriterieBegrunnelser as Record<string, unknown>[])
+        // getEtterlevelse returnerer ett objekt (ikke en liste) — bruk isRecord, ikke extractArray
+        const existingRecord = isRecord(existingRaw) ? existingRaw : null;
+        const existingSKBs = existingRecord && Array.isArray(existingRecord.suksesskriterieBegrunnelser)
+          ? (existingRecord.suksesskriterieBegrunnelser as Record<string, unknown>[])
           : [];
 
         const W = 76;
         const lines: string[] = [];
         lines.push(`✅  K${kravNummer}.${kravVersjon} — ${kravNavn} er oppdatert`);
         lines.push(`    Status: ${status}`);
+        if (statusBegrunnelse) lines.push(`    Statusbegrunnelse: ${statusBegrunnelse}`);
 
         if (hensikt) {
           lines.push('');

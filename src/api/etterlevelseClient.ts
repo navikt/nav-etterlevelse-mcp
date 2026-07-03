@@ -278,6 +278,11 @@ export class EtterlevelseClient {
     const data = await this.graphql(
       `{ etterlevelseDokumentasjon(filter: {id: "${id}"}) { content {
           id title etterlevelseNummer teams
+          beskrivelse behandlerPersonopplysninger
+          irrelevansFor { code }
+          behandlingIds dpBehandlingIds
+          risikovurderinger
+          prioritertKravNummer
           behandlinger { id navn }
           etterlevelser {
             id kravNummer kravVersjon etterleves status statusBegrunnelse
