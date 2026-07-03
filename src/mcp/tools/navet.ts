@@ -11,6 +11,7 @@ const FAGOMRAADER = {
   'tiltak-og-virkemidler': 'fag-og-ytelser-arbeid-tiltak-og-virkemidler',
   'pensjon-alderspensjon': 'fag-og-ytelser-pensjon-alderspensjon',
   'markedsarbeid': 'fag-og-ytelser-arbeid-markedsarbeid',
+  'fag-og-ytelser': 'fag-og-ytelser',
 } as const;
 
 type Fagomrade = keyof typeof FAGOMRAADER;
