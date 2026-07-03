@@ -94,27 +94,32 @@ function extractCanvasText(layout: unknown): string {
           (wp as Record<string, unknown>)['innerHtml'] ??
           ((wp as Record<string, unknown>)['data'] as Record<string, unknown> | undefined)?.['bodyHtml'] ?? '';
         if (typeof inner === 'string' && inner.trim()) {
-          // Steg 1: konverter blokklementer til linjeskift
-          let text = inner
+          // Ekstraher tekst ved å splitte på '<' — garanterer at ingen '<'-tegn
+          // overlever til output (CodeQL CWE-116 / incomplete-multi-char-sanitization).
+          // Chunk 0: tekst før første tag. Chunk N: skip tag-innhold (frem til '>'),
+          // behold tekst etter '>'. Chunk uten '>': del av uavsluttet tag — droppes.
+          const chunks = inner
             .replace(/<br\s*\/?>/gi, '\n')
-            .replace(/<\/?(p|div|li|h[1-6])[^>]*>/gi, '\n');
+            .replace(/<\/?(p|div|li|h[1-6])[^>]*>/gi, '\n')
+            .split('<');
+          const textChunks: string[] = [chunks[0]];
+          for (let i = 1; i < chunks.length; i++) {
+            const closeIdx = chunks[i].indexOf('>');
+            if (closeIdx >= 0) {
+              textChunks.push(chunks[i].slice(closeIdx + 1));
+            }
+            // ingen '>': del av uavsluttet tag (f.eks. '<script uten lukk) — droppes
+          }
 
-          // Steg 2: strip alle HTML-tagger inkl. uavsluttede
-          text = text.replace(/<[^>]*>?/g, '');
-
-          // Steg 3: fjern encodede vinkeltegn (ikke dekod — forhindrer tag-rekonstruksjon)
-          text = text.replace(/&lt;/g, '').replace(/&gt;/g, '');
-
-          // Steg 4: dekod trygge entiteter (&amp; sist — etter at vinkeltegn er fjernet)
-          text = text
+          const text = textChunks
+            .join('')
             .replace(/&nbsp;/g, ' ')
+            .replace(/&lt;/g, '')
+            .replace(/&gt;/g, '')
+            .replace(/&amp;/g, '&')
             .replace(/&quot;/g, '"')
-            .replace(/&amp;/g, '&');
-
-          // Steg 5: eksplisitt sanitering — fjern alle eventuelle gjenværende < og >
-          text = text.replace(/[<>]/g, '');
-
-          text = text.replace(/\n{3,}/g, '\n\n').trim();
+            .replace(/\n{3,}/g, '\n\n')
+            .trim();
           if (text) parts.push(text);
         }
       }
