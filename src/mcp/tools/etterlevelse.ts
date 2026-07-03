@@ -1615,6 +1615,100 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
   );
 
   server.registerTool(
+    'write_pvk_melding_til_pvo',
+    {
+      description:
+        'Skriv eller oppdater utkast til melding til personvernombudet (PVO) på det låste PVK-dokumentet. ' +
+        'Lagres alltid som utkast — agenten sender aldri inn til PVO. ' +
+        'Teamet trykker «Send inn» i etterlevelse.ansatt.nav.no når de er klare. ' +
+        'Feltene rendres som markdown i UI-et. ' +
+        'merknadTilPvo: bakgrunn og spørsmål til PVO. ' +
+        'endringsNotat: oppsummering av endringer siden forrige innsending (kun ved revurdering).',
+      inputSchema: {
+        merknadTilPvo: z
+          .string()
+          .min(1)
+          .describe('Bakgrunn, begrunnelse og eventuelle spørsmål til PVO. Rendres som markdown.'),
+        endringsNotat: z
+          .string()
+          .optional()
+          .describe('Oppsummering av endringer siden siste PVO-tilbakemelding. Kun relevant ved revurdering.'),
+      },
+      annotations: writeAnnotations,
+    },
+    async ({ merknadTilPvo, endringsNotat }) => {
+      const writeGuardError = requireWriteEnabled();
+      if (writeGuardError) return writeGuardError;
+
+      const guardError = requireDocumentLock(ctx);
+      if (guardError) return guardError;
+
+      const { lockedPvkDokumentId } = ctx.tokenData;
+      if (!lockedPvkDokumentId) {
+        return toolError(
+          'Ingen PVK-dokument funnet for dette etterlevelsesdokumentet. Opprett PVK-dokument først.',
+        );
+      }
+
+      try {
+        const existing = await client.getPvkDokumentById(lockedPvkDokumentId);
+        if (!isRecord(existing)) {
+          return toolError(`Fant ikke PVK-dokument med id ${lockedPvkDokumentId}`);
+        }
+
+        const antall = typeof existing.antallInnsendingTilPvo === 'number'
+          ? existing.antallInnsendingTilPvo
+          : 0;
+        const existingMeldinger = Array.isArray(existing.meldingerTilPvo)
+          ? existing.meldingerTilPvo
+          : [];
+
+        // Finn eventuelt eksisterende utkast (sendtTilPvoDato er tom) og oppdater det,
+        // eller legg til ny melding
+        const utkastIndex = existingMeldinger.findIndex(
+          (m) => isRecord(m) && (!m.sendtTilPvoDato || m.sendtTilPvoDato === ''),
+        );
+
+        const nyMelding = {
+          innsendingId: antall + 1,
+          merknadTilPvo,
+          endringsNotat: endringsNotat ?? '',
+          sendtTilPvoDato: '',   // utkast — teamet sender manuelt
+          sendtTilPvoAv: '',
+          etterlevelseDokumentVersjon: existing.currentEtterlevelseDokumentVersjon ?? 1,
+        };
+
+        const oppdatertMeldinger = utkastIndex >= 0
+          ? existingMeldinger.map((m, i) => (i === utkastIndex ? nyMelding : m))
+          : [...existingMeldinger, nyMelding];
+
+        const result = await client.patchPvkDokument(lockedPvkDokumentId, {
+          meldingerTilPvo: oppdatertMeldinger,
+        });
+
+        const action = utkastIndex >= 0 ? 'oppdatert' : 'opprettet';
+        const previewLines = [
+          formatField('PVK-dokumentId', lockedPvkDokumentId),
+          formatField('Handling', `Utkast ${action} (innsendingId: ${nyMelding.innsendingId})`),
+          formatField('Merknad til PVO', merknadTilPvo.slice(0, 120) + (merknadTilPvo.length > 120 ? '…' : '')),
+          endringsNotat ? formatField('Endringsnotat', endringsNotat.slice(0, 80) + (endringsNotat.length > 80 ? '…' : '')) : null,
+          formatField('Status', 'Utkast — send inn manuelt i etterlevelse.ansatt.nav.no'),
+        ].filter((line): line is string => Boolean(line));
+
+        return toolResult({
+          preview: boxSection('PVK MELDING TIL PVO', previewLines.join('\n')),
+          pvkDokumentId: lockedPvkDokumentId,
+          innsendingId: nyMelding.innsendingId,
+          action,
+          result,
+        });
+      } catch (error) {
+        return toolError(error);
+      }
+    },
+  );
+
+  server.registerTool(
     'write_pvk_egenskaper',
     {
       description:
