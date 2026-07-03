@@ -97,12 +97,11 @@ function extractCanvasText(layout: unknown): string {
           const text = inner
             .replace(/<br\s*\/?>/gi, '\n')
             .replace(/<\/?(p|div|li|h[1-6])[^>]*>/gi, '\n')
-            .replace(/<[^>]+>/g, '')
+            .replace(/<[^>]*>?/g, '')   // strip tags inkl. uavsluttede (<script uten >)
+            .replace(/[<>]/g, '')        // eksplisitt sanitering — fjern alle gjenværende < og >
             .replace(/&nbsp;/g, ' ')
             .replace(/&amp;/g, '&')
-            // &lt; og &gt; lates udekodet — å dekode dem til < og > ville kunne
-            // rekonstruere HTML-tagger fra encodet innhold (CodeQL CWE-116).
-            // Agenten leser &lt;/&gt; korrekt som markup-kontekst.
+            // &lt; og &gt; lates udekodet — dekoding ville rekonstruere HTML-tagger
             .replace(/&quot;/g, '"')
             .replace(/\n{3,}/g, '\n\n')
             .trim();
