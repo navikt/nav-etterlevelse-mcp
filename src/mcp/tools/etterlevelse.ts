@@ -299,6 +299,7 @@ function normalizeRisikoscenario(raw: unknown) {
     id: asString(scenario.id) ?? '',
     navn: cleanText(scenario.navn ?? scenario.name, 'Uten navn'),
     beskrivelse: cleanText(scenario.beskrivelse),
+    generelScenario: typeof scenario.generelScenario === 'boolean' ? scenario.generelScenario : undefined,
     sannsynlighetsNivaa: asNumber(scenario.sannsynlighetsNivaa),
     sannsynlighetsNivaaBegrunnelse: cleanText(scenario.sannsynlighetsNivaaBegrunnelse),
     konsekvensNivaa: asNumber(scenario.konsekvensNivaa),
@@ -307,6 +308,12 @@ function normalizeRisikoscenario(raw: unknown) {
     konsekvensNivaaEtterTiltak: asNumber(scenario.konsekvensNivaaEtterTiltak),
     nivaaBegrunnelseEtterTiltak: cleanText(scenario.nivaaBegrunnelseEtterTiltak),
     ingenTiltak: typeof scenario.ingenTiltak === 'boolean' ? scenario.ingenTiltak : undefined,
+    relevanteKravNummer: Array.isArray(scenario.relevanteKravNummer)
+      ? (scenario.relevanteKravNummer as unknown[]).map((k) => asNumber(k) ?? asString(k)).filter(Boolean)
+      : [],
+    tiltakIds: Array.isArray(scenario.tiltakIds)
+      ? (scenario.tiltakIds as unknown[]).map((id) => asString(id)).filter(Boolean)
+      : [],
   };
 }
 
@@ -317,6 +324,9 @@ function formatRisikoscenarioSection(raw: unknown, index?: number): string {
   const lines = [
     formatField('Id', scenario.id),
     formatField('Navn', scenario.navn),
+    scenario.generelScenario !== undefined
+      ? formatField('Type', scenario.generelScenario ? 'Øvrig (uten kravkobling)' : 'Krav-koblet')
+      : null,
     formatField('Beskrivelse', scenario.beskrivelse || '(tom)'),
     formatField('Sannsynlighet', scenario.sannsynlighetsNivaa),
     formatField('Begrunnelse sannsynlighet', scenario.sannsynlighetsNivaaBegrunnelse),
@@ -326,6 +336,12 @@ function formatRisikoscenarioSection(raw: unknown, index?: number): string {
     formatField('Konsekvens etter tiltak', scenario.konsekvensNivaaEtterTiltak),
     formatField('Begrunnelse etter tiltak', scenario.nivaaBegrunnelseEtterTiltak),
     formatField('Ingen tiltak', scenario.ingenTiltak),
+    scenario.relevanteKravNummer.length > 0
+      ? formatField('Relevante krav', scenario.relevanteKravNummer.join(', '))
+      : null,
+    scenario.tiltakIds.length > 0
+      ? formatField('Tiltak', scenario.tiltakIds.join(', '))
+      : null,
   ].filter((line): line is string => Boolean(line));
 
   return boxSection(title, lines.join('\n'));
