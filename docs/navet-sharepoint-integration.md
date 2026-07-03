@@ -5,7 +5,9 @@ lover, retningslinjer og hva veiledere har lov/ikke lov til å registrere. Innho
 er verdifullt som domenekontekst for nav-etterlevelse og nav-pvk, men kan per nå ikke
 hentes automatisk.
 
-**Status:** Implementert i `feat/navet-sharepoint`. Dev-tilgang innvilget for `fag-og-ytelser`-siten av #tech-azure. Venter på test og godkjenning før merge til main.
+**Status:** Implementert i `feat/navet-sharepoint`. Dev-tilgang innvilget for `fag-og-ytelser` hub-siten av #tech-azure.
+
+**Testresultat:** Hub-siten returnerer 200 sider blandet på tvers av alle fagområder. Innholdet er ikke strukturert per fagområde, og tittelfiltrering er for lite presist. Den fagområdespesifikke konteksten (personvernregler, retningslinjer) ligger på sub-sitene. **Sub-site-tilgang nødvendig for å gjøre verktøyet nyttig.** Be om tilgang til spesifikke sub-siter, f.eks.:`fag-og-ytelser-arbeid-arbeidsrettet-brukeroppfolging` som første prioritet.
 
 ---
 
