@@ -5,7 +5,7 @@ lover, retningslinjer og hva veiledere har lov/ikke lov til å registrere. Innho
 er verdifullt som domenekontekst for nav-etterlevelse og nav-pvk, men kan per nå ikke
 hentes automatisk.
 
-**Status:** Avventer admin-consent for `Sites.Selected`-tilgang i Entra ID.
+**Status:** Implementert i `feat/navet-sharepoint`. Dev-tilgang innvilget for `fag-og-ytelser`-siten av #tech-azure. Venter på test og godkjenning før merge til main.
 
 ---
 

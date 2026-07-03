@@ -67,6 +67,9 @@ bevart for auditing.
 | `link_krav_to_risikoscenario` | Koble krav til risikoscenario |
 | `unlink_krav_from_risikoscenario` | Fjern krav-kobling fra risikoscenario |
 
+| `list_navet_pages` | List sider på en Navet-site for et fagområde |
+| `get_navet_page` | Hent tekstinnhold fra en Navet-side (fagretningslinjer, lover, personvern) |
+
 ### Behandlingskatalog — les
 
 | Tool | Beskrivelse |

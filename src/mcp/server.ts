@@ -3,10 +3,12 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { BehandlingskatalogClient } from '../api/behandlingskatalogClient.js';
 import { EtterlevelseClient } from '../api/etterlevelseClient.js';
+import { NavetClient } from '../api/navetClient.js';
 import { config, mcpServerInfo } from '../config.js';
 import { type McpTokenData } from '../auth/store.js';
 import { registerBehandlingskatalogTools } from './tools/behandlingskatalog.js';
 import { registerEtterlevelseTools } from './tools/etterlevelse.js';
+import { registerNavetTools } from './tools/navet.js';
 
 export interface SessionContext {
   tokenData: McpTokenData;
@@ -38,11 +40,37 @@ async function exchangeViaTexas(userToken: string, targetScope: string): Promise
   }
 }
 
-export function createMcpServer(ctx: SessionContext, behandlingskatalogClient: BehandlingskatalogClient): McpServer {
+/** Henter et app-token (client credentials / M2M) via Texas for tjenester som ikke bruker OBO. */
+async function getAppTokenViaTexas(targetScope: string): Promise<string | null> {
+  try {
+    const response = await fetch(config.api.texasTokenUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        target: targetScope,
+        identity_provider: 'azuread',
+      }),
+    });
+    if (!response.ok) {
+      console.log(`Texas M2M token failed for ${targetScope}:`, response.status, await response.text());
+      return null;
+    }
+    const data = await response.json() as { access_token?: string };
+    return data.access_token ?? null;
+  } catch (error) {
+    console.log(`Texas M2M token error for ${targetScope}:`, error);
+    return null;
+  }
+}
+
+export function createMcpServer(ctx: SessionContext, behandlingskatalogClient: BehandlingskatalogClient, navetClient: NavetClient | null): McpServer {
   const server = new McpServer(mcpServerInfo);
 
   registerEtterlevelseTools(server, ctx);
   registerBehandlingskatalogTools(server, behandlingskatalogClient);
+  if (navetClient) {
+    registerNavetTools(server, navetClient);
+  }
 
   return server;
 }
@@ -55,9 +83,10 @@ export async function handleMcpHttpRequest(
   const userToken = tokens.tokenData.userToken;
 
   // Exchange userToken via Texas OBO for downstream tokens
-  const [etterlevelseToken, bkToken] = await Promise.all([
+  const [etterlevelseToken, bkToken, navetToken] = await Promise.all([
     exchangeViaTexas(userToken, config.azure.etterlevelseScope),
     exchangeViaTexas(userToken, config.azure.behandlingskatalogScope),
+    getAppTokenViaTexas('https://graph.microsoft.com/.default'),
   ]);
 
   if (!etterlevelseToken) {
@@ -76,7 +105,11 @@ export async function handleMcpHttpRequest(
   };
 
   const behandlingskatalogClient = new BehandlingskatalogClient(bkToken);
-  const server = createMcpServer(ctx, behandlingskatalogClient);
+  const navetClient = navetToken ? new NavetClient(navetToken) : null;
+  if (!navetClient) {
+    console.log('Navet-token ikke tilgjengelig — list_navet_pages og get_navet_page er ikke aktive');
+  }
+  const server = createMcpServer(ctx, behandlingskatalogClient, navetClient);
   const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
 
   let cleanedUp = false;
