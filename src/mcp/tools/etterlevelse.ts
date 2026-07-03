@@ -333,9 +333,16 @@ function formatRisikoscenarioSection(raw: unknown, index?: number): string {
 
 function normalizeTiltak(raw: unknown) {
   const tiltak = isRecord(raw) ? raw : {};
+  // API returnerer risikoscenarioIds (plural, array) — singular-feltet er typisk tomt
+  const risikoscenarioId =
+    asString(tiltak.risikoscenarioId) ||
+    (Array.isArray(tiltak.risikoscenarioIds) && tiltak.risikoscenarioIds.length > 0
+      ? asString(tiltak.risikoscenarioIds[0])
+      : '') ||
+    '';
   return {
     id: asString(tiltak.id) ?? '',
-    risikoscenarioId: asString(tiltak.risikoscenarioId) ?? '',
+    risikoscenarioId,
     pvkDokumentId: asString(tiltak.pvkDokumentId) ?? '',
     navn: cleanText(tiltak.navn ?? tiltak.name, 'Uten navn'),
     beskrivelse: cleanText(tiltak.beskrivelse),
