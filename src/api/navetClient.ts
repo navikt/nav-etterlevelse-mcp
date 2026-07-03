@@ -94,17 +94,27 @@ function extractCanvasText(layout: unknown): string {
           (wp as Record<string, unknown>)['innerHtml'] ??
           ((wp as Record<string, unknown>)['data'] as Record<string, unknown> | undefined)?.['bodyHtml'] ?? '';
         if (typeof inner === 'string' && inner.trim()) {
-          const text = inner
+          // Steg 1: konverter blokklementer til linjeskift
+          let text = inner
             .replace(/<br\s*\/?>/gi, '\n')
-            .replace(/<\/?(p|div|li|h[1-6])[^>]*>/gi, '\n')
-            .replace(/<[^>]*>?/g, '')   // strip tags inkl. uavsluttede (<script uten >)
-            .replace(/[<>]/g, '')        // eksplisitt sanitering — fjern alle gjenværende < og >
+            .replace(/<\/?(p|div|li|h[1-6])[^>]*>/gi, '\n');
+
+          // Steg 2: strip alle HTML-tagger inkl. uavsluttede
+          text = text.replace(/<[^>]*>?/g, '');
+
+          // Steg 3: fjern encodede vinkeltegn (ikke dekod — forhindrer tag-rekonstruksjon)
+          text = text.replace(/&lt;/g, '').replace(/&gt;/g, '');
+
+          // Steg 4: dekod trygge entiteter (&amp; sist — etter at vinkeltegn er fjernet)
+          text = text
             .replace(/&nbsp;/g, ' ')
-            .replace(/&amp;/g, '&')
-            // &lt; og &gt; lates udekodet — dekoding ville rekonstruere HTML-tagger
             .replace(/&quot;/g, '"')
-            .replace(/\n{3,}/g, '\n\n')
-            .trim();
+            .replace(/&amp;/g, '&');
+
+          // Steg 5: eksplisitt sanitering — fjern alle eventuelle gjenværende < og >
+          text = text.replace(/[<>]/g, '');
+
+          text = text.replace(/\n{3,}/g, '\n\n').trim();
           if (text) parts.push(text);
         }
       }
