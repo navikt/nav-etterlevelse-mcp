@@ -100,8 +100,9 @@ function extractCanvasText(layout: unknown): string {
             .replace(/<[^>]+>/g, '')
             .replace(/&nbsp;/g, ' ')
             .replace(/&amp;/g, '&')
-            .replace(/&lt;/g, '«')
-            .replace(/&gt;/g, '»')
+            // &lt; og &gt; lates udekodet — å dekode dem til < og > ville kunne
+            // rekonstruere HTML-tagger fra encodet innhold (CodeQL CWE-116).
+            // Agenten leser &lt;/&gt; korrekt som markup-kontekst.
             .replace(/&quot;/g, '"')
             .replace(/\n{3,}/g, '\n\n')
             .trim();
