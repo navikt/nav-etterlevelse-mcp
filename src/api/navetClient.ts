@@ -34,6 +34,28 @@ export class NavetClient {
     return response.json();
   }
 
+  /** List sites assosiert med hub-siten (for å kartlegge struktur) */
+  async listHubAssociatedSites(siteId: string): Promise<{ id: string; name: string; webUrl: string }[]> {
+    const results: { id: string; name: string; webUrl: string }[] = [];
+
+    // Prøv /sites/{id}/sites (sub-sites)
+    try {
+      const data = await this.get(`${GRAPH_BASE}/sites/${siteId}/sites`) as Record<string, unknown>;
+      if (Array.isArray(data['value'])) {
+        for (const s of data['value'] as Record<string, unknown>[]) {
+          results.push({
+            id: typeof s['id'] === 'string' ? s['id'] : '',
+            name: typeof s['name'] === 'string' ? s['name'] : '',
+            webUrl: typeof s['webUrl'] === 'string' ? s['webUrl'] : '',
+          });
+        }
+      }
+    } catch (e) {
+      // Ikke tilgjengelig eller tom
+    }
+    return results;
+  }
+
   /** Hent site-ID for en Navet-site gitt URL-segment, f.eks. "fag-og-ytelser-arbeid-arbeidsrettet-brukeroppfolging" */
   async getSiteId(siteRelativePath: string): Promise<string> {
     const url = `${GRAPH_BASE}/sites/${NAVNO_HOST}:/sites/${siteRelativePath}`;

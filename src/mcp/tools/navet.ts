@@ -12,6 +12,7 @@ const FAGOMRAADER = {
   'pensjon-alderspensjon': 'fag-og-ytelser-pensjon-alderspensjon',
   'markedsarbeid': 'fag-og-ytelser-arbeid-markedsarbeid',
   'fag-og-ytelser': 'fag-og-ytelser',
+  'stonadsokonomi': 'fag-og-ytelser-stonadsokonomi',
 } as const;
 
 type Fagomrade = keyof typeof FAGOMRAADER;
@@ -33,6 +34,23 @@ function toolResult(data: unknown) {
 }
 
 export function registerNavetTools(server: McpServer, navetClient: NavetClient): void {
+  server.registerTool(
+    'list_navet_hub_sites',
+    {
+      description: 'List sites assosiert med fag-og-ytelser hub-siten (midlertidig kartleggingsverktøy).',
+      inputSchema: {},
+    },
+    async () => {
+      try {
+        const siteId = await navetClient.getSiteId('fag-og-ytelser');
+        const sites = await navetClient.listHubAssociatedSites(siteId);
+        return toolResult({ siteId, antall: sites.length, sites });
+      } catch (error) {
+        return toolError(error instanceof Error ? error.message : String(error));
+      }
+    },
+  );
+
   server.registerTool(
     'list_navet_pages',
     {
