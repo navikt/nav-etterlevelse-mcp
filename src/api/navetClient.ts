@@ -66,19 +66,14 @@ export class NavetClient {
   }
 
   /**
-   * Hent tekstinnhold fra en side med traversering av interne lenker.
+   * Hent tekstinnhold fra en side.
    *
-   * Strategi:
-   * 1. /webParts — henter alle webparts inkl. verticalSection og standardWebPart.searchablePlainTexts
-   * 2. listItem CanvasContent1 — fallback for sider med gammelt webpart-format
-   * 3. Traversering — for navigasjonssider som kun inneholder lenker, hentes innholdet
-   *    fra lenkede interne SharePoint-sider (maks 1 nivå dypt, maks 5 sider)
+   * Strategi (fallback-kjede):
+   * 1. /webParts — henter alle webparts inkl. verticalSection, støtter
+   *    textWebPart.innerHtml og standardWebPart.data.serverProcessedContent.searchablePlainTexts
+   * 2. listItem CanvasContent1 — råinnhold via Graph listItem hvis /webParts er tom
    */
-  async getPageContent(
-    siteId: string,
-    pageId: string,
-    _depth = 0,
-  ): Promise<{ title: string; content: string; webUrl: string }> {
+  async getPageContent(siteId: string, pageId: string): Promise<{ title: string; content: string; webUrl: string }> {
     // Hent metadata (tittel, URL, listItem-referanse)
     const meta = await this.get(
       `${GRAPH_BETA}/sites/${siteId}/pages/${pageId}/microsoft.graph.sitePage`,
@@ -88,15 +83,12 @@ export class NavetClient {
 
     // Strategi 1: /webParts — dekker alle seksjoner og webpart-typer
     let content = '';
-    let internalLinks: string[] = [];
     try {
       const wpData = await this.get(
         `${GRAPH_BETA}/sites/${siteId}/pages/${pageId}/microsoft.graph.sitePage/webParts`,
       ) as Record<string, unknown>;
       if (Array.isArray(wpData['value'])) {
-        const webparts = wpData['value'] as Record<string, unknown>[];
-        content = extractTextFromWebparts(webparts);
-        internalLinks = extractInternalLinks(webparts, siteId);
+        content = extractTextFromWebparts(wpData['value'] as Record<string, unknown>[]);
       }
     } catch {
       // Fortsett til neste strategi
@@ -123,88 +115,8 @@ export class NavetClient {
       }
     }
 
-    // Strategi 3: traverser interne lenker hvis siden er en navigasjonsside
-    if (_depth === 0 && internalLinks.length > 0 && content.split('\n').length < 5) {
-      const linkedParts: string[] = [];
-      const seen = new Set<string>();
-      for (const linkedUrl of internalLinks.slice(0, 5)) {
-        if (seen.has(linkedUrl)) continue;
-        seen.add(linkedUrl);
-        try {
-          const linkedPageId = await this.getPageIdByUrl(siteId, linkedUrl);
-          if (!linkedPageId) continue;
-          const linked = await this.getPageContent(siteId, linkedPageId, 1);
-          if (linked.content && linked.content !== '(ingen tekstinnhold funnet)') {
-            linkedParts.push(`### ${linked.title}\n\n${linked.content}`);
-          }
-        } catch {
-          // Siden ikke tilgjengelig
-        }
-      }
-      if (linkedParts.length > 0) {
-        content = [content, ...linkedParts].filter(Boolean).join('\n\n---\n\n');
-      }
-    }
-
     return { title, content: content || '(ingen tekstinnhold funnet)', webUrl };
   }
-
-  /** Slå opp page-ID fra en intern SharePoint SitePages-URL */
-  private async getPageIdByUrl(siteId: string, pageUrl: string): Promise<string | null> {
-    try {
-      // Normaliser URL til relativ sti for $filter
-      const encoded = encodeURIComponent(pageUrl);
-      const url = `${GRAPH_BETA}/sites/${siteId}/pages?$filter=webUrl eq '${encoded}'&$select=id`;
-      const data = await this.get(url) as Record<string, unknown>;
-      if (Array.isArray(data['value']) && data['value'].length > 0) {
-        const first = data['value'][0] as Record<string, unknown>;
-        return typeof first['id'] === 'string' ? first['id'] : null;
-      }
-      // Fallback: søk via tittelslug fra URL
-      const slug = pageUrl.split('/SitePages/')[1]?.replace('.aspx', '').replace(/-/g, ' ');
-      if (!slug) return null;
-      const searchUrl = `${GRAPH_BETA}/sites/${siteId}/pages?$select=id,title,webUrl`;
-      const all = await this.get(searchUrl) as Record<string, unknown>;
-      if (Array.isArray(all['value'])) {
-        const match = (all['value'] as Record<string, unknown>[]).find(
-          (p) => typeof p['webUrl'] === 'string' && p['webUrl'].includes(
-            pageUrl.split('/SitePages/')[1] ?? '',
-          ),
-        );
-        return match && typeof match['id'] === 'string' ? match['id'] : null;
-      }
-    } catch {
-      // Ikke funnet
-    }
-    return null;
-  }
-}
-
-/** Ekstraher interne SharePoint SitePages-lenker fra webparts. */
-function extractInternalLinks(webparts: Record<string, unknown>[], _siteId: string): string[] {
-  const urls: string[] = [];
-  for (const wp of webparts) {
-    const data = wp['data'] as Record<string, unknown> | undefined;
-    const spc = data?.['serverProcessedContent'] as Record<string, unknown> | undefined;
-    const links = spc?.['links'];
-    if (Array.isArray(links)) {
-      for (const link of links as Record<string, unknown>[]) {
-        const url = typeof link['value'] === 'string' ? link['value'] : '';
-        try {
-          const parsed = new URL(url);
-          if (
-            parsed.hostname === 'navno.sharepoint.com' &&
-            parsed.pathname.toLowerCase().includes('/sitepages/')
-          ) {
-            urls.push(url);
-          }
-        } catch {
-          // Ugyldig URL — ignorer
-        }
-      }
-    }
-  }
-  return [...new Set(urls)];
 }
 
 /** Ekstraher tekst fra /webParts-responsen.
