@@ -280,8 +280,7 @@ export class EtterlevelseClient {
           id title etterlevelseNummer teams
           beskrivelse behandlerPersonopplysninger
           irrelevansFor { code }
-          behandlingIds dpBehandlingIds
-          risikovurderinger
+          behandlingIds
           prioritertKravNummer
           behandlinger { id navn }
           etterlevelser {
