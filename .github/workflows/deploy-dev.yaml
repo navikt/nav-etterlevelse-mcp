@@ -46,7 +46,7 @@ jobs:
         run: pnpm run build
 
       - name: Build and push image
-        uses: nais/docker-build-push@v0
+        uses: nais/docker-build-push@31c3a7321909bcb20799fdf46153fec721fd9512 # v0
         id: docker-build-push
         with:
           team: dab
@@ -62,12 +62,12 @@ jobs:
         with:
           ref: ${{ github.event.inputs.branch || github.ref }}
       - name: Deploy Unleash API token to dev-gcp
-        uses: nais/deploy/actions/deploy@v2
+        uses: nais/deploy/actions/deploy@fc3eae3edebabdf67f7592102ae16176d5ba3b5f # v2
         env:
           CLUSTER: dev-gcp
           RESOURCE: .nais/unleash-api-token-dev.yaml
       - name: Deploy to dev-gcp
-        uses: nais/deploy/actions/deploy@v2
+        uses: nais/deploy/actions/deploy@fc3eae3edebabdf67f7592102ae16176d5ba3b5f # v2
         env:
           CLUSTER: dev-gcp
           RESOURCE: .nais/app-dev.yaml

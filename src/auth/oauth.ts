@@ -628,8 +628,14 @@ h2{color:#007bff}</style></head>
     const grantType = bodyString(req.body, 'grant_type');
     const clientId = bodyString(req.body, 'client_id');
 
-    if (!grantType) {
-      sendJsonError(res, 400, 'invalid_request', 'grant_type is required');
+    const allowedGrantTypes = new Set([
+      'authorization_code',
+      'refresh_token',
+      'urn:ietf:params:oauth:grant-type:device_code',
+    ]);
+
+    if (!grantType || !allowedGrantTypes.has(grantType)) {
+      sendJsonError(res, 400, 'unsupported_grant_type', 'Unsupported or missing grant_type');
       return;
     }
 
