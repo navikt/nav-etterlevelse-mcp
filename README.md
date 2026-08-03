@@ -68,8 +68,32 @@ bevart for auditing.
 | `link_krav_to_risikoscenario` | Koble krav til risikoscenario |
 | `unlink_krav_from_risikoscenario` | Fjern krav-kobling fra risikoscenario |
 
+### Navet (SharePoint) — les
+
+Leser fagområdespesifikke sider fra NAVs interne Navet via Microsoft Graph API med `Sites.Selected`-tilgang.
+Tilgang innvilges per fagområde av #tech-azure. Se [implementasjonsplan](docs/navet-sharepoint-integration.md) for detaljer.
+
+| Tool | Beskrivelse |
+|------|-------------|
 | `list_navet_pages` | List sider på en Navet-site for et fagområde |
 | `get_navet_page` | Hent tekstinnhold fra en Navet-side (fagretningslinjer, lover, personvern) |
+
+**Tilgang per fagområde (dev):**
+
+| Fagområde-kode | Status |
+|---|---|
+| `arbeidsrettet-brukeroppfolging` | ✅ Tilgang innvilget |
+| `utbetalinger` | ✅ Tilgang innvilget |
+| `intranett-utvikling` | ✅ Tilgang innvilget |
+| `fag-og-ytelser` | ✅ Hub-site (navigasjon, begrenset innhold) |
+| `stonadsokonomi` | ⏳ Planlagt |
+| `arbeidsavklaringspenger` | ⏳ Planlagt |
+| `dagpenger` | ⏳ Planlagt |
+| `sykefravarsoppfolging-og-sykepenger` | ⏳ Planlagt |
+| `sosiale-tjenester` | ⏳ Planlagt |
+| `tiltak-og-virkemidler` | ⏳ Planlagt |
+| `pensjon-alderspensjon` | ⏳ Planlagt |
+| `markedsarbeid` | ⏳ Planlagt |
 
 ### Behandlingskatalog — les
 
