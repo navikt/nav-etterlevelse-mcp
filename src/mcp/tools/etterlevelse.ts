@@ -200,14 +200,25 @@ function sanitizeEtterlevelseDokumentasjonForUpdate(document: unknown): Record<s
 }
 
 function stripHtml(html: string): string {
-  return html
+  // Bruk split-på-vinkelparentes for å garantere at ingen '<'-tegn overlever
+  // (CodeQL CWE-116 / incomplete-multi-char-sanitization)
+  const chunks = html
     .replace(/<br\s*\/?>/gi, '\n')
     .replace(/<\/?(p|div|li|ul|ol|h[1-6])[^>]*>/gi, '\n')
-    .replace(/<[^>]+>/g, '')
+    .split('<');
+  const textChunks: string[] = [chunks[0]];
+  for (let i = 1; i < chunks.length; i++) {
+    const closeIdx = chunks[i].indexOf('>');
+    if (closeIdx >= 0) {
+      textChunks.push(chunks[i].slice(closeIdx + 1));
+    }
+  }
+  return textChunks
+    .join('')
     .replace(/&nbsp;/g, ' ')
+    .replace(/&lt;/g, '')
+    .replace(/&gt;/g, '')
     .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
     .replace(/&quot;/g, '"')
     .replace(/\n{3,}/g, '\n\n')
     .trim();

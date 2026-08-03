@@ -1,5 +1,6 @@
-import { createHash, randomBytes } from 'node:crypto';
+import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import type { Express, Request, Response } from 'express';
+import rateLimit from 'express-rate-limit';
 import {
   authCodeTtlSeconds,
   config,
@@ -126,10 +127,18 @@ function randomToken(): string {
 /** Genererer en menneskelig lesbar bruker-kode på formatet XXXX-XXXX (unngår tvetydige tegn). */
 function randomUserCode(): string {
   const chars = 'BCDFGHJKLMNPQRSTVWXYZ23456789';
-  const bytes = randomBytes(8);
+  const charsLen = chars.length; // 29
+  const maxUnbiased = 256 - (256 % charsLen); // 232 — alt over dette forkastes
   let code = '';
-  for (const byte of bytes) {
-    code += chars[byte % chars.length];
+  while (code.length < 8) {
+    const bytes = randomBytes(16);
+    for (const byte of bytes) {
+      if (code.length >= 8) break;
+      if (byte < maxUnbiased) {
+        code += chars[byte % charsLen];
+      }
+      // byte >= maxUnbiased: forkast for å unngå bias
+    }
   }
   return `${code.slice(0, 4)}-${code.slice(4)}`;
 }
@@ -190,9 +199,20 @@ function buildProtectedResourceMetadata() {
   };
 }
 
+function safeEqual(a: string, b: string): boolean {
+  try {
+    const aBuf = Buffer.from(a);
+    const bBuf = Buffer.from(b);
+    if (aBuf.length !== bBuf.length) return false;
+    return timingSafeEqual(aBuf, bBuf);
+  } catch {
+    return false;
+  }
+}
+
 function verifyPkce(codeVerifier: string, codeChallenge: string): boolean {
   const digest = createHash('sha256').update(codeVerifier).digest('base64url');
-  return digest === codeChallenge;
+  return safeEqual(digest, codeChallenge);
 }
 
 async function exchangeAzureToken(params: URLSearchParams): Promise<AzureTokenResponse> {
@@ -283,6 +303,26 @@ function buildAuthCodeRecord(
 }
 
 export function registerOAuthRoutes(app: Express): void {
+  // Rate limiting på alle OAuth-endepunkter for å forhindre brute force og DoS
+  const oauthLimiter = rateLimit({
+    windowMs: 60 * 1000, // 1 minutt
+    max: 60,             // maks 60 forespørsler per IP per minutt
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'too_many_requests', error_description: 'Rate limit exceeded' },
+  });
+
+  const tokenLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: 20, // strengere limit på token-endepunktet
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'too_many_requests', error_description: 'Rate limit exceeded' },
+  });
+
+  app.use(['/oauth/', '/register', '/device_authorization', '/device'], oauthLimiter);
+  app.use(['/oauth/token'], tokenLimiter);
+
   app.get('/.well-known/oauth-authorization-server', (_req, res) => {
     setNoStore(res);
     res.json(buildAuthorizationServerMetadata());
@@ -474,7 +514,8 @@ button{margin-top:12px;padding:10px 24px;font-size:1em;cursor:pointer}</style></
     const callbackErrorDescription = firstQueryValue(req.query.error_description);
 
     if (callbackError) {
-      res.status(400).send(`OAuth callback failed: ${callbackErrorDescription ?? callbackError}`);
+      // Ikke reflekter bruker-kontrollert feilmelding direkte i HTML (XSS)
+      res.status(400).json({ error: 'oauth_callback_failed', error_description: 'Authentication failed' });
       return;
     }
 
@@ -613,7 +654,7 @@ h2{color:#007bff}</style></head>
         return;
       }
 
-      if (authCode.clientId !== clientId || authCode.redirectUri !== redirectUri) {
+      if (!safeEqual(authCode.clientId, clientId) || !safeEqual(authCode.redirectUri, redirectUri)) {
         sendJsonError(res, 400, 'invalid_grant', 'Authorization code does not match client');
         return;
       }
@@ -654,7 +695,7 @@ h2{color:#007bff}</style></head>
         return;
       }
 
-      if (refreshTokenRecord.clientId !== clientId) {
+      if (!safeEqual(refreshTokenRecord.clientId, clientId)) {
         sendJsonError(res, 400, 'invalid_grant', 'Refresh token does not belong to the client');
         return;
       }
@@ -711,7 +752,7 @@ h2{color:#007bff}</style></head>
         return;
       }
 
-      if (deviceSession.clientId !== clientId) {
+      if (!safeEqual(deviceSession.clientId, clientId)) {
         sendJsonError(res, 400, 'invalid_grant', 'Device code does not belong to this client');
         return;
       }
