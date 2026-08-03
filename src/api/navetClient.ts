@@ -190,8 +190,16 @@ function extractInternalLinks(webparts: Record<string, unknown>[], _siteId: stri
     if (Array.isArray(links)) {
       for (const link of links as Record<string, unknown>[]) {
         const url = typeof link['value'] === 'string' ? link['value'] : '';
-        if (url.includes('navno.sharepoint.com') && url.toLowerCase().includes('/sitepages/')) {
-          urls.push(url);
+        try {
+          const parsed = new URL(url);
+          if (
+            parsed.hostname === 'navno.sharepoint.com' &&
+            parsed.pathname.toLowerCase().includes('/sitepages/')
+          ) {
+            urls.push(url);
+          }
+        } catch {
+          // Ugyldig URL — ignorer
         }
       }
     }
