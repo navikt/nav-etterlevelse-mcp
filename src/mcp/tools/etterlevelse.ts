@@ -218,7 +218,6 @@ function stripHtml(html: string): string {
     .replace(/&nbsp;/g, ' ')
     .replace(/&lt;/g, '')
     .replace(/&gt;/g, '')
-    .replace(/&amp;/g, '&')
     .replace(/&quot;/g, '"')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
