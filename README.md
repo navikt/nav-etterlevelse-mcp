@@ -78,14 +78,14 @@ Tilgang innvilges per fagområde av #tech-azure. Se [implementasjonsplan](docs/n
 | `list_navet_pages` | List sider på en Navet-site for et fagområde |
 | `get_navet_page` | Hent tekstinnhold fra en Navet-side (fagretningslinjer, lover, personvern) |
 
-**Tilgang per fagområde (dev):**
+**Tilgang per fagområde:**
 
 | Fagområde-kode | Status |
 |---|---|
-| `arbeidsrettet-brukeroppfolging` | ✅ Tilgang innvilget |
-| `utbetalinger` | ✅ Tilgang innvilget |
-| `intranett-utvikling` | ✅ Tilgang innvilget |
-| `fag-og-ytelser` | ✅ Hub-site (navigasjon, begrenset innhold) |
+| `arbeidsrettet-brukeroppfolging` | ✅ Tilgang innvilget (dev + prod) |
+| `utbetalinger` | ✅ Tilgang innvilget (dev + prod) |
+| `intranett-utvikling` | ✅ Tilgang innvilget (dev + prod) |
+| `fag-og-ytelser` | ✅ Hub-site (dev + prod, begrenset innhold) |
 | `stonadsokonomi` | ⏳ Planlagt |
 | `arbeidsavklaringspenger` | ⏳ Planlagt |
 | `dagpenger` | ⏳ Planlagt |
