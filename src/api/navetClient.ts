@@ -65,65 +65,148 @@ export class NavetClient {
     return pages;
   }
 
-  /** Hent tekstinnhold fra en side via canvasLayout webParts */
+  /**
+   * Hent tekstinnhold fra en side.
+   *
+   * Strategi (fallback-kjede):
+   * 1. /webParts — henter alle webparts inkl. verticalSection, støtter
+   *    textWebPart.innerHtml og standardWebPart.data.serverProcessedContent.searchablePlainTexts
+   * 2. listItem CanvasContent1 — råinnhold via Graph listItem hvis /webParts er tom
+   *
+   * Tidligere brukte vi ?$expand=canvasLayout som bare dekket horizontalSections
+   * og gikk glipp av verticalSection og standardWebPart-tekst.
+   */
   async getPageContent(siteId: string, pageId: string): Promise<{ title: string; content: string; webUrl: string }> {
-    const url = `${GRAPH_BETA}/sites/${siteId}/pages/${pageId}/microsoft.graph.sitePage?$expand=canvasLayout`;
-    const data = await this.get(url) as Record<string, unknown>;
-    const title = typeof data['title'] === 'string' ? data['title'] : '';
-    const webUrl = typeof data['webUrl'] === 'string' ? data['webUrl'] : '';
-    const content = extractCanvasText(data['canvasLayout']);
-    return { title, content, webUrl };
+    // Hent metadata (tittel, URL, listItem-referanse)
+    const meta = await this.get(
+      `${GRAPH_BETA}/sites/${siteId}/pages/${pageId}/microsoft.graph.sitePage`,
+    ) as Record<string, unknown>;
+    const title = typeof meta['title'] === 'string' ? meta['title'] : '';
+    const webUrl = typeof meta['webUrl'] === 'string' ? meta['webUrl'] : '';
+
+    // Strategi 1: /webParts — dekker alle seksjoner og webpart-typer
+    let content = '';
+    try {
+      const wpData = await this.get(
+        `${GRAPH_BETA}/sites/${siteId}/pages/${pageId}/microsoft.graph.sitePage/webParts`,
+      ) as Record<string, unknown>;
+      if (Array.isArray(wpData['value'])) {
+        content = extractTextFromWebparts(wpData['value'] as Record<string, unknown>[]);
+      }
+    } catch {
+      // Fortsett til neste strategi
+    }
+
+    // Strategi 2: listItem CanvasContent1 via Graph (ingen separat token nødvendig)
+    if (!content) {
+      try {
+        const sharepointIds = meta['sharepointIds'] as Record<string, unknown> | undefined;
+        const listId = sharepointIds?.['listId'];
+        const listItemId = sharepointIds?.['listItemId'];
+        if (typeof listId === 'string' && typeof listItemId === 'string') {
+          const itemData = await this.get(
+            `${GRAPH_BASE}/sites/${siteId}/lists/${listId}/items/${listItemId}?$expand=fields($select=CanvasContent1)`,
+          ) as Record<string, unknown>;
+          const fields = itemData['fields'] as Record<string, unknown> | undefined;
+          const canvasContent = fields?.['CanvasContent1'];
+          if (typeof canvasContent === 'string' && canvasContent.trim()) {
+            content = extractTextFromCanvasContent1(canvasContent);
+          }
+        }
+      } catch {
+        // Ingen innhold tilgjengelig
+      }
+    }
+
+    return { title, content: content || '(ingen tekstinnhold funnet)', webUrl };
   }
 }
 
-/** Trekk ut ren tekst fra SharePoint canvasLayout (webParts) */
-function extractCanvasText(layout: unknown): string {
-  if (!layout || typeof layout !== 'object') return '';
-  const sections = (layout as Record<string, unknown>)['horizontalSections'];
-  if (!Array.isArray(sections)) return '';
-
+/** Ekstraher tekst fra /webParts-responsen.
+ *  Håndterer textWebPart (innerHtml) og standardWebPart (searchablePlainTexts). */
+function extractTextFromWebparts(webparts: Record<string, unknown>[]): string {
   const parts: string[] = [];
-  for (const section of sections) {
-    const columns = (section as Record<string, unknown>)['columns'];
-    if (!Array.isArray(columns)) continue;
-    for (const column of columns) {
-      const webparts = (column as Record<string, unknown>)['webparts'];
-      if (!Array.isArray(webparts)) continue;
-      for (const wp of webparts) {
-        const inner =
-          (wp as Record<string, unknown>)['innerHtml'] ??
-          ((wp as Record<string, unknown>)['data'] as Record<string, unknown> | undefined)?.['bodyHtml'] ?? '';
-        if (typeof inner === 'string' && inner.trim()) {
-          // Ekstraher tekst ved å splitte på '<' — garanterer at ingen '<'-tegn
-          // overlever til output (CodeQL CWE-116 / incomplete-multi-char-sanitization).
-          // Chunk 0: tekst før første tag. Chunk N: skip tag-innhold (frem til '>'),
-          // behold tekst etter '>'. Chunk uten '>': del av uavsluttet tag — droppes.
-          const chunks = inner
-            .replace(/<br\s*\/?>/gi, '\n')
-            .replace(/<\/?(p|div|li|h[1-6])[^>]*>/gi, '\n')
-            .split('<');
-          const textChunks: string[] = [chunks[0]];
-          for (let i = 1; i < chunks.length; i++) {
-            const closeIdx = chunks[i].indexOf('>');
-            if (closeIdx >= 0) {
-              textChunks.push(chunks[i].slice(closeIdx + 1));
-            }
-            // ingen '>': del av uavsluttet tag (f.eks. '<script uten lukk) — droppes
-          }
-
-          const text = textChunks
-            .join('')
-            .replace(/&nbsp;/g, ' ')
-            .replace(/&lt;/g, '')
-            .replace(/&gt;/g, '')
-            .replace(/&quot;/g, '"')
-            .replace(/&amp;/g, '&')
-            .replace(/\n{3,}/g, '\n\n')
-            .trim();
-          if (text) parts.push(text);
-        }
+  for (const wp of webparts) {
+    // textWebPart
+    const inner = wp['innerHtml'];
+    if (typeof inner === 'string' && inner.trim()) {
+      const text = htmlToText(inner);
+      if (text) parts.push(text);
+      continue;
+    }
+    // standardWebPart: serverProcessedContent.searchablePlainTexts
+    const data = wp['data'] as Record<string, unknown> | undefined;
+    const spc = data?.['serverProcessedContent'] as Record<string, unknown> | undefined;
+    const plainTexts = spc?.['searchablePlainTexts'];
+    if (Array.isArray(plainTexts)) {
+      for (const pt of plainTexts as Record<string, unknown>[]) {
+        const val = pt['value'];
+        if (typeof val === 'string' && val.trim()) parts.push(val.trim());
+      }
+    }
+    // standardWebPart: searchablePlainTexts som flat array av strenger
+    const texts = data?.['searchablePlainTexts'];
+    if (Array.isArray(texts)) {
+      for (const t of texts) {
+        if (typeof t === 'string' && t.trim()) parts.push(t.trim());
       }
     }
   }
   return parts.join('\n\n');
+}
+
+/** Ekstraher tekst fra rå CanvasContent1 JSON-streng (SharePoint intern format). */
+function extractTextFromCanvasContent1(canvasContent: string): string {
+  const parts: string[] = [];
+  try {
+    const items = JSON.parse(canvasContent);
+    if (!Array.isArray(items)) return '';
+    for (const item of items) {
+      // innerHtml på webpart-nivå
+      if (typeof item.innerHTML === 'string' && item.innerHTML.trim()) {
+        parts.push(htmlToText(item.innerHTML));
+      }
+      // Nøstede webparts
+      if (Array.isArray(item.webparts)) {
+        for (const wp of item.webparts) {
+          if (typeof wp.innerHTML === 'string' && wp.innerHTML.trim()) {
+            parts.push(htmlToText(wp.innerHTML));
+          }
+          if (typeof wp.innerHtml === 'string' && wp.innerHtml.trim()) {
+            parts.push(htmlToText(wp.innerHtml));
+          }
+        }
+      }
+    }
+  } catch {
+    // Ikke parsbart JSON — returner tom
+  }
+  return parts.join('\n\n');
+}
+
+/**
+ * Konverter HTML til ren tekst ved å splitte på '<'.
+ * Garanterer at ingen '<'-tegn overlever til output (CodeQL CWE-116).
+ */
+function htmlToText(html: string): string {
+  const chunks = html
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/?(p|div|li|h[1-6])[^>]*>/gi, '\n')
+    .split('<');
+  const textChunks: string[] = [chunks[0]];
+  for (let i = 1; i < chunks.length; i++) {
+    const closeIdx = chunks[i].indexOf('>');
+    if (closeIdx >= 0) {
+      textChunks.push(chunks[i].slice(closeIdx + 1));
+    }
+  }
+  return textChunks
+    .join('')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&lt;/g, '')
+    .replace(/&gt;/g, '')
+    .replace(/&quot;/g, '"')
+    .replace(/&amp;/g, '&')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
 }
