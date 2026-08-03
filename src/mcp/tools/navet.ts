@@ -13,6 +13,8 @@ const FAGOMRAADER = {
   'markedsarbeid': 'fag-og-ytelser-arbeid-markedsarbeid',
   'fag-og-ytelser': 'fag-og-ytelser',
   'stonadsokonomi': 'fag-og-ytelser-stonadsokonomi',
+  'utbetalinger': 'fag-og-ytelser-utbetalinger',
+  'intranett-utvikling': 'intranett-utvikling',
 } as const;
 
 type Fagomrade = keyof typeof FAGOMRAADER;
