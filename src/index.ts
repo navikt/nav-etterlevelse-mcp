@@ -8,7 +8,12 @@ import { initUnleash } from './unleash.js';
 void initUnleash();
 
 const app = express();
-app.disable('x-powered-by');
+
+// NAIS kjører bak en ingress som legger til X-Forwarded-For.
+// trust proxy=1 betyr at Express stoler på første proxy-hopp (NAIS-ingressen)
+// slik at express-rate-limit bruker riktig klient-IP, ikke proxy-IP.
+app.set('trust proxy', 1);
+
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: false }));
 
