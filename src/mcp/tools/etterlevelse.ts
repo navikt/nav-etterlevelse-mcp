@@ -2335,7 +2335,14 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
           summary:
             `✅ Etterlevelsesdokumentasjon opprettet: ${title} (E${etterlevelseNummer})\n` +
             `ID: ${id}\n` +
-            `Kall lock_document("${id}") for å låse sesjonen til dette dokumentet.`,
+            `\n` +
+            `Kall lock_document("${id}") for å låse sesjonen til dette dokumentet.\n` +
+            `\n` +
+            `⚠️ Feltene nedenfor må fylles ut manuelt i UI-et av brukeren:\n` +
+            `   • Enkeltpersoner med redigeringstilgang — https://etterlevelse.ansatt.nav.no/dokumentasjon/${id}/edit\n` +
+            `   • Risikoeier — samme side\n` +
+            `\n` +
+            `Informer brukeren om dette før du fortsetter.`,
           etterlevelseDokumentasjonId: id,
           etterlevelseNummer,
           result,
