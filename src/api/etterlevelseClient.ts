@@ -661,13 +661,49 @@ export class EtterlevelseClient {
     return this.put('/risikoscenario/update/addRelevantKrav', { kravnummer, risikoscenarioIder });
   }
 
-  async getMyTeams(): Promise<Array<{ id: string; name: string; productAreaName?: string }>> {
+  async getMyTeams(): Promise<
+    Array<{
+      id: string;
+      name: string;
+      productAreaId?: string;
+      productAreaName?: string;
+      nomAvdelingId?: string;
+      avdelingNavn?: string;
+    }>
+  > {
     const payload = await this.get('/team', { myTeams: 'true' });
     const items = extractArray<Record<string, unknown>>(payload);
-    return items.map((item) => ({
+
+    const teams = items.map((item) => ({
       id: asString(item.id) ?? '',
       name: asString(item.name) ?? asString(item.navn) ?? '',
+      productAreaId: asString(item.productAreaId),
       productAreaName: asString(item.productAreaName),
+    }));
+
+    // Berik med avdelingsinformasjon fra produktområdet
+    const paIds = [...new Set(teams.map((t) => t.productAreaId).filter((id): id is string => !!id))];
+    const paMap = new Map<string, { nomAvdelingId?: string; avdelingNavn?: string }>();
+    await Promise.all(
+      paIds.map(async (paId) => {
+        try {
+          const pa = await this.get(`/team/productarea/${paId}`);
+          if (isRecord(pa)) {
+            const avdeling = isRecord(pa.avdeling) ? pa.avdeling : undefined;
+            paMap.set(paId, {
+              nomAvdelingId: asString(pa.avdelingNomId) ?? undefined,
+              avdelingNavn: asString(avdeling?.navn) ?? undefined,
+            });
+          }
+        } catch {
+          // produktområde ikke tilgjengelig — fortsett uten avdelingsinfo
+        }
+      }),
+    );
+
+    return teams.map((t) => ({
+      ...t,
+      ...(t.productAreaId ? (paMap.get(t.productAreaId) ?? {}) : {}),
     }));
   }
 

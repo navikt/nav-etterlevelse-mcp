@@ -2127,7 +2127,8 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
     {
       description:
         'Hent team som den innloggede brukeren er medlem av (fra teamkatalogen via etterlevelse-backend). ' +
-        'Bruk dette for å finne riktige team-UUIDer før oppretting av etterlevelsesdokumentasjon.',
+        'Returnerer id, name, productAreaId, productAreaName, nomAvdelingId og avdelingNavn per team. ' +
+        'Bruk nomAvdelingId og avdelingNavn direkte når du oppretter eller oppdaterer etterlevelsesdokumentasjon.',
       inputSchema: {},
       annotations: readOnlyAnnotations,
     },
