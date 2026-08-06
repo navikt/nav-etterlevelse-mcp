@@ -671,6 +671,18 @@ export class EtterlevelseClient {
     }));
   }
 
+  async listNomAvdelinger(): Promise<Array<{ id: string; navn: string }>> {
+    const payload = await this.get('/nom/avdelinger');
+    const items = extractArray<Record<string, unknown>>(payload);
+    return items
+      .map((item) => ({
+        id: asString(item.id) ?? '',
+        navn: asString(item.navn) ?? '',
+      }))
+      .filter((a) => a.id && a.navn)
+      .sort((a, b) => a.navn.localeCompare(b.navn, 'nb'));
+  }
+
   async getMyTeams(): Promise<
     Array<{
       id: string;

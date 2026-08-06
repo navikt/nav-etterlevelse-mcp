@@ -2221,6 +2221,29 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
   );
 
   server.registerTool(
+    'list_nom_avdelinger',
+    {
+      description:
+        'List alle avdelinger fra NOM (NAVs organisasjonsmaster) via etterlevelse-backend. ' +
+        'Returnerer id og navn per avdeling, sortert alfabetisk. ' +
+        'Brukes for å finne nomAvdelingId og avdelingNavn til etterlevelsesdokumentasjon.',
+      inputSchema: {},
+      annotations: readOnlyAnnotations,
+    },
+    async () => {
+      try {
+        const avdelinger = await client.listNomAvdelinger();
+        if (avdelinger.length === 0) {
+          return toolResult({ avdelinger: [], message: 'Ingen avdelinger funnet i NOM.' });
+        }
+        return toolResult({ avdelinger });
+      } catch (error) {
+        return toolError(error);
+      }
+    },
+  );
+
+  server.registerTool(
     'create_etterlevelse_dokumentasjon',
     {
       description:
