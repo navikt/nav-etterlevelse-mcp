@@ -2197,6 +2197,30 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
   );
 
   server.registerTool(
+    'search_slack_channel',
+    {
+      description:
+        'Søk etter Slack-kanaler via etterlevelse-backend (ingen ny integrasjon — bruker eksisterende Bot Token). ' +
+        'Bruk dette for å finne kanal-ID til varslingsadresser. Returnerer id, name og numMembers.',
+      inputSchema: {
+        name: z.string().min(3).describe('Kanalnavn å søke på (minst 3 tegn)'),
+      },
+      annotations: readOnlyAnnotations,
+    },
+    async ({ name }) => {
+      try {
+        const channels = await client.searchSlackChannels(name);
+        if (channels.length === 0) {
+          return toolResult({ channels: [], message: `Ingen Slack-kanaler funnet for "${name}".` });
+        }
+        return toolResult({ channels });
+      } catch (error) {
+        return toolError(error);
+      }
+    },
+  );
+
+  server.registerTool(
     'create_etterlevelse_dokumentasjon',
     {
       description:
