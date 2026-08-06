@@ -661,6 +661,28 @@ export class EtterlevelseClient {
     return this.put('/risikoscenario/update/addRelevantKrav', { kravnummer, risikoscenarioIder });
   }
 
+  async searchSlackChannels(name: string): Promise<Array<{ id: string; name: string; numMembers?: number }>> {
+    const payload = await this.get(`/team/slack/channel/search/${encodeURIComponent(name)}`);
+    const items = extractArray<Record<string, unknown>>(payload);
+    return items.map((item) => ({
+      id: asString(item.id) ?? '',
+      name: asString(item.name) ?? '',
+      numMembers: typeof item.numMembers === 'number' ? item.numMembers : undefined,
+    }));
+  }
+
+  async listNomAvdelinger(): Promise<Array<{ id: string; navn: string }>> {
+    const payload = await this.get('/nom/avdelinger');
+    const items = extractArray<Record<string, unknown>>(payload);
+    return items
+      .map((item) => ({
+        id: asString(item.id) ?? '',
+        navn: asString(item.navn) ?? '',
+      }))
+      .filter((a) => a.id && a.navn)
+      .sort((a, b) => a.navn.localeCompare(b.navn, 'nb'));
+  }
+
   async getMyTeams(): Promise<
     Array<{
       id: string;

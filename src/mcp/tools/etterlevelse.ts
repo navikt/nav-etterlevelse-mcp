@@ -127,9 +127,13 @@ const etterlevelseDokumentasjonReadOnlyFields = [
   'sistEndretDokumentasjonAvMeg',
   'hasCurrentUser',
   'irrepirsibleFields',
-  'resources',
   'prioritertKravNummer', // Strippes fra GET — settes eksplisitt av agenten hvis ønsket
 ] as const;
+
+const varslingsadresseSchema = z.object({
+  adresse: z.string().min(1).describe('Slack-kanal-ID, Slack-bruker-ID eller e-postadresse'),
+  type: z.enum(['SLACK', 'SLACK_USER', 'EPOST']).describe('SLACK: kanal, SLACK_USER: enkeltperson, EPOST: e-post'),
+});
 
 const ytterligereEgenskaperCodes = [
   'SYSTEMATIC_PROFILING',
@@ -1173,6 +1177,25 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
           .array(z.string())
           .optional()
           .describe('UUID-liste over team fra teamkatalogen som eier dokumentet'),
+        resources: z
+          .array(z.string())
+          .optional()
+          .describe('NAV-identer for enkeltpersoner som eier dokumentet (fallback hvis team mangler)'),
+        nomAvdelingId: z
+          .string()
+          .min(1)
+          .optional()
+          .describe('NOM-id for avdelingen som er ansvarlig (påkrevd av UI)'),
+        avdelingNavn: z
+          .string()
+          .min(1)
+          .optional()
+          .describe('Navn på avdelingen (påkrevd av UI)'),
+        varslingsadresser: z
+          .array(varslingsadresseSchema)
+          .min(1)
+          .optional()
+          .describe('Varslingsadresser (Slack-kanal/-bruker eller e-post) — min 1 kreves av UI'),
         behandlerPersonopplysninger: z
           .boolean()
           .optional()
@@ -1193,6 +1216,10 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
       Risikovurderinger,
       prioritertKravNummer,
       teams,
+      resources,
+      nomAvdelingId,
+      avdelingNavn,
+      varslingsadresser,
       behandlerPersonopplysninger,
       title,
     }) => {
@@ -1217,6 +1244,10 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
         if (Risikovurderinger !== undefined) cleaned.risikovurderinger = Risikovurderinger;
         if (prioritertKravNummer !== undefined) cleaned.prioritertKravNummer = prioritertKravNummer;
         if (teams !== undefined) cleaned.teams = teams;
+        if (resources !== undefined) cleaned.resources = resources;
+        if (nomAvdelingId !== undefined) cleaned.nomAvdelingId = nomAvdelingId;
+        if (avdelingNavn !== undefined) cleaned.avdelingNavn = avdelingNavn;
+        if (varslingsadresser !== undefined) cleaned.varslingsadresser = varslingsadresser;
         if (behandlerPersonopplysninger !== undefined) cleaned.behandlerPersonopplysninger = behandlerPersonopplysninger;
         if (title !== undefined) cleaned.title = title;
 
@@ -1251,6 +1282,15 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
         }
         if (teams !== undefined) {
           lines.push(`Teams: ${teams.join(', ')}`);
+        }
+        if (resources !== undefined) {
+          lines.push(`Resources: ${resources.join(', ')}`);
+        }
+        if (nomAvdelingId !== undefined) {
+          lines.push(`Avdeling: ${avdelingNavn ?? ''} (${nomAvdelingId})`);
+        }
+        if (varslingsadresser !== undefined) {
+          lines.push(`Varslingsadresser: ${varslingsadresser.map((v) => `${v.type}:${v.adresse}`).join(', ')}`);
         }
         if (title !== undefined) {
           lines.push(`Tittel: ${title}`);
@@ -1789,6 +1829,17 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
         return toolError('Oppgi minst ett egenskapsfelt som skal oppdateres.');
       }
 
+      const effectivePvkVurdering = pvkVurdering ?? (patch as Record<string, unknown>).pvkVurdering;
+      if (
+        (effectivePvkVurdering === 'SKAL_IKKE_UTFORE' || effectivePvkVurdering === 'ALLEREDE_UTFORT') &&
+        (!pvkVurderingsBegrunnelse || pvkVurderingsBegrunnelse.trim() === '')
+      ) {
+        return toolError(
+          `pvkVurderingsBegrunnelse er påkrevd når pvkVurdering er "${effectivePvkVurdering}". ` +
+            'Forklar hvorfor PVK ikke skal gjennomføres eller allerede er gjennomført.',
+        );
+      }
+
       try {
         const result = await client.patchPvkDokument(lockedPvkDokumentId, patch);
         const saved = isRecord(result) ? result : patch;
@@ -2146,6 +2197,53 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
   );
 
   server.registerTool(
+    'search_slack_channel',
+    {
+      description:
+        'Søk etter Slack-kanaler via etterlevelse-backend (ingen ny integrasjon — bruker eksisterende Bot Token). ' +
+        'Bruk dette for å finne kanal-ID til varslingsadresser. Returnerer id, name og numMembers.',
+      inputSchema: {
+        name: z.string().min(3).describe('Kanalnavn å søke på (minst 3 tegn)'),
+      },
+      annotations: readOnlyAnnotations,
+    },
+    async ({ name }) => {
+      try {
+        const channels = await client.searchSlackChannels(name);
+        if (channels.length === 0) {
+          return toolResult({ channels: [], message: `Ingen Slack-kanaler funnet for "${name}".` });
+        }
+        return toolResult({ channels });
+      } catch (error) {
+        return toolError(error);
+      }
+    },
+  );
+
+  server.registerTool(
+    'list_nom_avdelinger',
+    {
+      description:
+        'List alle avdelinger fra NOM (NAVs organisasjonsmaster) via etterlevelse-backend. ' +
+        'Returnerer id og navn per avdeling, sortert alfabetisk. ' +
+        'Brukes for å finne nomAvdelingId og avdelingNavn til etterlevelsesdokumentasjon.',
+      inputSchema: {},
+      annotations: readOnlyAnnotations,
+    },
+    async () => {
+      try {
+        const avdelinger = await client.listNomAvdelinger();
+        if (avdelinger.length === 0) {
+          return toolResult({ avdelinger: [], message: 'Ingen avdelinger funnet i NOM.' });
+        }
+        return toolResult({ avdelinger });
+      } catch (error) {
+        return toolError(error);
+      }
+    },
+  );
+
+  server.registerTool(
     'create_etterlevelse_dokumentasjon',
     {
       description:
@@ -2161,8 +2259,40 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
           ),
         teams: z
           .array(z.string())
+          .optional()
+          .describe(
+            'UUID-liste over team fra teamkatalogen som eier dokumentet (hentes via get_my_teams). ' +
+              'Enten teams eller resources må ha minst ett element.',
+          ),
+        resources: z
+          .array(z.string())
+          .optional()
+          .describe(
+            'NAV-identer for enkeltpersoner som eier dokumentet. ' +
+              'Brukes som fallback hvis get_my_teams returnerer tomt — legg da til brukerens egen NAV-ident. ' +
+              'Enten teams eller resources må ha minst ett element.',
+          ),
+        nomAvdelingId: z
+          .string()
           .min(1)
-          .describe('UUID-liste over team fra teamkatalogen som eier dokumentet (hentes via get_my_teams)'),
+          .describe(
+            'NOM-id for avdelingen som er ansvarlig (påkrevd av UI). ' +
+              'Hentes fra get_my_teams-responsen (nomAvdelingId-feltet for valgt team).',
+          ),
+        avdelingNavn: z
+          .string()
+          .min(1)
+          .describe(
+            'Navn på avdelingen (påkrevd av UI). ' +
+              'Hentes fra get_my_teams-responsen (avdelingNavn-feltet for valgt team).',
+          ),
+        varslingsadresser: z
+          .array(varslingsadresseSchema)
+          .min(1)
+          .describe(
+            'Varslingsadresser (påkrevd av UI — minst én). Bruk Slack-kanal for teamet. ' +
+              'Finn Slack-kanal-ID via GET /api/team/slack/channel/search/{kanalnavn}.',
+          ),
         behandlingIds: z
           .array(z.string())
           .optional()
@@ -2196,6 +2326,10 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
       title,
       beskrivelse,
       teams,
+      resources,
+      nomAvdelingId,
+      avdelingNavn,
+      varslingsadresser,
       behandlingIds,
       behandlerPersonopplysninger,
       irrelevansFor,
@@ -2204,11 +2338,24 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
       const writeGuardError = requireWriteEnabled();
       if (writeGuardError) return writeGuardError;
 
+      const resolvedTeams = teams ?? [];
+      const resolvedResources = resources ?? [];
+      if (resolvedTeams.length === 0 && resolvedResources.length === 0) {
+        return toolError(
+          'Påkrevd: minst 1 team eller 1 person. ' +
+            'Bruk get_my_teams for å finne team-UUID, eller legg til brukerens NAV-ident i resources.',
+        );
+      }
+
       try {
         const body = {
           title,
           beskrivelse,
-          teams,
+          teams: resolvedTeams,
+          resources: resolvedResources,
+          nomAvdelingId,
+          avdelingNavn,
+          varslingsadresser,
           behandlingIds: behandlingIds ?? [],
           dpBehandlingIds: [],
           behandlerPersonopplysninger,
@@ -2216,9 +2363,7 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
           prioritertKravNummer: prioritertKravNummer ?? [],
           etterlevelseNummer: 0,
           etterlevelseDokumentVersjon: 1,
-          resources: [],
           risikoeiere: [],
-          varslingsadresser: [],
           gjenbrukBeskrivelse: '',
           tilgjengeligForGjenbruk: false,
           forGjenbruk: false,
@@ -2237,7 +2382,14 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
           summary:
             `✅ Etterlevelsesdokumentasjon opprettet: ${title} (E${etterlevelseNummer})\n` +
             `ID: ${id}\n` +
-            `Kall lock_document("${id}") for å låse sesjonen til dette dokumentet.`,
+            `\n` +
+            `Kall lock_document("${id}") for å låse sesjonen til dette dokumentet.\n` +
+            `\n` +
+            `⚠️ Feltene nedenfor må fylles ut manuelt i UI-et av brukeren:\n` +
+            `   • Enkeltpersoner med redigeringstilgang — https://etterlevelse.ansatt.nav.no/dokumentasjon/${id}/edit\n` +
+            `   • Risikoeier — samme side\n` +
+            `\n` +
+            `Informer brukeren om dette før du fortsetter.`,
           etterlevelseDokumentasjonId: id,
           etterlevelseNummer,
           result,
