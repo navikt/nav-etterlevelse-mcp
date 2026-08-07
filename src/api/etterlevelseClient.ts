@@ -299,6 +299,29 @@ export class EtterlevelseClient {
     return data;
   }
 
+  async getEtterlevelseDokumentasjonStatus(id: string): Promise<unknown> {
+    const data = await this.graphql(
+      `{ etterlevelseDokumentasjon(filter: {id: "${id}"}) { content {
+          id title etterlevelseNummer teams
+          behandlerPersonopplysninger
+          irrelevansFor { code }
+          behandlingIds
+          prioritertKravNummer
+          etterlevelser {
+            kravNummer kravVersjon etterleves status
+            suksesskriterieBegrunnelser {
+              suksesskriterieId suksesskriterieStatus
+            }
+          }
+        } } }`,
+    );
+    if (isRecord(data) && isRecord(data['etterlevelseDokumentasjon'])) {
+      const content = extractArray(data['etterlevelseDokumentasjon']['content']);
+      return content[0] ?? null;
+    }
+    return data;
+  }
+
   async getEtterlevelseDokumentasjonRaw(id: string): Promise<any> {
     return this.get(`/etterlevelsedokumentasjon/${id}`);
   }

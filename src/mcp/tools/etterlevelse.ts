@@ -437,7 +437,8 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
     'get_etterlevelse_dokumentasjon',
     {
       description:
-        'Hent full etterlevelsedokumentasjon på id, inkludert alle nestede etterlevelser med suksesskriteriebegrunnelser.',
+        'Hent full etterlevelsedokumentasjon på id, inkludert alle nestede etterlevelser med suksesskriteriebegrunnelser. ' +
+        'Bruk get_etterlevelse_status_oversikt i stedet for gap-analyse — den returnerer kun statuser uten begrunnelsestekst.',
       inputSchema: {
         id: z.string().min(1).describe('UUID for etterlevelsedokumentasjonen'),
       },
@@ -446,6 +447,28 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
     async ({ id }) => {
       try {
         return toolResult(await client.getEtterlevelseDokumentasjon(id));
+      } catch (error) {
+        return toolError(error);
+      }
+    },
+  );
+
+  server.registerTool(
+    'get_etterlevelse_status_oversikt',
+    {
+      description:
+        'Hent statusoversikt for et etterlevelsesdokument — uten begrunnelsestekst. ' +
+        'Returnerer kravNummer, kravVersjon, status og suksesskriterieStatus per SK for alle etterlevelser. ' +
+        'Bruk dette i stedet for get_etterlevelse_dokumentasjon ved gap-analyse og prioritering. ' +
+        'Hent begrunnelsestekst per krav ved behov via get_etterlevelse.',
+      inputSchema: {
+        id: z.string().min(1).describe('UUID for etterlevelsedokumentasjonen'),
+      },
+      annotations: readOnlyAnnotations,
+    },
+    async ({ id }) => {
+      try {
+        return toolResult(await client.getEtterlevelseDokumentasjonStatus(id));
       } catch (error) {
         return toolError(error);
       }
@@ -2248,6 +2271,7 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
     {
       description:
         'Opprett ny etterlevelsesdokumentasjon. Bruk get_my_teams for å hente riktige team-UUIDer først. ' +
+        'etterlevelseNummer og etterlevelseDokumentVersjon settes automatisk (0 og 1). ' +
         'Etter oppretting: kall lock_document med den returnerte IDen for å låse sesjonen til det nye dokumentet.',
       inputSchema: {
         title: z.string().min(1).describe('Tittel på etterlevelsesdokumentasjonen'),
