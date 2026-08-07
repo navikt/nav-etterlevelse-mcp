@@ -287,6 +287,7 @@ export class EtterlevelseClient {
             id kravNummer kravVersjon etterleves status statusBegrunnelse
             suksesskriterieBegrunnelser {
               suksesskriterieId begrunnelse suksesskriterieStatus
+              veiledning veiledningsTekst veiledningsTekst2
             }
           }
         } } }`,
