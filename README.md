@@ -28,7 +28,8 @@ bevart for auditing.
 | Tool | Beskrivelse |
 |------|-------------|
 | `list_etterlevelse_dokumentasjoner` | Søk/list etterlevelsesdokumentasjoner |
-| `get_etterlevelse_dokumentasjon` | Hent ett dokument med alle etterlevelser |
+| `get_etterlevelse_dokumentasjon` | Hent ett dokument med alle etterlevelser og begrunnelsestekst |
+| `get_etterlevelse_status_oversikt` | Hent statusoversikt uten begrunnelsestekst — bruk for gap-analyse |
 | `list_krav` | List krav, filtrer på tema, tagger eller dokument |
 | `get_krav` | Hent ett krav med suksesskriterier |
 | `get_etterlevelse` | Hent etterlevelse for et spesifikt krav |
@@ -36,7 +37,9 @@ bevart for auditing.
 | `get_pvk_dokument` | Hent PVK-dokument for låst dokument |
 | `list_risikoscenarioer` | List risikoscenarioer for låst PVK-dokument |
 | `list_tiltak` | List tiltak for låst PVK-dokument |
-| `get_my_teams` | Hent team du er medlem av |
+| `get_my_teams` | Hent team du er medlem av (inkl. nomAvdelingId og avdelingNavn) |
+| `list_nom_avdelinger` | List alle avdelinger fra NOM |
+| `search_slack_channel` | Søk etter Slack-kanaler (for varslingsadresser) |
 | `lock_document` | Lås et dokument for skriveoperasjoner i gjeldende sesjon |
 
 ### Etterlevelse — skriv *(krever feature-toggle)*
@@ -179,4 +182,4 @@ In-memory sesjonsstoren betyr at ett token per pod er gyldige. Av den grunn er
 
 | Utvidelse | Beskrivelse | Status |
 |-----------|-------------|--------|
-| [Navet (SharePoint) integrasjon](docs/navet-sharepoint-integration.md) | Les fagretningslinjer og personvernsider fra Navet via Microsoft Graph API med `Sites.Selected`-tilgang. Gjør at nav-context-skillen kan hente domenekontekst automatisk. | Avventer admin-consent for `Sites.Selected` i Entra ID |
+| Navet-tilgang for flere fagområder | `Sites.Selected`-tilgang for stonadsokonomi, dagpenger, sykepenger m.fl. | ⏳ Planlagt |
