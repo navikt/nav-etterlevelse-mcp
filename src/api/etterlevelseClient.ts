@@ -287,7 +287,29 @@ export class EtterlevelseClient {
             id kravNummer kravVersjon etterleves status statusBegrunnelse
             suksesskriterieBegrunnelser {
               suksesskriterieId begrunnelse suksesskriterieStatus
-              veiledning veiledningsTekst veiledningsTekst2
+            }
+          }
+        } } }`,
+    );
+    if (isRecord(data) && isRecord(data['etterlevelseDokumentasjon'])) {
+      const content = extractArray(data['etterlevelseDokumentasjon']['content']);
+      return content[0] ?? null;
+    }
+    return data;
+  }
+
+  async getEtterlevelseDokumentasjonStatus(id: string): Promise<unknown> {
+    const data = await this.graphql(
+      `{ etterlevelseDokumentasjon(filter: {id: "${id}"}) { content {
+          id title etterlevelseNummer teams
+          behandlerPersonopplysninger
+          irrelevansFor { code }
+          behandlingIds
+          prioritertKravNummer
+          etterlevelser {
+            kravNummer kravVersjon etterleves status
+            suksesskriterieBegrunnelser {
+              suksesskriterieId suksesskriterieStatus
             }
           }
         } } }`,
