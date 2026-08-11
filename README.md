@@ -122,13 +122,7 @@ Tilgang innvilges per fagområde av #tech-azure. Se [implementasjonsplan](docs/n
 
 ## Oppsett
 
-### 1. Deploy
-
-```bash
-gh workflow run deploy.yaml
-```
-
-### 2. Bruk via OpenCode / Copilot CLI
+### 1. Bruk via OpenCode / Copilot CLI
 
 Legg til MCP-serveren:
 
@@ -157,7 +151,7 @@ I copilot autentiserer du automatisk inne i agent sesjonen.
 
 Ingen `.cplt.toml` er nødvendig — agenten kaller kun MCP-serveren direkte.
 
-### 3. Installer etterlevelse-skills
+### 2. Installer etterlevelse-skills
 
 MCP-serveren brukes av skillene i [navikt/dab-copilot-config](https://github.com/navikt/dab-copilot-config).
 Se README der for oppsett av symlinker til `~/.copilot/skills/` og `~/.config/opencode/skills/`.
