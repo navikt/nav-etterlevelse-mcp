@@ -110,24 +110,21 @@ const irrelevansForCodes = [
   'OKONOMISYSTEM',
 ] as const;
 
+// Følger frontend sin etterlevelseDokumentasjonToDomainToObject nøyaktig.
+// Frontend sletter kun disse 7 feltene — alt annet (inkl. versjonHistorikk)
+// sendes tilbake i PUT og lagres av backend.
 const etterlevelseDokumentasjonReadOnlyFields = [
-  'changeStamp',
-  'teamsData',
-  'risikoeiereData',
-  'behandlinger',
-  'dpBehandlinger',
-  'produktOmradetData',
-  'resourcesData',
+  'changeStamp',       // frontend sletter
+  'version',           // frontend sletter (optimistic locking)
+  'teamsData',         // frontend sletter (teams-UUIDs brukes fra `teams`-feltet)
+  'resourcesData',     // frontend sletter (navIdents brukes fra `resources`-feltet)
+  'behandlinger',      // frontend sletter (UUIDs brukes fra `behandlingIds`)
+  'dpBehandlinger',    // frontend sletter (UUIDs brukes fra `dpBehandlingIds`)
+  'ardoqSystemData',   // frontend sletter (IDs brukes fra `ardoqSystemIds`)
+  // Beregnede felter backend uansett ignorerer fra request:
   'hasCurrentUserAccess',
-  'versjonHistorikk',
-  'stats',
-  'sistEndretEtterlevelse',
-  'sistEndretDokumentasjon',
-  'sistEndretEtterlevelseAvMeg',
-  'sistEndretDokumentasjonAvMeg',
   'hasCurrentUser',
-  'irrepirsibleFields',
-  'prioritertKravNummer', // Strippes fra GET — settes eksplisitt av agenten hvis ønsket
+  'produktOmradetData',
 ] as const;
 
 const varslingsadresseSchema = z.object({
