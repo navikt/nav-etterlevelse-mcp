@@ -149,12 +149,24 @@ opencode mcp auth nav-etterlevelse-mcp
 ```
 I copilot autentiserer du automatisk inne i agent sesjonen.
 
-Ingen `.cplt.toml` er nødvendig — agenten kaller kun MCP-serveren direkte.
-
 ### 2. Installer etterlevelse-skills
 
 MCP-serveren brukes av skillene i [navikt/dab-copilot-config](https://github.com/navikt/dab-copilot-config).
 Se README der for oppsett av symlinker til `~/.copilot/skills/` og `~/.config/opencode/skills/`.
+
+### 3. Kjøring i sandbox (cplt)
+
+Hvis du kjører agenten i cplt er det to ting som må konfigureres:
+* cplt må gis skrivetilgang til skills-mappene
+* cplt må få lov å koble seg til mcp-serveren uten å gå gjennom proxyen
+
+Dette kan løses med en ~/.config/cplt/config.toml a.la dette:
+```bash
+[allow]
+read = ["<path-til_skills-repo>/copilot-config/all/skills"]
+[proxy]
+allowed_domains = "intern.nav.no" # intern.dev.nav.no for test
+```
 
 ## Sesjonshåndtering
 
