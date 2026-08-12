@@ -160,12 +160,15 @@ Hvis du kjører agenten i cplt er det to ting som må konfigureres:
 * cplt må gis skrivetilgang til skills-mappene
 * cplt må få lov å koble seg til mcp-serveren uten å gå gjennom proxyen
 
+I tillegg kan det være en utfordring av tunge verktøykall timer ut mot proxyen etter 60 sekunder. 
+
 Dette kan løses med en ~/.config/cplt/config.toml a.la dette:
 ```bash
 [allow]
 read = ["<path-til_skills-repo>/copilot-config/all/skills"]
 [proxy]
 allowed_domains = "intern.nav.no" # intern.dev.nav.no for test
+timeout = 180
 ```
 
 ## Sesjonshåndtering
