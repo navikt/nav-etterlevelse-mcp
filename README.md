@@ -32,6 +32,7 @@ bevart for auditing.
 | `get_etterlevelse_status_oversikt` | Hent statusoversikt uten begrunnelsestekst — bruk for gap-analyse |
 | `list_krav` | List krav, filtrer på tema, tagger eller dokument |
 | `get_krav` | Hent ett krav med suksesskriterier |
+| `get_krav_for_gjennomgang` | Forbered interaktiv gjennomgang med synlig kravhensikt, SK-beskrivelser og eventuell eksisterende besvarelse |
 | `get_etterlevelse` | Hent etterlevelse for et spesifikt krav |
 | `get_behandlingens_livsloep` | Hent behandlingens livsløp for låst dokument |
 | `get_pvk_dokument` | Hent PVK-dokument for låst dokument |
