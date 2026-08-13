@@ -589,8 +589,9 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
           const criterionDescription = asString(criterion.beskrivelse);
           const needsJustification = criterion.behovForBegrunnelse;
           contextLines.push('', boxSection(
-            `${criterionName} (${criterionId})`,
+            `SUKSESSKRITERIUM ${index + 1}`,
             [
+              criterionName,
               criterionDescription ? stripHtml(criterionDescription) : '(Ingen beskrivelse registrert)',
               needsJustification !== undefined ? `Behov for begrunnelse: ${String(needsJustification)}` : '',
             ].filter(Boolean).join('\n'),
