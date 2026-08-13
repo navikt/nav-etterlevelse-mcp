@@ -255,7 +255,8 @@ function wordWrap(text: string, width: number, indent = ''): string {
 }
 
 function boxSection(title: string, content: string, width = 76): string {
-  const bar = '─'.repeat(width - title.length - 4);
+  const barLen = Math.max(0, width - title.length - 4);
+  const bar = '─'.repeat(barLen);
   const wrapped = wordWrap(content, width - 4, '  ');
   const lines = wrapped
     .split('\n')
