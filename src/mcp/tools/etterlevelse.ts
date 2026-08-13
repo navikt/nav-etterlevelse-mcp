@@ -505,7 +505,9 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
   server.registerTool(
     'get_krav',
     {
-      description: 'Hent et krav enten med UUID eller formatet K123.1.',
+      description:
+        'Hent et krav enten med UUID eller formatet K123.1. ' +
+        'Før du presenterer eller foreslår en besvarelse, bruk get_krav_for_gjennomgang slik at kravets hensikt og SK-beskrivelser vises til brukeren.',
       inputSchema: {
         id: z.string().min(1).describe('UUID eller krav-id på format K123.1'),
       },
@@ -514,6 +516,95 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
     async ({ id }) => {
       try {
         return toolResult(await client.getKrav(id));
+      } catch (error) {
+        return toolError(error);
+      }
+    },
+  );
+
+  server.registerTool(
+    'get_krav_for_gjennomgang',
+    {
+      description:
+        'Forbered interaktiv gjennomgang av ett krav. Returnerer og formaterer kravets hensikt, utdypende beskrivelse, ' +
+        'varsel, relevans, rettskilder, dokumentasjon og alle suksesskriteriers navn og beskrivelse. ' +
+        'Hvis dokumentasjonId oppgis, inkluderes også eksisterende besvarelse. Vis summary-feltet til brukeren før du presenterer et forslag.',
+      inputSchema: {
+        krav: z
+          .string()
+          .regex(/^K\d+\.\d+$/i)
+          .describe('Kravreferanse på format K123.1'),
+        etterlevelseDokumentasjonId: z
+          .string()
+          .min(1)
+          .optional()
+          .describe('UUID for etterlevelsesdokumentasjonen, for å inkludere eksisterende besvarelse'),
+      },
+      annotations: readOnlyAnnotations,
+    },
+    async ({ krav, etterlevelseDokumentasjonId }) => {
+      try {
+        const kravRaw = await client.getKrav(krav);
+        const kravRecord = isRecord(kravRaw) ? kravRaw : {};
+        const kravNummer = asNumber(kravRecord.kravNummer ?? kravRecord.nummer);
+        const kravVersjon = asNumber(kravRecord.kravVersjon ?? kravRecord.versjon);
+        const successCriteria = Array.isArray(kravRecord.suksesskriterier)
+          ? (kravRecord.suksesskriterier as Record<string, unknown>[])
+          : [];
+        const existingRaw = etterlevelseDokumentasjonId && kravNummer !== undefined && kravVersjon !== undefined
+          ? await client.getEtterlevelse({
+              etterlevelseDokumentasjonId,
+              kravNummer,
+              kravVersjon,
+            })
+          : undefined;
+
+        const title = asString(kravRecord.navn) ?? krav;
+        const contextLines = [
+          `KRAVKONTEKST FOR GJENNOMGANG: ${title}`,
+          `Identifikator: ${kravNummer !== undefined && kravVersjon !== undefined ? `K${kravNummer}.${kravVersjon}` : krav}`,
+          `Status: ${asString(kravRecord.status) ?? 'ukjent'}`,
+        ];
+        const contextFields: Array<[string, unknown]> = [
+          ['KRAVETS HENSIKT', kravRecord.hensikt],
+          ['UTDYPPENDE BESKRIVELSE', kravRecord.utdypendeBeskrivelse],
+          ['VARSELMELDING', kravRecord.varselMelding],
+          ['RELEVANS FOR', kravRecord.relevansFor],
+          ['DOKUMENTASJON / MER OM KRAVET', kravRecord.dokumentasjon],
+          ['BEGREPER', kravRecord.begreper],
+          ['REGELVERK', kravRecord.regelverk],
+          ['RETTSKILDER', kravRecord.rettskilder],
+        ];
+        for (const [label, value] of contextFields) {
+          if (value !== undefined && value !== null && value !== '') {
+            const text = typeof value === 'string' ? stripHtml(value) : JSON.stringify(value, null, 2);
+            contextLines.push('', boxSection(label, text));
+          }
+        }
+        contextLines.push('', 'SUKSESSKRITERIER');
+        for (const [index, criterion] of successCriteria.entries()) {
+          const criterionId = asString(criterion.id) ?? `#${index + 1}`;
+          const criterionName = asString(criterion.navn) ?? `Suksesskriterium ${criterionId}`;
+          const criterionDescription = asString(criterion.beskrivelse);
+          const needsJustification = criterion.behovForBegrunnelse;
+          contextLines.push('', boxSection(
+            `${criterionName} (${criterionId})`,
+            [
+              criterionDescription ? stripHtml(criterionDescription) : '(Ingen beskrivelse registrert)',
+              needsJustification !== undefined ? `Behov for begrunnelse: ${String(needsJustification)}` : '',
+            ].filter(Boolean).join('\n'),
+          ));
+        }
+        if (existingRaw !== undefined) {
+          contextLines.push('', boxSection('EKSISTERENDE BESVARELSE', JSON.stringify(existingRaw, null, 2)));
+        }
+        contextLines.push('', 'Vis denne kravkonteksten før analyse og forslag til besvarelse.');
+
+        return toolResult({
+          krav: kravRaw,
+          eksisterendeBesvarelse: existingRaw,
+          summary: contextLines.join('\n'),
+        });
       } catch (error) {
         return toolError(error);
       }
