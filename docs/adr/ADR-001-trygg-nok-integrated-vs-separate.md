@@ -83,19 +83,37 @@ konteksten, men at:
    uten at brukeren må konfigurere og autentisere mot to separate MCP-servere.
 2. **Én server — én innlogging.** OBO-tokenet for etterlevelse og Dataverse hentes
    fra samme autentiseringsøkt, noe som gir en sømløs brukeropplevelse.
-3. **PVK-presedens:** Sensitive personvernvurderinger (PVK) er allerede integrert
-   i samme server. Sensitiv sikkerhetsinfo i TryggNok er ikke et sterkere argument
-   for separasjon enn det PVK allerede representerer.
+3. **Risikoprofil er lik for PVK og TryggNok:** Begge kategoriene inneholder
+   sensitiv informasjon som ikke bør eksponeres bredt. Dette er ikke et argument
+   for integrasjon, men betyr at risikoen må vurderes samlet — se forutsetning
+   om ROS/etterlevelse nedenfor.
 4. **Enklere vedlikehold:** Én Nais-applikasjon, én CI/CD-pipeline, én
    konfigurasjonsflate.
 
-**PVK-presedens:** PVK-modulen inneholder sensitive personvernvurderinger som sendes
-til personvernombudet. Dette er sammenlignbart med sensitiv sikkerhetsinfo i TryggNok.
-PVK er allerede integrert i `nav-etterlevelse-mcp` uten at det har vært et problem —
-det samme prinsippet gjelder for TryggNok.
-
 En eventuell separat `nav-trygg-nok-mcp` kan vurderes på et senere tidspunkt dersom
 det oppstår et reelt behov for å bruke TryggNok-funksjonalitet uavhengig av etterlevelse.
+
+---
+
+## Forutsetning: ROS og etterlevelsesdokumentasjon for agentisk etterlevelse
+
+Denne beslutningen innebærer at `nav-etterlevelse-mcp` vil håndtere to kategorier
+sensitiv informasjon i agentens kontekst:
+
+- **Personvernsvakheter** — fra PVK-modulen (allerede tilgjengelig i dag)
+- **Sikkerhetssvakheter** — fra TryggNok (ny med denne integrasjonen)
+
+Per i dag er det gjennomført en ROS for agentisk etterlevelse, men denne er ikke
+godkjent av risikoeier. Det er heller ikke fullført etterlevelsesdokumentasjon eller
+PVK for løsningen. Risikoen ved at sensitiv informasjon eksponeres i agentens kontekst
+er ikke formelt vurdert.
+
+**Denne integrasjonen bør ikke settes i produksjon før:**
+
+1. ROS for agentisk etterlevelse er godkjent av risikoeier — risikoscenarioer for
+   lekkasje av personvernsvakheter (PVK) og sikkerhetssvakheter (TryggNok) er
+   dokumentert og mitigert
+2. Etterlevelsesdokumentasjon og PVK for agentisk etterlevelse er fullført
 
 ---
 
@@ -106,3 +124,4 @@ det oppstår et reelt behov for å bruke TryggNok-funksjonalitet uavhengig av et
 - NAIS Texas-konfigurasjon utvides med Dataverse OBO-scope
 - `app.yaml` og `app-dev.yaml` oppdateres med ny Texas-konfigurasjon
 - Nais app-registrering trenger `user_impersonation`-tillatelse mot Dataverse
+- **Blokkerer produksjonssetting:** Godkjent ROS og fullført etterlevelse/PVK for agentisk etterlevelse

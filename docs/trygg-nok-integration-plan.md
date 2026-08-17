@@ -111,6 +111,13 @@ skillbasert orkestrering — ikke om server-intern konteksttilgang.
 | Admin consent i Nav-tenant | ⏳ Avventer app-reg | NAV IT |
 | NAIS Texas OBO-konfigurasjon for Dataverse | ⏳ Avventer app-reg | NAIS / teamet |
 | Kartlegge TryggNok datamodell | ⏳ Ikke påbegynt | Teamet (se tips nedenfor) |
+| **ROS for agentisk etterlevelse godkjent av risikoeier** | ⚠️ Påbegynt, ikke godkjent | Teamet |
+| **Etterlevelse og PVK for agentisk etterlevelse fullført** | ❌ Ikke påbegynt | Teamet |
+
+> **Merk:** TryggNok-integrasjonen bør ikke settes i produksjon før ROS er godkjent
+> og etterlevelse/PVK er fullført. Risikoen for lekkasje av personvernsvakheter (PVK)
+> og sikkerhetssvakheter (TryggNok) i agentens kontekst er ikke formelt vurdert.
+> Se [ADR-001](adr/ADR-001-trygg-nok-integrated-vs-separate.md) for detaljer.
 
 ### Tips: Kartlegge datamodellen uten app-registrering
 
