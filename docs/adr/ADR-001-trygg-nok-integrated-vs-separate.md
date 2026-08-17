@@ -65,33 +65,29 @@ Nye verktøy legges i `src/mcp/tools/trygg-nok.ts` og `src/api/tryggNokClient.ts
 
 ## Beslutning
 
-**Alternativ A — integrert i `nav-etterlevelse-mcp`.**
+**Alternativ A — integrert i `nav-etterlevelse-mcp`, med mulighet for senere utskilling.**
 
 ### Begrunnelse
 
-**Presisering om kontekst:** `nav-etterlevelse-mcp` er en tilstandsløs server —
-den eneste tilstanden som lever her er påloggings- og autentiseringstoken.
-Konteksten fra en etterlevelsesgjennomgang (kildekodeanalyse, `system-context.md`,
-`domain-context.md`, behandlingskatalog-data, PVK-vurderinger) lever i **agenten**
-og i filer produsert av skillene underveis. Denne konteksten er tilgjengelig for
-agenten uansett hvilken MCP-server den kaller.
+Beslutningen utsettes ikke, men tas inkrementelt: start integrert, skill ut ved behov.
 
-Argumentet for integrert løsning er derfor ikke at serveren «har tilgang» til
-konteksten, men at:
+Argumentene for og mot separat server er reelle, men umodne å ta stilling til nå:
+- Det er uavklart om en selvstendig ROS-arbeidsflyt (med `security-champion` og
+  `threat-model`) vil ha et reelt behov for en separat server, eller om skill-basert
+  komposisjon over felles filer (`system-context.md` etc.) er tilstrekkelig
+- TryggNok-integrasjonen er under utforskning — datamodell og omfang er ikke kartlagt
 
-1. **Skillene kan orkestrere på tvers av etterlevelse og TryggNok i én arbeidsflyt**
-   uten at brukeren må konfigurere og autentisere mot to separate MCP-servere.
-2. **Én server — én innlogging.** OBO-tokenet for etterlevelse og Dataverse hentes
-   fra samme autentiseringsøkt, noe som gir en sømløs brukeropplevelse.
-3. **Risikoprofil er lik for PVK og TryggNok:** Begge kategoriene inneholder
-   sensitiv informasjon som ikke bør eksponeres bredt. Dette er ikke et argument
-   for integrasjon, men betyr at risikoen må vurderes samlet — se forutsetning
-   om ROS/etterlevelse nedenfor.
-4. **Enklere vedlikehold:** Én Nais-applikasjon, én CI/CD-pipeline, én
-   konfigurasjonsflate.
+**Valget er bevisst reversibelt:** Kode plasseres i dedikerte filer
+(`src/mcp/tools/trygg-nok.ts`, `src/api/tryggNokClient.ts`) uten avhengigheter inn
+i etterlevelse-koden. Utskilling til egen server krever kun å flytte disse filene og
+etablere en ny Nais-applikasjon.
 
-En eventuell separat `nav-trygg-nok-mcp` kan vurderes på et senere tidspunkt dersom
-det oppstår et reelt behov for å bruke TryggNok-funksjonalitet uavhengig av etterlevelse.
+**Tilleggsargumenter for integrert start:**
+- Én server — én innlogging. OBO-tokenet for etterlevelse og Dataverse hentes fra
+  samme autentiseringsøkt.
+- Skillene kan orkestrere på tvers av etterlevelse og TryggNok uten at brukeren
+  konfigurerer og autentiserer mot to separate servere.
+- Enklere vedlikehold i startfasen: én Nais-applikasjon, én CI/CD-pipeline.
 
 ---
 
