@@ -93,6 +93,13 @@ Se dedikerte ADR-er:
 Ny kode plasseres i `src/mcp/tools/trygg-nok.ts` og `src/api/tryggNokClient.ts`,
 etter samme mønster som eksisterende etterlevelse- og PVK-verktøy.
 
+**Merk:** `nav-etterlevelse-mcp` er tilstandsløs — eneste tilstand er
+autentiseringstoken. Konteksten fra en etterlevelsesgjennomgang (kildekodeanalyse,
+`system-context.md`, `domain-context.md`) lever i agenten og i filer produsert av
+skillene. Denne konteksten er tilgjengelig for agenten uansett hvilken server den
+kaller. Integrasjonsargumentet handler derfor om sømløs brukeropplevelse og
+skillbasert orkestrering — ikke om server-intern konteksttilgang.
+
 ---
 
 ## Avhengigheter og forutsetninger

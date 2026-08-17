@@ -69,13 +69,25 @@ Nye verktøy legges i `src/mcp/tools/trygg-nok.ts` og `src/api/tryggNokClient.ts
 
 ### Begrunnelse
 
-Den sentrale verdien av integrasjonen er at en AI-agent kan gjennomføre en ROS
-med full forståelse av systemet som vurderes: kildekode, arkitektur, dataflyt og
-domenelogikk. Denne konteksten er allerede tilgjengelig i `nav-etterlevelse-mcp`
-under en etterlevelsesgjennomgang.
+**Presisering om kontekst:** `nav-etterlevelse-mcp` er en tilstandsløs server —
+den eneste tilstanden som lever her er påloggings- og autentiseringstoken.
+Konteksten fra en etterlevelsesgjennomgang (kildekodeanalyse, `system-context.md`,
+`domain-context.md`, behandlingskatalog-data, PVK-vurderinger) lever i **agenten**
+og i filer produsert av skillene underveis. Denne konteksten er tilgjengelig for
+agenten uansett hvilken MCP-server den kaller.
 
-En separat server mister denne konteksten og reduserer kvaliteten på
-risikovurderingene vesentlig.
+Argumentet for integrert løsning er derfor ikke at serveren «har tilgang» til
+konteksten, men at:
+
+1. **Skillene kan orkestrere på tvers av etterlevelse og TryggNok i én arbeidsflyt**
+   uten at brukeren må konfigurere og autentisere mot to separate MCP-servere.
+2. **Én server — én innlogging.** OBO-tokenet for etterlevelse og Dataverse hentes
+   fra samme autentiseringsøkt, noe som gir en sømløs brukeropplevelse.
+3. **PVK-presedens:** Sensitive personvernvurderinger (PVK) er allerede integrert
+   i samme server. Sensitiv sikkerhetsinfo i TryggNok er ikke et sterkere argument
+   for separasjon enn det PVK allerede representerer.
+4. **Enklere vedlikehold:** Én Nais-applikasjon, én CI/CD-pipeline, én
+   konfigurasjonsflate.
 
 **PVK-presedens:** PVK-modulen inneholder sensitive personvernvurderinger som sendes
 til personvernombudet. Dette er sammenlignbart med sensitiv sikkerhetsinfo i TryggNok.
