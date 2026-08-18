@@ -20,6 +20,8 @@ const ETTERLEVELSE_API_BASE_URL =
   process.env.ETTERLEVELSE_API_BASE_URL ?? 'http://etterlevelse-backend.teamdatajegerne';
 const BEHANDLINGSKATALOG_API_BASE_URL =
   process.env.BEHANDLINGSKATALOG_API_BASE_URL ?? 'http://behandlingskatalog-backend.teamdatajegerne';
+const ETTERLEVELSE_FRONTEND_URL =
+  process.env.ETTERLEVELSE_FRONTEND_URL ?? 'https://etterlevelse.ansatt.nav.no';
 
 function requireEnv(name: string): string {
   const value = process.env[name];
@@ -53,6 +55,7 @@ export const config = {
     behandlingskatalogBaseUrl: BEHANDLINGSKATALOG_API_BASE_URL,
     texasTokenExchangeUrl: TEXAS_TOKEN_EXCHANGE_URL,
     texasTokenUrl: TEXAS_TOKEN_URL,
+    etterlevelseFrontendUrl: ETTERLEVELSE_FRONTEND_URL,
   },
 } as const;
 

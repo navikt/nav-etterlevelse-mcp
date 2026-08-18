@@ -39,6 +39,8 @@ spec:
       value: api://prod-gcp.teamdatajegerne.behandlingskatalog-backend/.default
     - name: NAV_ETTERLEVELSE_MCP_SCOPE
       value: api://prod-gcp.dab.nav-etterlevelse-mcp/.default
+    - name: ETTERLEVELSE_FRONTEND_URL
+      value: https://etterlevelse.ansatt.nav.no
   accessPolicy:
     outbound:
       rules:
