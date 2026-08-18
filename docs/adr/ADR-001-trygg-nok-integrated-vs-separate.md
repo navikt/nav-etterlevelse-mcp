@@ -37,6 +37,9 @@ Nye verktøy legges i `src/mcp/tools/trygg-nok.ts` og `src/api/tryggNokClient.ts
 **Ulemper:**
 - TryggNok kan ikke brukes uavhengig av etterlevelse
 - Øker størrelsen og ansvarsområdet til én server
+- **Team Datajegerne** (naturlig eier av nav-etterlevelse-mcp) vil sitte med
+  vedlikeholdsansvar for TryggNok-kode mot et system de ikke eier — på sikt bør
+  TryggNok-eierteamet ta eierskap til dette integrasjonslaget
 
 ### Alternativ B: Separat MCP-server
 
@@ -44,6 +47,8 @@ Nye verktøy legges i `src/mcp/tools/trygg-nok.ts` og `src/api/tryggNokClient.ts
 - Klar separasjon av ansvar
 - TryggNok-funksjonalitet tilgjengelig uavhengig av etterlevelse
 - Isolert deployment og versjonering
+- **Organisatorisk eierskap følger systemgrenser:** TryggNok-eierteamet kan ta
+  eierskap til `nav-trygg-nok-mcp` uten å måtte forholde seg til etterlevelse-koden
 
 **Ulemper:**
 - Mister tilgang til etterlevelseskontekst (kildekodeanalyse, system-context, PVK)
@@ -76,6 +81,12 @@ Argumentene for og mot separat server er reelle, men umodne å ta stilling til n
   `threat-model`) vil ha et reelt behov for en separat server, eller om skill-basert
   komposisjon over felles filer (`system-context.md` etc.) er tilstrekkelig
 - TryggNok-integrasjonen er under utforskning — datamodell og omfang er ikke kartlagt
+- TryggNok-eierteamet er ikke identifisert — eierskap til integrasjonslaget er uavklart
+
+Det organisatoriske eierskapsargumentet taler på sikt for separat server: prinsippet
+om at teamet som eier et system også bør eie integrasjonslaget mot det systemet. Dette
+er ikke et argument for å vente, men for å holde utskilling åpen som en naturlig neste
+steg når TryggNok-eierteamet er identifisert og ønsker å ta eierskap.
 
 **Valget er bevisst reversibelt:** Kode plasseres i dedikerte filer
 (`src/mcp/tools/trygg-nok.ts`, `src/api/tryggNokClient.ts`) uten avhengigheter inn
