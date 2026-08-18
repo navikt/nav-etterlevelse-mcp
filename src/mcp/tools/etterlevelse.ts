@@ -1,8 +1,11 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import * as z from 'zod/v4';
 import { authStore } from '../../auth/store.js';
+import { config } from '../../config.js';
 import type { SessionContext } from '../server.js';
 import { isWriteEnabled } from '../../unleash.js';
+
+const etterlevelseFrontendUrl = config.api.etterlevelseFrontendUrl;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -908,7 +911,7 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
       const { lockedPvkDokumentId } = ctx.tokenData;
       if (!lockedPvkDokumentId) {
         return toolError(
-          'Ingen PVK-dokument funnet for dette etterlevelsesdokumentet. Opprett PVK-dokument i etterlevelse.ansatt.nav.no først.',
+          `Ingen PVK-dokument funnet for dette etterlevelsesdokumentet. Opprett PVK-dokument i ${etterlevelseFrontendUrl} først.`,
         );
       }
 
@@ -952,7 +955,7 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
 
       const { lockedPvkDokumentId } = ctx.tokenData;
       if (!lockedPvkDokumentId) {
-        return toolError('Ingen PVK-dokument funnet for dette etterlevelsesdokumentet. Opprett PVK-dokument i etterlevelse.ansatt.nav.no først.');
+        return toolError(`Ingen PVK-dokument funnet for dette etterlevelsesdokumentet. Opprett PVK-dokument i ${etterlevelseFrontendUrl} først.`);
       }
 
       try {
@@ -1010,7 +1013,7 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
       }
 
       if (!ctx.tokenData.lockedPvkDokumentId) {
-        return toolError('Ingen PVK-dokument funnet for dette etterlevelsesdokumentet. Opprett PVK-dokument i etterlevelse.ansatt.nav.no først.');
+        return toolError(`Ingen PVK-dokument funnet for dette etterlevelsesdokumentet. Opprett PVK-dokument i ${etterlevelseFrontendUrl} først.`);
       }
 
       try {
@@ -1065,7 +1068,7 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
       description:
         'Skriv/oppdater en etterlevelsesbesvarelse for et krav. Krever aktiv sesjonslås (kall lock_document først). ' +
         'Henter kravets hensikt og eksisterende begrunnelse og returnerer dem i svaret for menneskelig gjennomgang. ' +
-        'OPPFYLT og FERDIG/FERDIGSTILT kan ikke settes via agenten — sett disse manuelt i etterlevelse.ansatt.nav.no ' +
+        `OPPFYLT og FERDIG/FERDIGSTILT kan ikke settes via agenten — sett disse manuelt i ${etterlevelseFrontendUrl} ` +
         'etter at du har lest suksesskriterieteksten og kravets hensikt.',
       inputSchema: {
         etterlevelseDokumentasjonId: z
@@ -1198,7 +1201,7 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
 
         lines.push('');
         lines.push('⚠  OPPFYLT kan ikke settes via agenten.');
-        lines.push('   Sett OPPFYLT/FERDIG i etterlevelse.ansatt.nav.no etter at du har');
+        lines.push(`   Sett OPPFYLT/FERDIG i ${etterlevelseFrontendUrl} etter at du har`);
         lines.push('   lest suksesskriterieteksten og kravets hensikt ovenfor.');
 
         return toolResult({
@@ -1666,7 +1669,7 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
       const { lockedPvkDokumentId } = ctx.tokenData;
       if (!lockedPvkDokumentId) {
         return toolError(
-          'Ingen PVK-dokument funnet for dette etterlevelsesdokumentet. Opprett PVK-dokument i etterlevelse.ansatt.nav.no først.',
+          `Ingen PVK-dokument funnet for dette etterlevelsesdokumentet. Opprett PVK-dokument i ${etterlevelseFrontendUrl} først.`,
         );
       }
 
@@ -1751,7 +1754,7 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
       const { lockedPvkDokumentId } = ctx.tokenData;
       if (!lockedPvkDokumentId) {
         return toolError(
-          'Ingen PVK-dokument funnet for dette etterlevelsesdokumentet. Opprett PVK-dokument i etterlevelse.ansatt.nav.no først.',
+          `Ingen PVK-dokument funnet for dette etterlevelsesdokumentet. Opprett PVK-dokument i ${etterlevelseFrontendUrl} først.`,
         );
       }
 
@@ -1783,7 +1786,7 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
       description:
         'Skriv eller oppdater utkast til melding til personvernombudet (PVO) på det låste PVK-dokumentet. ' +
         'Lagres alltid som utkast — agenten sender aldri inn til PVO. ' +
-        'Teamet trykker «Send inn» i etterlevelse.ansatt.nav.no når de er klare. ' +
+        `Teamet trykker «Send inn» i ${etterlevelseFrontendUrl} når de er klare. ` +
         'Feltene rendres som markdown i UI-et. ' +
         'merknadTilPvo: bakgrunn og spørsmål til PVO. ' +
         'endringsNotat: oppsummering av endringer siden forrige innsending (kun ved revurdering).',
@@ -1855,7 +1858,7 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
           formatField('Handling', `Utkast ${action} (innsendingId: ${nyMelding.innsendingId})`),
           formatField('Merknad til PVO', merknadTilPvo.slice(0, 120) + (merknadTilPvo.length > 120 ? '…' : '')),
           endringsNotat ? formatField('Endringsnotat', endringsNotat.slice(0, 80) + (endringsNotat.length > 80 ? '…' : '')) : null,
-          formatField('Status', 'Utkast — send inn manuelt i etterlevelse.ansatt.nav.no'),
+          formatField('Status', `Utkast — send inn manuelt i ${etterlevelseFrontendUrl}`),
         ].filter((line): line is string => Boolean(line));
 
         return toolResult({
@@ -1924,7 +1927,7 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
       const { lockedPvkDokumentId } = ctx.tokenData;
       if (!lockedPvkDokumentId) {
         return toolError(
-          'Ingen PVK-dokument funnet for dette etterlevelsesdokumentet. Opprett PVK-dokument i etterlevelse.ansatt.nav.no først.',
+          `Ingen PVK-dokument funnet for dette etterlevelsesdokumentet. Opprett PVK-dokument i ${etterlevelseFrontendUrl} først.`,
         );
       }
 
@@ -2055,7 +2058,7 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
       const { lockedPvkDokumentId } = ctx.tokenData;
       if (!lockedPvkDokumentId) {
         return toolError(
-          'Ingen PVK-dokument funnet for dette etterlevelsesdokumentet. Opprett PVK-dokument i etterlevelse.ansatt.nav.no først.',
+          `Ingen PVK-dokument funnet for dette etterlevelsesdokumentet. Opprett PVK-dokument i ${etterlevelseFrontendUrl} først.`,
         );
       }
 
@@ -2201,7 +2204,7 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
     {
       description:
         'Opprett eller oppdater et tiltak for et risikoscenario. Krever aktiv sesjonslås (kall lock_document først). ' +
-        'Ansvarlig person settes manuelt i etterlevelse.ansatt.nav.no (NAVident behandles ikke av agenten).',
+        `Ansvarlig person settes manuelt i ${etterlevelseFrontendUrl} (NAVident behandles ikke av agenten).`,
       inputSchema: {
         risikoscenarioId: z.string().uuid().describe('UUID for risikoscenarioet tiltaket tilhører'),
         tiltakId: z.string().uuid().optional().describe('UUID for tiltaket ved oppdatering'),
@@ -2231,7 +2234,7 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
       const { lockedPvkDokumentId } = ctx.tokenData;
       if (!lockedPvkDokumentId) {
         return toolError(
-          'Ingen PVK-dokument funnet for dette etterlevelsesdokumentet. Opprett PVK-dokument i etterlevelse.ansatt.nav.no først.',
+          `Ingen PVK-dokument funnet for dette etterlevelsesdokumentet. Opprett PVK-dokument i ${etterlevelseFrontendUrl} først.`,
         );
       }
 
@@ -2500,7 +2503,7 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
             `Kall lock_document("${id}") for å låse sesjonen til dette dokumentet.\n` +
             `\n` +
             `⚠️ Feltene nedenfor må fylles ut manuelt i UI-et av brukeren:\n` +
-            `   • Enkeltpersoner med redigeringstilgang — https://etterlevelse.ansatt.nav.no/dokumentasjon/${id}/edit\n` +
+            `   • Enkeltpersoner med redigeringstilgang — ${etterlevelseFrontendUrl}/dokumentasjon/${id}/edit\n` +
             `   • Risikoeier — samme side\n` +
             `\n` +
             `Informer brukeren om dette før du fortsetter.`,
