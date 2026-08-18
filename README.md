@@ -168,7 +168,7 @@ Dette kan løses med en ~/.config/cplt/config.toml a.la dette:
 [allow]
 read = ["<path-til_skills-repo>/copilot-config/all/skills"]
 [proxy]
-allowed_domains = "intern.nav.no" # intern.dev.nav.no for test
+allow_private_domains = "intern.nav.no" # intern.dev.nav.no for test
 timeout = 180
 ```
 
