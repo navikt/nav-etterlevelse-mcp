@@ -122,6 +122,16 @@ er ikke formelt vurdert.
    dokumentert og mitigert
 2. Etterlevelsesdokumentasjon og PVK for agentisk etterlevelse er fullført
 
+**Relevant for ROS-vurderingen:**
+Navs oppdaterte retningslinjer for Copilot (juni 2026) har fjernet restriksjoner mot
+bruk av virksomhetskritisk og konfidensiell informasjon i M365 Copilot. Eneste
+gjenværende restriksjon er personopplysninger om Navs brukere. Retningslinjene er
+skrevet for M365 Copilot og Copilot Chat, men argumentasjonslinjen (data lagres ikke,
+brukes ikke til trening, opererer innenfor sikkerhetsperimeter) er relevant å vurdere
+opp mot GitHub Copilot og OpenCode i ROS-arbeidet.
+
+Se: [Oppdaterte retningslinjer for Copilot med færre restriksjoner (Navet)](https://navno.sharepoint.com/sites/intranett-fellesnyheter/SitePages/Oppdaterte-retningslinjer-for-Copilot-med-færre-restriksjoner.aspx)
+
 ---
 
 ## Konsekvenser
