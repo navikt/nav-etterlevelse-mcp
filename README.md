@@ -157,20 +157,29 @@ Se README der for oppsett av symlinker til `~/.copilot/skills/` og `~/.config/op
 
 ### 3. Kjøring i sandbox (cplt)
 
-Hvis du kjører agenten i cplt er det to ting som må konfigureres:
-* cplt må gis skrivetilgang til skills-mappene
-* cplt må få lov å koble seg til mcp-serveren uten å gå gjennom proxyen
+Fra august 2026 er Nav-ansatte pålagt å kjøre AI-agenter i sandkasse-miljø. Følgende
+konfigurasjon er påkrevd i `~/.config/cplt/config.toml`:
 
-I tillegg kan det være en utfordring av tunge verktøykall timer ut mot proxyen etter 60 sekunder. 
+```toml
+[sandbox]
+allow_browser = true          # Påkrevd for MCP OAuth-flows med nettleser
 
-Dette kan løses med en ~/.config/cplt/config.toml a.la dette:
-```bash
 [allow]
-read = ["<path-til_skills-repo>/copilot-config/all/skills"]
+read = ["<path-til-skills-repo>/copilot-config/all/skills"]
+
 [proxy]
-allow_private_domains = "intern.nav.no" # intern.dev.nav.no for test
-timeout = 180
+allow_private_domains = ["intern.nav.no"]  # Prod. Bruk ["intern.dev.nav.no"] for dev.
+timeout = 180                              # Forhindrer timeout på tunge verktøykall
 ```
+
+**`allow_browser = true`** er nødvendig for at OAuth-flyten mot MCP-serveren skal fungere
+inne i sandkassen. Uten dette kan ikke nettleseren åpnes for innlogging.
+
+**OpenCode:** Kjør `opencode mcp auth nav-etterlevelse-mcp` inne i sandkassen (forutsetter
+`allow_browser = true`) eller i et separat terminalvindu utenfor cplt.
+
+**Copilot CLI:** Autentiserer automatisk inne i sandkassen når nødvendig — ingen
+manuell pre-autentisering kreves.
 
 ## Sesjonshåndtering
 
@@ -182,8 +191,9 @@ Azure AD Entra-sesjonen lever i **10 timer** — Texas-sidekaren håndterer auto
 fornyelse av downstream-tokens innenfor denne perioden.
 
 Hvis en agentsesjon feiler med autentiseringsfeil:
-- **OpenCode:** Kjør `opencode mcp auth nav-etterlevelse-mcp` i et nytt terminalvindu
-- **Copilot CLI:** Prøv `/mcp`-kommandoen i chat-vinduet for å re-autentisere
+- **OpenCode:** Kjør `opencode mcp auth nav-etterlevelse-mcp` inne i sandkassen
+  (forutsetter `allow_browser = true`) eller i et separat terminalvindu utenfor cplt
+- **Copilot CLI:** Re-autentiserer automatisk — ingen manuell handling nødvendig
 
 In-memory sesjonsstoren betyr at ett token per pod er gyldige. Av den grunn er
 `replicas.max: 1` i NAIS-manifestet — se kommentar i `.nais/app.yaml` for detaljer.
