@@ -157,29 +157,12 @@ Se README der for oppsett av symlinker til `~/.copilot/skills/` og `~/.config/op
 
 ### 3. Kjøring i sandbox (cplt)
 
-Fra august 2026 er Nav-ansatte pålagt å kjøre AI-agenter i sandkasse-miljø. Følgende
-konfigurasjon er påkrevd i `~/.config/cplt/config.toml`:
+Se [dab-copilot-config README](https://github.com/navikt/dab-copilot-config#kjøring-i-cplt-sandbox)
+for komplett cplt-oppsett (skills, GH_TOKEN, OAuth-autentisering).
 
-```toml
-[sandbox]
-allow_browser = true          # Påkrevd for MCP OAuth-flows med nettleser
-
-[allow]
-read = ["<path-til-skills-repo>/copilot-config/all/skills"]
-
-[proxy]
-allow_private_domains = ["intern.nav.no"]  # Prod. Bruk ["intern.dev.nav.no"] for dev.
-timeout = 180                              # Forhindrer timeout på tunge verktøykall
-```
-
-**`allow_browser = true`** er nødvendig for at OAuth-flyten mot MCP-serveren skal fungere
-inne i sandkassen. Uten dette kan ikke nettleseren åpnes for innlogging.
-
-**OpenCode:** Kjør `opencode mcp auth nav-etterlevelse-mcp` inne i sandkassen (forutsetter
-`allow_browser = true`) eller i et separat terminalvindu utenfor cplt.
-
-**Copilot CLI:** Autentiserer automatisk inne i sandkassen når nødvendig — ingen
-manuell pre-autentisering kreves.
+MCP-serveren krever spesifikt:
+- `sandbox.allow_browser = true` — for OAuth-flows mot nav-etterlevelse-mcp
+- `proxy.allow_private_domains = ["intern.nav.no"]` — for tilgang til intern ingress
 
 ## Sesjonshåndtering
 
