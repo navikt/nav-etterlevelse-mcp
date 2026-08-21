@@ -182,6 +182,4 @@ In-memory sesjonsstoren betyr at ett token per pod er gyldige. Av den grunn er
 
 ## Planlagte utvidelser
 
-| Utvidelse | Beskrivelse | Status |
-|-----------|-------------|--------|
-| Navet-tilgang for flere fagområder | `Sites.Selected`-tilgang for dagpenger, sykepenger m.fl. | ⏳ Planlagt |
+Ingen planlagte utvidelser for øyeblikket.
