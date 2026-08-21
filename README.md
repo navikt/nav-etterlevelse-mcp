@@ -90,7 +90,6 @@ Tilgang innvilges per fagområde av #tech-azure. Se [implementasjonsplan](docs/n
 | `utbetalinger` | ✅ Tilgang innvilget (dev + prod) |
 | `intranett-utvikling` | ✅ Tilgang innvilget (dev + prod) |
 | `fag-og-ytelser` | ✅ Hub-site (dev + prod, begrenset innhold) |
-| `stonadsokonomi` | ⏳ Planlagt |
 | `arbeidsavklaringspenger` | ⏳ Planlagt |
 | `dagpenger` | ⏳ Planlagt |
 | `sykefravarsoppfolging-og-sykepenger` | ⏳ Planlagt |
@@ -185,4 +184,4 @@ In-memory sesjonsstoren betyr at ett token per pod er gyldige. Av den grunn er
 
 | Utvidelse | Beskrivelse | Status |
 |-----------|-------------|--------|
-| Navet-tilgang for flere fagområder | `Sites.Selected`-tilgang for stonadsokonomi, dagpenger, sykepenger m.fl. | ⏳ Planlagt |
+| Navet-tilgang for flere fagområder | `Sites.Selected`-tilgang for dagpenger, sykepenger m.fl. | ⏳ Planlagt |
