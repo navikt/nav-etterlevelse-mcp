@@ -130,8 +130,8 @@ Legg til MCP-serveren:
 ```bash
 opencode mcp add
 # Velg "remote", skriv inn URL:
-# Prod: https://nav-etterlevelse-mcp.intern.nav.no
-# Dev:  https://nav-etterlevelse-mcp.intern.dev.nav.no
+# Prod: https://nav-etterlevelse-mcp.intern.nav.no/mcp
+# Dev:  https://nav-etterlevelse-mcp.intern.dev.nav.no/mcp
 ```
 I copilot CLI kan du bruke `mcp`-kommandoene direkte, f.eks.:
 ```bash
@@ -139,7 +139,7 @@ I copilot CLI kan du bruke `mcp`-kommandoene direkte, f.eks.:
 
 name: nav-etterlevelse-mcp
 servertype: HTTP
-remote server: https://nav-etterlevelse-mcp.intern.nav.no
+remote server: https://nav-etterlevelse-mcp.intern.nav.no/mcp
 ```
 Copilot validerer mcp servere mot mcp-registry, så det er ikke mulig å legge til dev-instansen
 
