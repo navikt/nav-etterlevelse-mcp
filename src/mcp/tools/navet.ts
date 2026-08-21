@@ -12,7 +12,6 @@ const FAGOMRAADER = {
   'pensjon-alderspensjon': 'fag-og-ytelser-pensjon-alderspensjon',
   'markedsarbeid': 'fag-og-ytelser-arbeid-markedsarbeid',
   'fag-og-ytelser': 'fag-og-ytelser',
-  'stonadsokonomi': 'fag-og-ytelser-stonadsokonomi',
   'utbetalinger': 'fag-og-ytelser-utbetalinger',
   'intranett-utvikling': 'intranett-utvikling',
 } as const;

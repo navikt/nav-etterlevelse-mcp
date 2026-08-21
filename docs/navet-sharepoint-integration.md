@@ -26,7 +26,6 @@ Start med dev, og utvid til prod når MCP-serveren er godkjent i mcp-registry.
 | Arbeidsrettet oppfølging | `https://navno.sharepoint.com/sites/fag-og-ytelser-arbeid-arbeidsrettet-brukeroppfolging` |
 | Arbeidsavklaringspenger (AAP) | `https://navno.sharepoint.com/sites/fag-og-ytelser-arbeid-arbeidsavklaringspenger` |
 | Dagpenger | `https://navno.sharepoint.com/sites/fag-og-ytelser-arbeid-dagpenger` |
-| Stønadsøkonomi/utbetaling | `https://navno.sharepoint.com/sites/fag-og-ytelser-stonadsokonomi` |
 
 ### Prioritet 2 — øvrige fagområder
 
@@ -53,7 +52,6 @@ Start med dev, og utvid til prod når MCP-serveren er godkjent i mcp-registry.
 > - `fag-og-ytelser-arbeid-arbeidsrettet-brukeroppfolging`
 > - `fag-og-ytelser-arbeid-arbeidsavklaringspenger`
 > - `fag-og-ytelser-arbeid-dagpenger`
-> - `fag-og-ytelser-stonadsokonomi`
 >
 > Prioritet 2 (øvrige fagområder i nav-etterlevelse/nav-pvk-skillene):
 > - `fag-og-ytelser-arbeid-sykefravarsoppfolging-og-sykepenger`

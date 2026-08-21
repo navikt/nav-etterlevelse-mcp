@@ -90,14 +90,13 @@ Tilgang innvilges per fagområde av #tech-azure. Se [implementasjonsplan](docs/n
 | `utbetalinger` | ✅ Tilgang innvilget (dev + prod) |
 | `intranett-utvikling` | ✅ Tilgang innvilget (dev + prod) |
 | `fag-og-ytelser` | ✅ Hub-site (dev + prod, begrenset innhold) |
-| `stonadsokonomi` | ⏳ Planlagt |
-| `arbeidsavklaringspenger` | ⏳ Planlagt |
-| `dagpenger` | ⏳ Planlagt |
-| `sykefravarsoppfolging-og-sykepenger` | ⏳ Planlagt |
-| `sosiale-tjenester` | ⏳ Planlagt |
-| `tiltak-og-virkemidler` | ⏳ Planlagt |
-| `pensjon-alderspensjon` | ⏳ Planlagt |
-| `markedsarbeid` | ⏳ Planlagt |
+| `arbeidsavklaringspenger` | ✅ Tilgang innvilget (dev + prod) |
+| `dagpenger` | ✅ Tilgang innvilget (dev + prod) |
+| `sykefravarsoppfolging-og-sykepenger` | ✅ Tilgang innvilget (dev + prod) |
+| `sosiale-tjenester` | ✅ Tilgang innvilget (dev + prod) |
+| `tiltak-og-virkemidler` | ✅ Tilgang innvilget (dev + prod) |
+| `pensjon-alderspensjon` | ✅ Tilgang innvilget (dev + prod) |
+| `markedsarbeid` | ✅ Tilgang innvilget (dev + prod) |
 
 ### Behandlingskatalog — les
 
@@ -183,6 +182,4 @@ In-memory sesjonsstoren betyr at ett token per pod er gyldige. Av den grunn er
 
 ## Planlagte utvidelser
 
-| Utvidelse | Beskrivelse | Status |
-|-----------|-------------|--------|
-| Navet-tilgang for flere fagområder | `Sites.Selected`-tilgang for stonadsokonomi, dagpenger, sykepenger m.fl. | ⏳ Planlagt |
+Ingen planlagte utvidelser for øyeblikket.
