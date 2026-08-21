@@ -4,13 +4,13 @@ import { NavetClient } from '../../api/navetClient.js';
 
 const FAGOMRAADER = {
   'arbeidsrettet-brukeroppfolging': 'fag-og-ytelser-arbeid-arbeidsrettet-brukeroppfolging',
-  'arbeidsavklaringspenger': 'fag-og-ytelser-arbeidsavklaringspenger',
-  'dagpenger': 'fag-og-ytelser-dagpenger',
-  'sykefravarsoppfolging-og-sykepenger': 'fag-og-ytelser-sykefravarsoppfolging-og-sykepenger',
+  'arbeidsavklaringspenger': 'fag-og-ytelser-arbeid-arbeidsavklaringspenger',
+  'dagpenger': 'fag-og-ytelser-arbeid-dagpenger',
+  'sykefravarsoppfolging-og-sykepenger': 'fag-og-ytelser-arbeid-sykefravarsoppfolging-og-sykepenger',
   'sosiale-tjenester': 'fag-og-ytelser-sosiale-tjenester',
-  'tiltak-og-virkemidler': 'fag-og-ytelser-tiltak-og-virkemidler',
+  'tiltak-og-virkemidler': 'fag-og-ytelser-arbeid-tiltak-og-virkemidler',
   'pensjon-alderspensjon': 'fag-og-ytelser-pensjon-alderspensjon',
-  'markedsarbeid': 'fag-og-ytelser-markedsarbeid',
+  'markedsarbeid': 'fag-og-ytelser-arbeid-markedsarbeid',
   'fag-og-ytelser': 'fag-og-ytelser',
   'utbetalinger': 'fag-og-ytelser-utbetalinger',
   'intranett-utvikling': 'intranett-utvikling',

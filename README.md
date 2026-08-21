@@ -95,7 +95,7 @@ Tilgang innvilges per fagområde av #tech-azure. Se [implementasjonsplan](docs/n
 | `sykefravarsoppfolging-og-sykepenger` | ✅ Tilgang innvilget (dev + prod) |
 | `sosiale-tjenester` | ✅ Tilgang innvilget (dev + prod) |
 | `tiltak-og-virkemidler` | ✅ Tilgang innvilget (dev + prod) |
-| `pensjon-alderspensjon` | ⏳ Tilgang ikke innvilget enda |
+| `pensjon-alderspensjon` | ✅ Tilgang innvilget (dev + prod) |
 | `markedsarbeid` | ✅ Tilgang innvilget (dev + prod) |
 
 ### Behandlingskatalog — les
