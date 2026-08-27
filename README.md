@@ -89,6 +89,7 @@ Tilgang innvilges per fagområde av #tech-azure. Se [implementasjonsplan](docs/n
 | `arbeidsrettet-brukeroppfolging` | ✅ Tilgang innvilget (dev + prod) |
 | `utbetalinger` | ✅ Tilgang innvilget (dev + prod) |
 | `intranett-utvikling` | ✅ Tilgang innvilget (dev + prod) |
+| `intranett-omstilling` | ✅ Tilgang innvilget (dev + prod) |
 | `fag-og-ytelser` | ✅ Hub-site (dev + prod, begrenset innhold) |
 | `arbeidsavklaringspenger` | ✅ Tilgang innvilget (dev + prod) |
 | `dagpenger` | ✅ Tilgang innvilget (dev + prod) |

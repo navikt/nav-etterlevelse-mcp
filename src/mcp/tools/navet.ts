@@ -14,6 +14,7 @@ const FAGOMRAADER = {
   'fag-og-ytelser': 'fag-og-ytelser',
   'utbetalinger': 'fag-og-ytelser-utbetalinger',
   'intranett-utvikling': 'intranett-utvikling',
+  'intranett-omstilling': 'intranett-omstilling',
 } as const;
 
 type Fagomrade = keyof typeof FAGOMRAADER;
