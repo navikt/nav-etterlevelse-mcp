@@ -65,6 +65,7 @@ jobs:
         env:
           CLUSTER: dev-gcp
           RESOURCE: .nais/alerts.yaml
+          ALERT_SLACK_CHANNEL: "#team_dab_alerts_dev"
       - name: Deploy to dev-gcp
         uses: nais/deploy/actions/deploy@fc3eae3edebabdf67f7592102ae16176d5ba3b5f # v2
         env:
@@ -90,6 +91,7 @@ jobs:
         env:
           CLUSTER: prod-gcp
           RESOURCE: .nais/alerts.yaml
+          ALERT_SLACK_CHANNEL: "#team_dab_alerts"
       - name: Deploy to prod-gcp
         uses: nais/deploy/actions/deploy@fc3eae3edebabdf67f7592102ae16176d5ba3b5f # v2
         env:

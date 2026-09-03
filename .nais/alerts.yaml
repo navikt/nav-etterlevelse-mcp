@@ -9,7 +9,7 @@ metadata:
 spec:
   receivers:
     slack:
-      channel: "#team_dab_alerts_dev"
+      channel: "{{ALERT_SLACK_CHANNEL}}"
       prependText: ""
   alerts:
     - alert: EtterlevelseMcpHighErrorRate
