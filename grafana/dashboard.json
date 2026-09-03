@@ -39,6 +39,26 @@
           "query": "dev-gcp,prod-gcp",
           "includeAll": false,
           "multi": false
+        },
+        {
+          "name": "namespace",
+          "type": "custom",
+          "label": "Namespace",
+          "description": "Velg Kubernetes-namespace",
+          "options": [
+            {
+              "text": "dab",
+              "value": "dab"
+            }
+          ],
+          "current": {
+            "selected": true,
+            "text": "dab",
+            "value": "dab"
+          },
+          "query": "dab",
+          "includeAll": false,
+          "multi": false
         }
       ]
     },
@@ -55,7 +75,7 @@
         },
         "targets": [
           {
-            "expr": "mcp_active_sessions{namespace=\"dab\", app=\"nav-etterlevelse-mcp\", cluster=\"$cluster\"}",
+            "expr": "mcp_active_sessions{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\", cluster=\"$cluster\"}",
             "legendFormat": "Aktive sesjoner",
             "refId": "A"
           }
@@ -98,7 +118,7 @@
         },
         "targets": [
           {
-            "expr": "sum(increase(auth_refreshes_total{namespace=\"dab\", app=\"nav-etterlevelse-mcp\", cluster=\"$cluster\"}[24h]))",
+            "expr": "sum(increase(auth_refreshes_total{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\", cluster=\"$cluster\"}[24h]))",
             "legendFormat": "Refresh",
             "refId": "A"
           }
@@ -137,7 +157,7 @@
         },
         "targets": [
           {
-            "expr": "sum(rate(mcp_errors_total{namespace=\"dab\", app=\"nav-etterlevelse-mcp\", cluster=\"$cluster\"}[1h])) / sum(rate(mcp_requests_total{namespace=\"dab\", app=\"nav-etterlevelse-mcp\", cluster=\"$cluster\"}[1h])) * 100",
+            "expr": "sum(rate(mcp_errors_total{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\", cluster=\"$cluster\"}[1h])) / sum(rate(mcp_requests_total{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\", cluster=\"$cluster\"}[1h])) * 100",
             "legendFormat": "Feilrate",
             "refId": "A"
           }
@@ -181,7 +201,7 @@
         },
         "targets": [
           {
-            "expr": "sum(increase(texas_obo_errors_total{namespace=\"dab\", app=\"nav-etterlevelse-mcp\", cluster=\"$cluster\"}[24h]))",
+            "expr": "sum(increase(texas_obo_errors_total{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\", cluster=\"$cluster\"}[24h]))",
             "legendFormat": "OBO-feil",
             "refId": "A"
           }
@@ -220,7 +240,7 @@
         },
         "targets": [
           {
-            "expr": "sum by (tool) (rate(mcp_requests_total{namespace=\"dab\", app=\"nav-etterlevelse-mcp\", cluster=\"$cluster\"}[1h]))",
+            "expr": "sum by (tool) (rate(mcp_requests_total{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\", cluster=\"$cluster\"}[1h]))",
             "legendFormat": "{{tool}}",
             "refId": "A"
           }
@@ -250,17 +270,17 @@
         },
         "targets": [
           {
-            "expr": "histogram_quantile(0.50, sum by (le, tool) (rate(mcp_request_duration_seconds_bucket{namespace=\"dab\", app=\"nav-etterlevelse-mcp\", cluster=\"$cluster\"}[1h])))",
+            "expr": "histogram_quantile(0.50, sum by (le, tool) (rate(mcp_request_duration_seconds_bucket{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\", cluster=\"$cluster\"}[1h])))",
             "legendFormat": "p50 {{tool}}",
             "refId": "A"
           },
           {
-            "expr": "histogram_quantile(0.95, sum by (le, tool) (rate(mcp_request_duration_seconds_bucket{namespace=\"dab\", app=\"nav-etterlevelse-mcp\", cluster=\"$cluster\"}[1h])))",
+            "expr": "histogram_quantile(0.95, sum by (le, tool) (rate(mcp_request_duration_seconds_bucket{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\", cluster=\"$cluster\"}[1h])))",
             "legendFormat": "p95 {{tool}}",
             "refId": "B"
           },
           {
-            "expr": "histogram_quantile(0.99, sum by (le, tool) (rate(mcp_request_duration_seconds_bucket{namespace=\"dab\", app=\"nav-etterlevelse-mcp\", cluster=\"$cluster\"}[1h])))",
+            "expr": "histogram_quantile(0.99, sum by (le, tool) (rate(mcp_request_duration_seconds_bucket{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\", cluster=\"$cluster\"}[1h])))",
             "legendFormat": "p99 {{tool}}",
             "refId": "C"
           }
@@ -291,7 +311,7 @@
         },
         "targets": [
           {
-            "expr": "sum by (kravnummer, suksesskriterium_status) (increase(etterlevelse_writes_total{namespace=\"dab\", app=\"nav-etterlevelse-mcp\", cluster=\"$cluster\"}[24h]))",
+            "expr": "sum by (kravnummer, suksesskriterium_status) (increase(etterlevelse_writes_total{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\", cluster=\"$cluster\"}[24h]))",
             "legendFormat": "K{{kravnummer}} — {{suksesskriterium_status}}",
             "refId": "A"
           }
@@ -318,7 +338,7 @@
         },
         "targets": [
           {
-            "expr": "sum by (operation, status) (increase(pvk_operations_total{namespace=\"dab\", app=\"nav-etterlevelse-mcp\", cluster=\"$cluster\"}[24h]))",
+            "expr": "sum by (operation, status) (increase(pvk_operations_total{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\", cluster=\"$cluster\"}[24h]))",
             "legendFormat": "{{operation}} — {{status}}",
             "refId": "A"
           }
@@ -345,7 +365,7 @@
         },
         "targets": [
           {
-            "expr": "sum by (fagomrade) (increase(navet_reads_total{namespace=\"dab\", app=\"nav-etterlevelse-mcp\", cluster=\"$cluster\"}[24h]))",
+            "expr": "sum by (fagomrade) (increase(navet_reads_total{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\", cluster=\"$cluster\"}[24h]))",
             "legendFormat": "{{fagomrade}}",
             "refId": "A"
           }
@@ -371,7 +391,7 @@
         },
         "targets": [
           {
-            "expr": "sum by (tool, error_type) (increase(mcp_errors_total{namespace=\"dab\", app=\"nav-etterlevelse-mcp\", cluster=\"$cluster\"}[24h]))",
+            "expr": "sum by (tool, error_type) (increase(mcp_errors_total{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\", cluster=\"$cluster\"}[24h]))",
             "legendFormat": "{{tool}} — {{error_type}}",
             "refId": "A",
             "format": "table",
