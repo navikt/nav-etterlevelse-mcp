@@ -1,6 +1,7 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import * as z from 'zod/v4';
 import { BehandlingskatalogClient } from '../../api/behandlingskatalogClient.js';
+import { instrumentedRegisterTool } from '../instrumentedRegisterTool.js';
 
 function toolResult(data: unknown) {
   return {
@@ -37,7 +38,7 @@ export function registerBehandlingskatalogTools(
   server: McpServer,
   client: BehandlingskatalogClient,
 ): void {
-  server.registerTool(
+  instrumentedRegisterTool(server, 
     'search_behandlinger',
     {
       description: 'Søk etter behandlinger i behandlingskatalogen.',
@@ -55,7 +56,7 @@ export function registerBehandlingskatalogTools(
     },
   );
 
-  server.registerTool(
+  instrumentedRegisterTool(server, 
     'get_behandling',
     {
       description: 'Hent en behandling med UUID eller B-nummer.',
@@ -73,7 +74,7 @@ export function registerBehandlingskatalogTools(
     },
   );
 
-  server.registerTool(
+  instrumentedRegisterTool(server, 
     'get_processor',
     {
       description: 'Hent en databehandler på UUID.',

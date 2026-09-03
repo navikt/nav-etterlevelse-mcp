@@ -1,6 +1,7 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import * as z from 'zod/v4';
 import { NavetClient } from '../../api/navetClient.js';
+import { instrumentedRegisterTool } from '../instrumentedRegisterTool.js';
 
 const FAGOMRAADER = {
   'arbeidsrettet-brukeroppfolging': 'fag-og-ytelser-arbeid-arbeidsrettet-brukeroppfolging',
@@ -36,7 +37,7 @@ function toolResult(data: unknown) {
 }
 
 export function registerNavetTools(server: McpServer, navetClient: NavetClient): void {
-  server.registerTool(
+  instrumentedRegisterTool(server, 
     'list_navet_pages',
     {
       description:
@@ -53,7 +54,7 @@ export function registerNavetTools(server: McpServer, navetClient: NavetClient):
           .describe('Filtrer på sidetittel, f.eks. "personvern" eller "rutiner"'),
       },
     },
-    async ({ fagomrade, filter }) => {
+    async ({ fagomrade, filter }: { fagomrade: Fagomrade; filter?: string }) => {
       try {
         const sitePath = FAGOMRAADER[fagomrade];
         const siteId = await navetClient.getSiteId(sitePath);
@@ -75,7 +76,7 @@ export function registerNavetTools(server: McpServer, navetClient: NavetClient):
     },
   );
 
-  server.registerTool(
+  instrumentedRegisterTool(server, 
     'get_navet_page',
     {
       description:
@@ -90,7 +91,7 @@ export function registerNavetTools(server: McpServer, navetClient: NavetClient):
         pageId: z.string().min(1).describe('Side-ID fra list_navet_pages'),
       },
     },
-    async ({ fagomrade, pageId }) => {
+    async ({ fagomrade, pageId }: { fagomrade: Fagomrade; pageId: string }) => {
       try {
         const sitePath = FAGOMRAADER[fagomrade];
         const siteId = await navetClient.getSiteId(sitePath);

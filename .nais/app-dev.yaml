@@ -22,6 +22,9 @@ spec:
   readiness:
     path: /health
     initialDelay: 10
+  prometheus:
+    enabled: true
+    path: /metrics
   ingresses:
     - https://nav-etterlevelse-mcp.intern.dev.nav.no
   env:

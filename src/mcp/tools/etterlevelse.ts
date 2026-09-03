@@ -2,6 +2,8 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import * as z from 'zod/v4';
 import { authStore } from '../../auth/store.js';
 import { config } from '../../config.js';
+import { instrumentedRegisterTool } from '../instrumentedRegisterTool.js';
+import { etterlevelseWritesTotal } from '../../metrics.js';
 import type { SessionContext } from '../server.js';
 import { isWriteEnabled } from '../../unleash.js';
 
@@ -415,7 +417,7 @@ function formatTiltakSection(raw: unknown, index?: number): string {
 export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext): void {
   const { etterlevelseClient: client } = ctx;
 
-  server.registerTool(
+  instrumentedRegisterTool(server, 
     'list_etterlevelse_dokumentasjoner',
     {
       description: 'List etterlevelsedokumentasjoner med enkel filtrering på søk og team.',
@@ -434,7 +436,7 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
     },
   );
 
-  server.registerTool(
+  instrumentedRegisterTool(server, 
     'get_etterlevelse_dokumentasjon',
     {
       description:
@@ -454,7 +456,7 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
     },
   );
 
-  server.registerTool(
+  instrumentedRegisterTool(server, 
     'get_etterlevelse_status_oversikt',
     {
       description:
@@ -476,7 +478,7 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
     },
   );
 
-  server.registerTool(
+  instrumentedRegisterTool(server, 
     'list_krav',
     {
       description:
@@ -506,7 +508,7 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
     },
   );
 
-  server.registerTool(
+  instrumentedRegisterTool(server, 
     'get_krav',
     {
       description:
@@ -526,7 +528,7 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
     },
   );
 
-  server.registerTool(
+  instrumentedRegisterTool(server, 
     'get_krav_for_gjennomgang',
     {
       description:
@@ -616,7 +618,7 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
     },
   );
 
-  server.registerTool(
+  instrumentedRegisterTool(server, 
     'get_etterlevelse',
     {
       description: 'Hent etterlevelse for en dokumentasjon og et spesifikt krav.',
@@ -642,7 +644,7 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
     },
   );
 
-  server.registerTool(
+  instrumentedRegisterTool(server, 
     'lock_document',
     {
       description:
@@ -709,7 +711,7 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
     },
   );
 
-  server.registerTool(
+  instrumentedRegisterTool(server, 
     'get_pvk_dokument',
     {
       description:
@@ -769,7 +771,7 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
     },
   );
 
-  server.registerTool(
+  instrumentedRegisterTool(server, 
     'create_pvk_dokument',
     {
       description:
@@ -813,7 +815,7 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
     },
   );
 
-  server.registerTool(
+  instrumentedRegisterTool(server, 
     'delete_pvk_dokument',
     {
       description: 'Slett PVK-dokumentet for det låste etterlevelsesdokumentet. Krever aktiv sesjonslås.',
@@ -842,7 +844,7 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
     },
   );
 
-  server.registerTool(
+  instrumentedRegisterTool(server, 
     'get_behandlingens_livsloep',
     {
       description: 'Hent behandlingens livsløp-dokument for det låste dokumentet.',
@@ -895,7 +897,7 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
     },
   );
 
-  server.registerTool(
+  instrumentedRegisterTool(server, 
     'list_risikoscenarioer',
     {
       description: 'List alle risikoscenarioer for det låste PVK-dokumentet.',
@@ -940,7 +942,7 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
     },
   );
 
-  server.registerTool(
+  instrumentedRegisterTool(server, 
     'list_tiltak',
     {
       description: 'List alle tiltak for det låste PVK-dokumentet.',
@@ -985,7 +987,7 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
 
   // --- Write-tools ---
 
-  server.registerTool(
+  instrumentedRegisterTool(server, 
     'link_krav_to_risikoscenario',
     {
       description:
@@ -1032,7 +1034,7 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
     },
   );
 
-  server.registerTool(
+  instrumentedRegisterTool(server, 
     'unlink_krav_from_risikoscenario',
     {
       description: 'Fjern koblingen mellom et kravnummer og et risikoscenario i PVK-dokumentet. Krever aktiv sesjonslås.',
@@ -1062,7 +1064,7 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
     },
   );
 
-  server.registerTool(
+  instrumentedRegisterTool(server, 
     'write_etterlevelse',
     {
       description:
@@ -1130,7 +1132,7 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
         const suksesskriterier = Array.isArray(krav.suksesskriterier)
           ? (krav.suksesskriterier as Record<string, unknown>[])
           : [];
-        const saniterteSKB = suksesskriterieBegrunnelser.map((skb) => {
+        const saniterteSKB = suksesskriterieBegrunnelser.map((skb: Record<string, unknown>) => {
           const def = suksesskriterier.find(
             (sk) => sk.id === skb.suksesskriterieId || sk.id === String(skb.suksesskriterieId),
           );
@@ -1148,6 +1150,16 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
           statusBegrunnelse,
           suksesskriterieBegrunnelser: saniterteSKB,
         });
+
+        // Instrumenter per SK for metrikker
+        for (const skb of saniterteSKB) {
+          etterlevelseWritesTotal.inc({
+            kravnummer: String(kravNummer),
+            kravversjon: String(kravVersjon),
+            suksesskriterium_id: String(skb.suksesskriterieId),
+            suksesskriterium_status: String(skb.suksesskriterieStatus),
+          });
+        }
 
         // Build summary with krav context for human review
         const kravNavn = typeof krav.navn === 'string' ? krav.navn : `K${kravNummer}.${kravVersjon}`;
@@ -1215,7 +1227,7 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
     },
   );
 
-  server.registerTool(
+  instrumentedRegisterTool(server, 
     'delete_etterlevelse',
     {
       description: 'Slett en etterlevelsesbesvarelse for et krav. Krever aktiv sesjonslås.',
@@ -1240,7 +1252,7 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
     },
   );
 
-  server.registerTool(
+  instrumentedRegisterTool(server, 
     'write_etterlevelse_dokumentasjon',
     {
       description:
@@ -1406,7 +1418,7 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
           lines.push(`Avdeling: ${avdelingNavn ?? ''} (${nomAvdelingId})`);
         }
         if (varslingsadresser !== undefined) {
-          lines.push(`Varslingsadresser: ${varslingsadresser.map((v) => `${v.type}:${v.adresse}`).join(', ')}`);
+          lines.push(`Varslingsadresser: ${varslingsadresser.map((v: Record<string, unknown>) => `${v.type}:${v.adresse}`).join(', ')}`);
         }
         if (title !== undefined) {
           lines.push(`Tittel: ${title}`);
@@ -1424,7 +1436,7 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
     },
   );
 
-  server.registerTool(
+  instrumentedRegisterTool(server, 
     'write_behandlingens_livsloep',
     {
       description:
@@ -1525,7 +1537,7 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
     },
   );
 
-  server.registerTool(
+  instrumentedRegisterTool(server, 
     'delete_behandlingens_livsloep',
     {
       description: 'Slett behandlingens livsløp-dokument for det låste etterlevelsesdokumentet. Krever aktiv sesjonslås.',
@@ -1554,7 +1566,7 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
     },
   );
 
-  server.registerTool(
+  instrumentedRegisterTool(server, 
     'write_behandlingens_art_og_omfang',
     {
       description:
@@ -1639,7 +1651,7 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
     },
   );
 
-  server.registerTool(
+  instrumentedRegisterTool(server, 
     'write_pvk_involvering',
     {
       description:
@@ -1722,7 +1734,7 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
     },
   );
 
-  server.registerTool(
+  instrumentedRegisterTool(server, 
     'write_pvk_risikoeier',
     {
       description:
@@ -1780,7 +1792,7 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
     },
   );
 
-  server.registerTool(
+  instrumentedRegisterTool(server, 
     'write_pvk_melding_til_pvo',
     {
       description:
@@ -1874,7 +1886,7 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
     },
   );
 
-  server.registerTool(
+  instrumentedRegisterTool(server, 
     'write_pvk_egenskaper',
     {
       description:
@@ -1985,7 +1997,7 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
     },
   );
 
-  server.registerTool(
+  instrumentedRegisterTool(server, 
      'write_risikoscenario',
     {
       description:
@@ -2115,7 +2127,7 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
     },
   );
 
-  server.registerTool(
+  instrumentedRegisterTool(server, 
     'delete_risikoscenario',
     {
       description:
@@ -2161,7 +2173,7 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
   );
 
 
-  server.registerTool(
+  instrumentedRegisterTool(server, 
     'delete_tiltak',
     {
       description: 'Slett et tiltak fra PVK-dokumentet. Krever aktiv sesjonslås. Fjerner automatisk koblingen til tilknyttede risikoscenarioer før sletting.',
@@ -2199,7 +2211,7 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
     },
   );
 
-  server.registerTool(
+  instrumentedRegisterTool(server, 
     'write_tiltak',
     {
       description:
@@ -2289,7 +2301,7 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
     },
   );
 
-  server.registerTool(
+  instrumentedRegisterTool(server, 
     'get_my_teams',
     {
       description:
@@ -2312,7 +2324,7 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
     },
   );
 
-  server.registerTool(
+  instrumentedRegisterTool(server, 
     'search_slack_channel',
     {
       description:
@@ -2336,7 +2348,7 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
     },
   );
 
-  server.registerTool(
+  instrumentedRegisterTool(server, 
     'list_nom_avdelinger',
     {
       description:
@@ -2359,7 +2371,7 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
     },
   );
 
-  server.registerTool(
+  instrumentedRegisterTool(server, 
     'create_etterlevelse_dokumentasjon',
     {
       description:
