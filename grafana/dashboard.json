@@ -2,7 +2,10 @@
   "dashboard": {
     "title": "nav-etterlevelse-mcp",
     "uid": "nav-etterlevelse-mcp",
-    "tags": ["dab", "nav-etterlevelse-mcp"],
+    "tags": [
+      "dab",
+      "nav-etterlevelse-mcp"
+    ],
     "timezone": "browser",
     "schemaVersion": 39,
     "version": 1,
@@ -11,28 +14,72 @@
       "from": "now-24h",
       "to": "now"
     },
+    "templating": {
+      "list": [
+        {
+          "name": "cluster",
+          "type": "custom",
+          "label": "Cluster",
+          "description": "Velg Kubernetes-cluster",
+          "options": [
+            {
+              "text": "dev-gcp",
+              "value": "dev-gcp"
+            },
+            {
+              "text": "prod-gcp",
+              "value": "prod-gcp"
+            }
+          ],
+          "current": {
+            "selected": true,
+            "text": "dev-gcp",
+            "value": "dev-gcp"
+          },
+          "query": "dev-gcp,prod-gcp",
+          "includeAll": false,
+          "multi": false
+        }
+      ]
+    },
     "panels": [
       {
         "id": 1,
         "title": "Aktive sesjoner",
         "type": "stat",
-        "gridPos": { "x": 0, "y": 0, "w": 6, "h": 4 },
+        "gridPos": {
+          "x": 0,
+          "y": 0,
+          "w": 6,
+          "h": 4
+        },
         "targets": [
           {
-            "expr": "mcp_active_sessions{namespace=\"dab\", app=\"nav-etterlevelse-mcp\"}",
+            "expr": "mcp_active_sessions{namespace=\"dab\", app=\"nav-etterlevelse-mcp\", cluster=\"$cluster\"}",
             "legendFormat": "Aktive sesjoner",
             "refId": "A"
           }
         ],
         "fieldConfig": {
           "defaults": {
-            "color": { "mode": "thresholds" },
+            "color": {
+              "mode": "thresholds"
+            },
             "thresholds": {
               "mode": "absolute",
               "steps": [
-                { "color": "green", "value": null },
-                { "color": "orange", "value": 5 },
-                { "color": "red", "value": 10 }
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "orange",
+                  "value": 5
+                },
+                {
+                  "color": "red",
+                  "value": 10
+                }
               ]
             },
             "unit": "short"
@@ -43,22 +90,35 @@
         "id": 2,
         "title": "Auth refresh siste 24t",
         "type": "stat",
-        "gridPos": { "x": 6, "y": 0, "w": 6, "h": 4 },
+        "gridPos": {
+          "x": 6,
+          "y": 0,
+          "w": 6,
+          "h": 4
+        },
         "targets": [
           {
-            "expr": "sum(increase(auth_refreshes_total{namespace=\"dab\", app=\"nav-etterlevelse-mcp\"}[24h]))",
+            "expr": "sum(increase(auth_refreshes_total{namespace=\"dab\", app=\"nav-etterlevelse-mcp\", cluster=\"$cluster\"}[24h]))",
             "legendFormat": "Refresh",
             "refId": "A"
           }
         ],
         "fieldConfig": {
           "defaults": {
-            "color": { "mode": "thresholds" },
+            "color": {
+              "mode": "thresholds"
+            },
             "thresholds": {
               "mode": "absolute",
               "steps": [
-                { "color": "green", "value": null },
-                { "color": "red", "value": 0 }
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "red",
+                  "value": 0
+                }
               ]
             },
             "unit": "short"
@@ -69,23 +129,39 @@
         "id": 3,
         "title": "Feilrate siste time",
         "type": "stat",
-        "gridPos": { "x": 12, "y": 0, "w": 6, "h": 4 },
+        "gridPos": {
+          "x": 12,
+          "y": 0,
+          "w": 6,
+          "h": 4
+        },
         "targets": [
           {
-            "expr": "sum(rate(mcp_errors_total{namespace=\"dab\", app=\"nav-etterlevelse-mcp\"}[1h])) / sum(rate(mcp_requests_total{namespace=\"dab\", app=\"nav-etterlevelse-mcp\"}[1h])) * 100",
+            "expr": "sum(rate(mcp_errors_total{namespace=\"dab\", app=\"nav-etterlevelse-mcp\", cluster=\"$cluster\"}[1h])) / sum(rate(mcp_requests_total{namespace=\"dab\", app=\"nav-etterlevelse-mcp\", cluster=\"$cluster\"}[1h])) * 100",
             "legendFormat": "Feilrate",
             "refId": "A"
           }
         ],
         "fieldConfig": {
           "defaults": {
-            "color": { "mode": "thresholds" },
+            "color": {
+              "mode": "thresholds"
+            },
             "thresholds": {
               "mode": "absolute",
               "steps": [
-                { "color": "green", "value": null },
-                { "color": "orange", "value": 5 },
-                { "color": "red", "value": 10 }
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "orange",
+                  "value": 5
+                },
+                {
+                  "color": "red",
+                  "value": 10
+                }
               ]
             },
             "unit": "percent",
@@ -97,22 +173,35 @@
         "id": 4,
         "title": "OBO-feil siste 24t",
         "type": "stat",
-        "gridPos": { "x": 18, "y": 0, "w": 6, "h": 4 },
+        "gridPos": {
+          "x": 18,
+          "y": 0,
+          "w": 6,
+          "h": 4
+        },
         "targets": [
           {
-            "expr": "sum(increase(texas_obo_errors_total{namespace=\"dab\", app=\"nav-etterlevelse-mcp\"}[24h]))",
+            "expr": "sum(increase(texas_obo_errors_total{namespace=\"dab\", app=\"nav-etterlevelse-mcp\", cluster=\"$cluster\"}[24h]))",
             "legendFormat": "OBO-feil",
             "refId": "A"
           }
         ],
         "fieldConfig": {
           "defaults": {
-            "color": { "mode": "thresholds" },
+            "color": {
+              "mode": "thresholds"
+            },
             "thresholds": {
               "mode": "absolute",
               "steps": [
-                { "color": "green", "value": null },
-                { "color": "red", "value": 1 }
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "red",
+                  "value": 1
+                }
               ]
             },
             "unit": "short"
@@ -123,17 +212,24 @@
         "id": 5,
         "title": "Kall per tool siste time",
         "type": "timeseries",
-        "gridPos": { "x": 0, "y": 4, "w": 12, "h": 8 },
+        "gridPos": {
+          "x": 0,
+          "y": 4,
+          "w": 12,
+          "h": 8
+        },
         "targets": [
           {
-            "expr": "sum by (tool) (rate(mcp_requests_total{namespace=\"dab\", app=\"nav-etterlevelse-mcp\"}[1h]))",
+            "expr": "sum by (tool) (rate(mcp_requests_total{namespace=\"dab\", app=\"nav-etterlevelse-mcp\", cluster=\"$cluster\"}[1h]))",
             "legendFormat": "{{tool}}",
             "refId": "A"
           }
         ],
         "fieldConfig": {
           "defaults": {
-            "color": { "mode": "palette-classic" },
+            "color": {
+              "mode": "palette-classic"
+            },
             "custom": {
               "drawStyle": "line",
               "fillOpacity": 10
@@ -146,27 +242,34 @@
         "id": 6,
         "title": "Responstid p50/p95/p99 per tool",
         "type": "timeseries",
-        "gridPos": { "x": 12, "y": 4, "w": 12, "h": 8 },
+        "gridPos": {
+          "x": 12,
+          "y": 4,
+          "w": 12,
+          "h": 8
+        },
         "targets": [
           {
-            "expr": "histogram_quantile(0.50, sum by (le, tool) (rate(mcp_request_duration_seconds_bucket{namespace=\"dab\", app=\"nav-etterlevelse-mcp\"}[1h])))",
+            "expr": "histogram_quantile(0.50, sum by (le, tool) (rate(mcp_request_duration_seconds_bucket{namespace=\"dab\", app=\"nav-etterlevelse-mcp\", cluster=\"$cluster\"}[1h])))",
             "legendFormat": "p50 {{tool}}",
             "refId": "A"
           },
           {
-            "expr": "histogram_quantile(0.95, sum by (le, tool) (rate(mcp_request_duration_seconds_bucket{namespace=\"dab\", app=\"nav-etterlevelse-mcp\"}[1h])))",
+            "expr": "histogram_quantile(0.95, sum by (le, tool) (rate(mcp_request_duration_seconds_bucket{namespace=\"dab\", app=\"nav-etterlevelse-mcp\", cluster=\"$cluster\"}[1h])))",
             "legendFormat": "p95 {{tool}}",
             "refId": "B"
           },
           {
-            "expr": "histogram_quantile(0.99, sum by (le, tool) (rate(mcp_request_duration_seconds_bucket{namespace=\"dab\", app=\"nav-etterlevelse-mcp\"}[1h])))",
+            "expr": "histogram_quantile(0.99, sum by (le, tool) (rate(mcp_request_duration_seconds_bucket{namespace=\"dab\", app=\"nav-etterlevelse-mcp\", cluster=\"$cluster\"}[1h])))",
             "legendFormat": "p99 {{tool}}",
             "refId": "C"
           }
         ],
         "fieldConfig": {
           "defaults": {
-            "color": { "mode": "palette-classic" },
+            "color": {
+              "mode": "palette-classic"
+            },
             "custom": {
               "drawStyle": "line",
               "fillOpacity": 5
@@ -180,17 +283,24 @@
         "id": 7,
         "title": "Etterlevelse-skriv per krav og status",
         "type": "bar",
-        "gridPos": { "x": 0, "y": 12, "w": 12, "h": 8 },
+        "gridPos": {
+          "x": 0,
+          "y": 12,
+          "w": 12,
+          "h": 8
+        },
         "targets": [
           {
-            "expr": "sum by (kravnummer, suksesskriterium_status) (increase(etterlevelse_writes_total{namespace=\"dab\", app=\"nav-etterlevelse-mcp\"}[24h]))",
+            "expr": "sum by (kravnummer, suksesskriterium_status) (increase(etterlevelse_writes_total{namespace=\"dab\", app=\"nav-etterlevelse-mcp\", cluster=\"$cluster\"}[24h]))",
             "legendFormat": "K{{kravnummer}} — {{suksesskriterium_status}}",
             "refId": "A"
           }
         ],
         "fieldConfig": {
           "defaults": {
-            "color": { "mode": "palette-classic" },
+            "color": {
+              "mode": "palette-classic"
+            },
             "unit": "short"
           }
         },
@@ -200,17 +310,24 @@
         "id": 8,
         "title": "PVK-operasjoner",
         "type": "bar",
-        "gridPos": { "x": 12, "y": 12, "w": 12, "h": 8 },
+        "gridPos": {
+          "x": 12,
+          "y": 12,
+          "w": 12,
+          "h": 8
+        },
         "targets": [
           {
-            "expr": "sum by (operation, status) (increase(pvk_operations_total{namespace=\"dab\", app=\"nav-etterlevelse-mcp\"}[24h]))",
+            "expr": "sum by (operation, status) (increase(pvk_operations_total{namespace=\"dab\", app=\"nav-etterlevelse-mcp\", cluster=\"$cluster\"}[24h]))",
             "legendFormat": "{{operation}} — {{status}}",
             "refId": "A"
           }
         ],
         "fieldConfig": {
           "defaults": {
-            "color": { "mode": "palette-classic" },
+            "color": {
+              "mode": "palette-classic"
+            },
             "unit": "short"
           }
         },
@@ -220,17 +337,24 @@
         "id": 9,
         "title": "Navet-bruk per fagområde",
         "type": "bar",
-        "gridPos": { "x": 0, "y": 20, "w": 12, "h": 6 },
+        "gridPos": {
+          "x": 0,
+          "y": 20,
+          "w": 12,
+          "h": 6
+        },
         "targets": [
           {
-            "expr": "sum by (fagomrade) (increase(navet_reads_total{namespace=\"dab\", app=\"nav-etterlevelse-mcp\"}[24h]))",
+            "expr": "sum by (fagomrade) (increase(navet_reads_total{namespace=\"dab\", app=\"nav-etterlevelse-mcp\", cluster=\"$cluster\"}[24h]))",
             "legendFormat": "{{fagomrade}}",
             "refId": "A"
           }
         ],
         "fieldConfig": {
           "defaults": {
-            "color": { "mode": "palette-classic" },
+            "color": {
+              "mode": "palette-classic"
+            },
             "unit": "short"
           }
         }
@@ -239,10 +363,15 @@
         "id": 10,
         "title": "Feil per tool og feiltype",
         "type": "table",
-        "gridPos": { "x": 12, "y": 20, "w": 12, "h": 6 },
+        "gridPos": {
+          "x": 12,
+          "y": 20,
+          "w": 12,
+          "h": 6
+        },
         "targets": [
           {
-            "expr": "sum by (tool, error_type) (increase(mcp_errors_total{namespace=\"dab\", app=\"nav-etterlevelse-mcp\"}[24h]))",
+            "expr": "sum by (tool, error_type) (increase(mcp_errors_total{namespace=\"dab\", app=\"nav-etterlevelse-mcp\", cluster=\"$cluster\"}[24h]))",
             "legendFormat": "{{tool}} — {{error_type}}",
             "refId": "A",
             "format": "table",
@@ -251,12 +380,20 @@
         ],
         "fieldConfig": {
           "defaults": {
-            "color": { "mode": "thresholds" },
+            "color": {
+              "mode": "thresholds"
+            },
             "thresholds": {
               "mode": "absolute",
               "steps": [
-                { "color": "green", "value": null },
-                { "color": "red", "value": 1 }
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "red",
+                  "value": 1
+                }
               ]
             }
           }
