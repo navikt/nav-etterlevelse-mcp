@@ -22,16 +22,29 @@ export function instrumentedRegisterTool(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const instrumentedHandler = async (args: any): Promise<any> => {
     const end = mcpRequestDuration.startTimer({ tool: name });
+    let status: 'ok' | 'error' = 'ok';
+    let errorType: string | undefined;
     try {
       const result = await handler(args);
-      mcpRequestsTotal.inc({ tool: name, status: 'ok' });
+      if (
+        result &&
+        typeof result === 'object' &&
+        'isError' in result &&
+        (result as { isError?: unknown }).isError === true
+      ) {
+        status = 'error';
+        errorType = 'ToolError';
+      }
       return result;
     } catch (error) {
-      mcpRequestsTotal.inc({ tool: name, status: 'error' });
-      const errorType = error instanceof Error ? error.name : 'UnknownError';
-      mcpErrorsTotal.inc({ tool: name, error_type: errorType });
+      status = 'error';
+      errorType = error instanceof Error ? error.name : 'UnknownError';
       throw error;
     } finally {
+      mcpRequestsTotal.inc({ tool: name, status });
+      if (status === 'error') {
+        mcpErrorsTotal.inc({ tool: name, error_type: errorType ?? 'UnknownError' });
+      }
       end();
     }
   };
