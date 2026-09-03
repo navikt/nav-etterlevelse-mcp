@@ -3,7 +3,7 @@ import * as z from 'zod/v4';
 import { authStore } from '../../auth/store.js';
 import { config } from '../../config.js';
 import { instrumentedRegisterTool } from '../instrumentedRegisterTool.js';
-import { etterlevelseWritesTotal } from '../../metrics.js';
+import { etterlevelseWritesTotal, etterlevelseDocsCreatedTotal, pvkOperationsTotal } from '../../metrics.js';
 import type { SessionContext } from '../server.js';
 import { isWriteEnabled } from '../../unleash.js';
 
@@ -2114,6 +2114,8 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
           isRecord(result) ? result : { id: scenarioId, ...request },
         );
 
+        pvkOperationsTotal.inc({ operation: scenarioId ? 'update_risikoscenario' : 'create_risikoscenario', status: 'ok' });
+
         return toolResult({
           preview: formatRisikoscenarioSection(scenario),
           action: scenarioId ? 'updated' : 'created',
@@ -2283,6 +2285,8 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
           result = await client.createTiltak(risikoscenarioId, request);
         }
         const tiltak = normalizeTiltak(isRecord(result) ? result : { id: tiltakId, ...request });
+
+        pvkOperationsTotal.inc({ operation: tiltakId ? 'update_tiltak' : 'create_tiltak', status: 'ok' });
 
         return toolResult({
           preview: formatTiltakSection(tiltak),
@@ -2505,6 +2509,8 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
         const saved = isRecord(result) ? result : {};
         const id = asString(saved.id) ?? '';
         const etterlevelseNummer = asString(saved.etterlevelseNummer) ?? '';
+
+        etterlevelseDocsCreatedTotal.inc();
 
         return toolResult({
           success: true,

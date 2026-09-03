@@ -6,6 +6,7 @@ import { EtterlevelseClient } from '../api/etterlevelseClient.js';
 import { NavetClient } from '../api/navetClient.js';
 import { config, mcpServerInfo } from '../config.js';
 import { type McpTokenData } from '../auth/store.js';
+import { texasOboErrorsTotal, upstreamErrorsTotal, mcpActiveSessions } from '../metrics.js';
 import { registerBehandlingskatalogTools } from './tools/behandlingskatalog.js';
 import { registerEtterlevelseTools } from './tools/etterlevelse.js';
 import { registerNavetTools } from './tools/navet.js';
@@ -30,12 +31,14 @@ async function exchangeViaTexas(userToken: string, targetScope: string): Promise
     });
     if (!response.ok) {
       console.log(`Texas OBO exchange failed for ${targetScope}:`, response.status, await response.text());
+      texasOboErrorsTotal.inc();
       return null;
     }
     const data = await response.json() as { access_token?: string };
     return data.access_token ?? null;
   } catch (error) {
     console.log(`Texas OBO exchange error for ${targetScope}:`, error);
+    texasOboErrorsTotal.inc();
     return null;
   }
 }
@@ -109,6 +112,9 @@ export async function handleMcpHttpRequest(
   if (!navetClient) {
     console.log('Navet-token ikke tilgjengelig — list_navet_pages og get_navet_page er ikke aktive');
   }
+
+  mcpActiveSessions.inc();
+
   const server = createMcpServer(ctx, behandlingskatalogClient, navetClient);
   const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
 
@@ -116,6 +122,7 @@ export async function handleMcpHttpRequest(
   const cleanup = async () => {
     if (cleanedUp) return;
     cleanedUp = true;
+    mcpActiveSessions.dec();
     await Promise.allSettled([transport.close(), server.close()]);
   };
 
@@ -126,6 +133,7 @@ export async function handleMcpHttpRequest(
     await transport.handleRequest(req, res, req.body);
   } catch (error) {
     console.log('Error while handling MCP request', error);
+    upstreamErrorsTotal.inc({ backend: 'mcp-server' });
     await cleanup();
     if (!res.headersSent) {
       res.status(500).json({

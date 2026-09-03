@@ -2,6 +2,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import * as z from 'zod/v4';
 import { NavetClient } from '../../api/navetClient.js';
 import { instrumentedRegisterTool } from '../instrumentedRegisterTool.js';
+import { navetReadsTotal } from '../../metrics.js';
 
 const FAGOMRAADER = {
   'arbeidsrettet-brukeroppfolging': 'fag-og-ytelser-arbeid-arbeidsrettet-brukeroppfolging',
@@ -56,6 +57,7 @@ export function registerNavetTools(server: McpServer, navetClient: NavetClient):
     },
     async ({ fagomrade, filter }: { fagomrade: Fagomrade; filter?: string }) => {
       try {
+        navetReadsTotal.inc({ fagomrade, operation: 'list_navet_pages' });
         const sitePath = FAGOMRAADER[fagomrade];
         const siteId = await navetClient.getSiteId(sitePath);
         const pages = await navetClient.listPages(siteId, filter);
@@ -93,6 +95,7 @@ export function registerNavetTools(server: McpServer, navetClient: NavetClient):
     },
     async ({ fagomrade, pageId }: { fagomrade: Fagomrade; pageId: string }) => {
       try {
+        navetReadsTotal.inc({ fagomrade, operation: 'get_navet_page' });
         const sitePath = FAGOMRAADER[fagomrade];
         const siteId = await navetClient.getSiteId(sitePath);
         const { title, content, webUrl } = await navetClient.getPageContent(siteId, pageId);
