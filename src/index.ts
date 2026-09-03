@@ -24,9 +24,13 @@ app.get('/health', (_req, res) => {
   res.json({ status: 'ok' });
 });
 
-app.get('/metrics', async (_req, res) => {
-  res.set('Content-Type', registry.contentType);
-  res.send(await registry.metrics());
+app.get('/metrics', (_req, res, next) => {
+  Promise.resolve(registry.metrics())
+    .then((m) => {
+      res.set('Content-Type', registry.contentType);
+      res.send(m);
+    })
+    .catch(next);
 });
 
 const mcpHandler = async (req: Request, res: Response): Promise<void> => {
