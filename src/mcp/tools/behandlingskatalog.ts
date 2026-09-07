@@ -1,6 +1,8 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import * as z from 'zod/v4';
 import { BehandlingskatalogClient } from '../../api/behandlingskatalogClient.js';
+import { instrumentedRegisterTool } from '../instrumentedRegisterTool.js';
+import { behandlingskatalogReadsTotal } from '../../metrics.js';
 
 function toolResult(data: unknown) {
   return {
@@ -37,7 +39,7 @@ export function registerBehandlingskatalogTools(
   server: McpServer,
   client: BehandlingskatalogClient,
 ): void {
-  server.registerTool(
+  instrumentedRegisterTool(server, 
     'search_behandlinger',
     {
       description: 'Søk etter behandlinger i behandlingskatalogen.',
@@ -48,6 +50,7 @@ export function registerBehandlingskatalogTools(
     },
     async ({ search }) => {
       try {
+        behandlingskatalogReadsTotal.inc({ operation: 'search_behandlinger' });
         return toolResult(await client.searchBehandlinger(search));
       } catch (error) {
         return toolError(error);
@@ -55,7 +58,7 @@ export function registerBehandlingskatalogTools(
     },
   );
 
-  server.registerTool(
+  instrumentedRegisterTool(server, 
     'get_behandling',
     {
       description: 'Hent en behandling med UUID eller B-nummer.',
@@ -66,6 +69,7 @@ export function registerBehandlingskatalogTools(
     },
     async ({ id }) => {
       try {
+        behandlingskatalogReadsTotal.inc({ operation: 'get_behandling' });
         return toolResult(await client.getBehandling(id));
       } catch (error) {
         return toolError(error);
@@ -73,7 +77,7 @@ export function registerBehandlingskatalogTools(
     },
   );
 
-  server.registerTool(
+  instrumentedRegisterTool(server, 
     'get_processor',
     {
       description: 'Hent en databehandler på UUID.',
@@ -84,6 +88,7 @@ export function registerBehandlingskatalogTools(
     },
     async ({ id }) => {
       try {
+        behandlingskatalogReadsTotal.inc({ operation: 'get_processor' });
         return toolResult(await client.getProcessor(id));
       } catch (error) {
         return toolError(error);

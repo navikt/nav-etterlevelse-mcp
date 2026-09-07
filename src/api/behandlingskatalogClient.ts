@@ -1,4 +1,5 @@
 import { config } from '../config.js';
+import { upstreamErrorsTotal } from '../metrics.js';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
@@ -107,6 +108,7 @@ export class BehandlingskatalogClient {
     }
 
     if (!response.ok) {
+      upstreamErrorsTotal.inc({ backend: 'behandlingskatalog' });
       throw new Error(`Behandlingskatalog API svarte ${response.status}: ${bodyText}`);
     }
 

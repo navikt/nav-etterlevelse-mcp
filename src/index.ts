@@ -3,6 +3,7 @@ import { requireMcpBearerToken, type AuthenticatedLocals } from './auth/middlewa
 import { registerOAuthRoutes } from './auth/oauth.js';
 import { config } from './config.js';
 import { handleMcpHttpRequest } from './mcp/server.js';
+import { registry } from './metrics.js';
 import { initUnleash } from './unleash.js';
 
 void initUnleash();
@@ -21,6 +22,15 @@ registerOAuthRoutes(app);
 
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok' });
+});
+
+app.get('/metrics', (_req, res, next) => {
+  Promise.resolve(registry.metrics())
+    .then((m) => {
+      res.set('Content-Type', registry.contentType);
+      res.send(m);
+    })
+    .catch(next);
 });
 
 const mcpHandler = async (req: Request, res: Response): Promise<void> => {

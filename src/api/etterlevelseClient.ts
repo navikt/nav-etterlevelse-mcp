@@ -1,4 +1,5 @@
 import { config } from '../config.js';
+import { upstreamErrorsTotal } from '../metrics.js';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
@@ -136,6 +137,7 @@ export class EtterlevelseClient {
     }
 
     if (!response.ok) {
+      upstreamErrorsTotal.inc({ backend: 'etterlevelse' });
       throw new Error(`Etterlevelse API svarte ${response.status}: ${bodyText}`);
     }
 
@@ -155,6 +157,7 @@ export class EtterlevelseClient {
     });
     const bodyText = await response.text();
     if (!response.ok) {
+      upstreamErrorsTotal.inc({ backend: 'etterlevelse' });
       throw new Error(`Etterlevelse API svarte ${response.status}: ${bodyText}`);
     }
     return bodyText ? (JSON.parse(bodyText) as unknown) : null;
@@ -173,6 +176,7 @@ export class EtterlevelseClient {
     });
     const bodyText = await response.text();
     if (!response.ok) {
+      upstreamErrorsTotal.inc({ backend: 'etterlevelse' });
       throw new Error(`Etterlevelse API svarte ${response.status}: ${bodyText}`);
     }
     return bodyText ? (JSON.parse(bodyText) as unknown) : null;
@@ -206,6 +210,7 @@ export class EtterlevelseClient {
 
     const bodyText = await response.text();
     if (!response.ok) {
+      upstreamErrorsTotal.inc({ backend: 'etterlevelse' });
       throw new Error(`Etterlevelse GraphQL svarte ${response.status}: ${bodyText}`);
     }
 
@@ -565,6 +570,7 @@ export class EtterlevelseClient {
 
     const bodyText = await response.text();
     if (!response.ok) {
+      upstreamErrorsTotal.inc({ backend: 'etterlevelse' });
       throw new Error(`Etterlevelse API svarte ${response.status}: ${bodyText}`);
     }
 

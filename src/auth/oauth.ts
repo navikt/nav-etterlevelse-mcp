@@ -12,6 +12,7 @@ import {
   mcpRefreshTokenTtlSeconds,
   mcpScope,
 } from '../config.js';
+import { authRefreshesTotal } from '../metrics.js';
 import { type AuthCodeRecord, authStore, type McpTokenData } from './store.js';
 
 interface AzureTokenResponse {
@@ -276,6 +277,8 @@ export async function ensureFreshAzureTokens(tokenData: McpTokenData): Promise<v
   tokenData.userToken = etterlevelseTokenResponse.access_token;
   tokenData.refreshToken = latestRefreshToken;
   tokenData.azureExpiresAt = calculateAzureExpiry(etterlevelseTokenResponse.expires_in);
+
+  authRefreshesTotal.inc();
 
   // userToken er fornyet — downstream tokens hentes via Texas OBO ved behov (ingen caching her)
 }
