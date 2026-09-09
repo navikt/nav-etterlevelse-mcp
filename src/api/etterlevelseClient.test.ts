@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { EtterlevelseClient } from './etterlevelseClient.js';
 
 function jsonResponse(body: unknown, status = 200): Response {
