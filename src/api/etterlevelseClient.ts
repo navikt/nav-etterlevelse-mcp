@@ -99,6 +99,45 @@ function isNotFoundError(error: unknown): boolean {
   return error instanceof Error && error.message.includes('Etterlevelse API svarte 404');
 }
 
+interface SuksesskriterieBegrunnelseBody {
+  suksesskriterieId: number;
+  begrunnelse: string;
+  suksesskriterieStatus: string;
+  veiledning?: boolean;
+  veiledningsTekst?: string;
+  veiledningsTekst2?: string;
+}
+
+// Mapper en eksisterende suksesskriterie-begrunnelse fra GET-responsen til et eksplisitt
+// request-shape, i stedet for å videresende hele det rå objektet (som gjør oppdateringen
+// skjør mot ekstra/read-only felter og endringer i responsformat). Dropper elementer uten
+// gyldig id/status — de er for korrupte til å sendes videre.
+function toSuksesskriterieBegrunnelseBody(
+  raw: Record<string, unknown>,
+): SuksesskriterieBegrunnelseBody | null {
+  const suksesskriterieId = Number(raw.suksesskriterieId);
+  const suksesskriterieStatus = raw.suksesskriterieStatus;
+  if (!Number.isFinite(suksesskriterieId) || typeof suksesskriterieStatus !== 'string' || !suksesskriterieStatus) {
+    return null;
+  }
+
+  const body: SuksesskriterieBegrunnelseBody = {
+    suksesskriterieId,
+    begrunnelse: typeof raw.begrunnelse === 'string' ? raw.begrunnelse : '',
+    suksesskriterieStatus,
+  };
+  if (typeof raw.veiledning === 'boolean') {
+    body.veiledning = raw.veiledning;
+  }
+  if (typeof raw.veiledningsTekst === 'string') {
+    body.veiledningsTekst = raw.veiledningsTekst;
+  }
+  if (typeof raw.veiledningsTekst2 === 'string') {
+    body.veiledningsTekst2 = raw.veiledningsTekst2;
+  }
+  return body;
+}
+
 export interface BehandlingensLivsloepFil {
   navn: string;
   type: 'image/png' | 'image/jpeg' | 'application/pdf';
@@ -426,6 +465,20 @@ export class EtterlevelseClient {
     // UNDER_ARBEID er kun gyldig for suksesskriterieStatus.
     const etterlevelseStatus = input.status === 'UNDER_ARBEID' ? 'UNDER_REDIGERING' : input.status;
 
+    // Backend erstatter hele suksesskriterieBegrunnelser-listen ved oppdatering
+    // (EtterlevelseRequest.mergeInto gjør ingen fletting av lister). Flett derfor
+    // inn eksisterende SK-er som ikke er del av dette kallet, slik at de ikke slettes.
+    const existingSKBs =
+      isRecord(existing) && Array.isArray(existing.suksesskriterieBegrunnelser)
+        ? (existing.suksesskriterieBegrunnelser as Record<string, unknown>[])
+        : [];
+    const updatedIds = new Set(input.suksesskriterieBegrunnelser.map((skb) => skb.suksesskriterieId));
+    const untouchedExistingSKBs = existingSKBs
+      .filter((skb) => !updatedIds.has(Number(skb.suksesskriterieId)))
+      .map(toSuksesskriterieBegrunnelseBody)
+      .filter((skb): skb is SuksesskriterieBegrunnelseBody => skb !== null);
+    const suksesskriterieBegrunnelser = [...untouchedExistingSKBs, ...input.suksesskriterieBegrunnelser];
+
     const body: Record<string, unknown> = {
       etterlevelseDokumentasjonId: input.etterlevelseDokumentasjonId,
       kravNummer: input.kravNummer,
@@ -433,7 +486,7 @@ export class EtterlevelseClient {
       etterleves: input.status !== 'IKKE_RELEVANT',
       status: etterlevelseStatus,
       statusBegrunnelse: input.statusBegrunnelse ?? '',
-      suksesskriterieBegrunnelser: input.suksesskriterieBegrunnelser,
+      suksesskriterieBegrunnelser,
     };
 
     if (isRecord(existing) && typeof existing.id === 'string') {
