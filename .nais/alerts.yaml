@@ -1,5 +1,5 @@
-apiVersion: nais.io/v1
-kind: Alert
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
 metadata:
   name: nav-etterlevelse-mcp-alerts
   namespace: dab
@@ -7,30 +7,37 @@ metadata:
     team: dab
     app: nav-etterlevelse-mcp
 spec:
-  receivers:
-    slack:
-      channel: "{{ALERT_SLACK_CHANNEL}}"
-      prependText: ""
-  alerts:
-    - alert: EtterlevelseMcpHighErrorRate
-      expr: |
-        rate(mcp_errors_total{namespace="dab", app="nav-etterlevelse-mcp"}[5m])
-        / rate(mcp_requests_total{namespace="dab", app="nav-etterlevelse-mcp"}[5m]) > 0.10
-      for: 5m
-      severity: warning
-      description: "Feilrate er over 10% siste 5 min. Sjekk logger for feiltype."
-      action: "Sjekk Grafana Loki: {app=\"nav-etterlevelse-mcp\", namespace=\"dab\"}"
+  groups:
+    - name: nav-etterlevelse-mcp
+      rules:
+        - alert: EtterlevelseMcpHighErrorRate
+          expr: |
+            rate(mcp_errors_total{namespace="dab", app="nav-etterlevelse-mcp"}[5m])
+            / rate(mcp_requests_total{namespace="dab", app="nav-etterlevelse-mcp"}[5m]) > 0.10
+          for: 5m
+          labels:
+            severity: warning
+            team: dab
+          annotations:
+            summary: "Høy feilrate i nav-etterlevelse-mcp"
+            description: "Feilrate er over 10% siste 5 min. Sjekk logger for feiltype."
 
-    - alert: EtterlevelseMcpTexasOboErrors
-      expr: rate(texas_obo_errors_total{namespace="dab", app="nav-etterlevelse-mcp"}[5m]) > 0
-      for: 2m
-      severity: critical
-      description: "OBO-veksling feiler — brukere kan ikke autentisere mot etterlevelse. Sjekk Texas-sidecar og Azure AD."
-      action: "Sjekk NAIS Console for Texas-sidecar status og logger"
+        - alert: EtterlevelseMcpTexasOboErrors
+          expr: rate(texas_obo_errors_total{namespace="dab", app="nav-etterlevelse-mcp"}[5m]) > 0
+          for: 2m
+          labels:
+            severity: critical
+            team: dab
+          annotations:
+            summary: "Texas OBO-feil i nav-etterlevelse-mcp"
+            description: "OBO-veksling feiler — brukere kan ikke autentisere mot etterlevelse. Sjekk Texas-sidecar og Azure AD."
 
-    - alert: EtterlevelseMcpNoTraffic
-      expr: rate(mcp_requests_total{namespace="dab", app="nav-etterlevelse-mcp"}[24h]) == 0
-      for: 24h
-      severity: info
-      description: "Enten er løsningen ikke i bruk, eller noe er galt med tilkoblingen. Verifiser at MCP-serveren svarer."
-      action: "Sjekk https://nav-etterlevelse-mcp.intern.dev.nav.no/health"
+        - alert: EtterlevelseMcpNoTraffic
+          expr: rate(mcp_requests_total{namespace="dab", app="nav-etterlevelse-mcp"}[24h]) == 0
+          for: 24h
+          labels:
+            severity: info
+            team: dab
+          annotations:
+            summary: "Ingen trafikk til nav-etterlevelse-mcp siste 24 timer"
+            description: "Enten er løsningen ikke i bruk, eller noe er galt med tilkoblingen. Verifiser at MCP-serveren svarer."
