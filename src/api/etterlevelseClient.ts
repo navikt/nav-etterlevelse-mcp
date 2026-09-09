@@ -426,6 +426,19 @@ export class EtterlevelseClient {
     // UNDER_ARBEID er kun gyldig for suksesskriterieStatus.
     const etterlevelseStatus = input.status === 'UNDER_ARBEID' ? 'UNDER_REDIGERING' : input.status;
 
+    // Backend erstatter hele suksesskriterieBegrunnelser-listen ved oppdatering
+    // (EtterlevelseRequest.mergeInto gjør ingen fletting av lister). Flett derfor
+    // inn eksisterende SK-er som ikke er del av dette kallet, slik at de ikke slettes.
+    const existingSKBs =
+      isRecord(existing) && Array.isArray(existing.suksesskriterieBegrunnelser)
+        ? (existing.suksesskriterieBegrunnelser as Record<string, unknown>[])
+        : [];
+    const updatedIds = new Set(input.suksesskriterieBegrunnelser.map((skb) => skb.suksesskriterieId));
+    const untouchedExistingSKBs = existingSKBs.filter(
+      (skb) => !updatedIds.has(Number(skb.suksesskriterieId)),
+    );
+    const suksesskriterieBegrunnelser = [...untouchedExistingSKBs, ...input.suksesskriterieBegrunnelser];
+
     const body: Record<string, unknown> = {
       etterlevelseDokumentasjonId: input.etterlevelseDokumentasjonId,
       kravNummer: input.kravNummer,
@@ -433,7 +446,7 @@ export class EtterlevelseClient {
       etterleves: input.status !== 'IKKE_RELEVANT',
       status: etterlevelseStatus,
       statusBegrunnelse: input.statusBegrunnelse ?? '',
-      suksesskriterieBegrunnelser: input.suksesskriterieBegrunnelser,
+      suksesskriterieBegrunnelser,
     };
 
     if (isRecord(existing) && typeof existing.id === 'string') {
