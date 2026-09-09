@@ -32,7 +32,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: 22
+          node-version: 22.12.0
           cache: pnpm
 
       - name: Install dependencies
@@ -40,6 +40,9 @@ jobs:
 
       - name: Build
         run: pnpm run build
+
+      - name: Test
+        run: pnpm test
 
       - name: Build and push image
         uses: nais/docker-build-push@31c3a7321909bcb20799fdf46153fec721fd9512 # v0
