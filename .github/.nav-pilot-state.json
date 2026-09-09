@@ -1,81 +1,73 @@
 {
   "collection": "platform",
-  "version": "2026.08.10-101926-2d0911b",
+  "version": "2026.09.07-074612-5c0c44d",
   "scope": "repo",
-  "source_sha": "2d0911b",
+  "source_sha": "5c0c44dcbb0b4f8eeaad61e8369d256a25da6ea8",
   "installed_at": "2026-06-12T12:31:30Z",
   "files": [
     {
-      "path": ".github/agents/nais.agent.md",
-      "hash": "c5a977cd971007ef"
-    },
-    {
-      "path": ".github/agents/observability.agent.md",
-      "hash": "790f7e03f52e44d8"
+      "path": ".github/agents/nav-pilot.agent.md",
+      "hash": "eed57b0a1dd623bf"
     },
     {
       "path": ".github/agents/security-champion.agent.md",
-      "hash": "5ccba48b66938fd0"
-    },
-    {
-      "path": ".github/agents/nav-pilot.agent.md",
-      "hash": "09c7351bf3ceb03b"
-    },
-    {
-      "path": ".github/skills/observability-setup/",
-      "hash": "78181a920d929a23"
-    },
-    {
-      "path": ".github/skills/security-review/",
-      "hash": "c74a83a4e61fbf58"
-    },
-    {
-      "path": ".github/skills/threat-model/",
-      "hash": "305fe669dec42981"
-    },
-    {
-      "path": ".github/skills/workstation-security/",
-      "hash": "75749c782af25813"
-    },
-    {
-      "path": ".github/skills/nav-plan/",
-      "hash": "0a160744cf2b4e82"
-    },
-    {
-      "path": ".github/skills/nav-deep-interview/",
-      "hash": "eeb3399ecd4e352c"
-    },
-    {
-      "path": ".github/skills/nav-architecture-review/",
-      "hash": "4618dec566442509"
-    },
-    {
-      "path": ".github/skills/nav-troubleshoot/",
-      "hash": "e9900d58d91ee0ee"
-    },
-    {
-      "path": ".github/instructions/golang.instructions.md",
-      "hash": "8be854c7a6750941"
-    },
-    {
-      "path": ".github/instructions/security-owasp.instructions.md",
-      "hash": "3388700634dd315d"
-    },
-    {
-      "path": ".github/instructions/github-actions.instructions.md",
-      "hash": "bbef6f3e56b8b3b3"
+      "hash": "a209e3ce5d93746d"
     },
     {
       "path": ".github/instructions/docker.instructions.md",
       "hash": "32db7a2f8aaab2ac"
     },
     {
+      "path": ".github/instructions/github-actions.instructions.md",
+      "hash": "bbef6f3e56b8b3b3"
+    },
+    {
+      "path": ".github/instructions/golang.instructions.md",
+      "hash": "b7bdff62f6964099"
+    },
+    {
+      "path": ".github/instructions/security-owasp.instructions.md",
+      "hash": "3388700634dd315d"
+    },
+    {
+      "path": ".github/prompts/golang-service.prompt.md",
+      "hash": "6b0b8487f8cc481e"
+    },
+    {
       "path": ".github/prompts/nais-manifest.prompt.md",
       "hash": "8576571223ffef8a"
     },
     {
-      "path": ".github/prompts/golang-service.prompt.md",
-      "hash": "42a507250b011dbd"
+      "path": ".github/skills/nav-architecture-review/",
+      "hash": "4618dec566442509"
+    },
+    {
+      "path": ".github/skills/nav-deep-interview/",
+      "hash": "eeb3399ecd4e352c"
+    },
+    {
+      "path": ".github/skills/nav-plan/",
+      "hash": "db7618d269cd2f07"
+    },
+    {
+      "path": ".github/skills/nav-troubleshoot/",
+      "hash": "e9900d58d91ee0ee"
+    },
+    {
+      "path": ".github/skills/observability-setup/",
+      "hash": "b16ee0c748b966bf"
+    },
+    {
+      "path": ".github/skills/security-review/",
+      "hash": "3c05f1012664e5c8"
+    },
+    {
+      "path": ".github/skills/threat-model/",
+      "hash": "8fd0fa04afd9b093"
+    },
+    {
+      "path": ".github/skills/workstation-security/",
+      "hash": "93d7292e18b1b82d"
     }
   ]
 }
