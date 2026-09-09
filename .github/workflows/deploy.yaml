@@ -41,6 +41,9 @@ jobs:
       - name: Build
         run: pnpm run build
 
+      - name: Test
+        run: pnpm test
+
       - name: Build and push image
         uses: nais/docker-build-push@31c3a7321909bcb20799fdf46153fec721fd9512 # v0
         id: docker-build-push
