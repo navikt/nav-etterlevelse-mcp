@@ -12,8 +12,8 @@ spec:
       rules:
         - alert: EtterlevelseMcpHighErrorRate
           expr: |
-            rate(mcp_errors_total{namespace="dab", app="nav-etterlevelse-mcp"}[5m])
-            / rate(mcp_requests_total{namespace="dab", app="nav-etterlevelse-mcp"}[5m]) > 0.10
+            sum(rate(mcp_errors_total{namespace="dab", app="nav-etterlevelse-mcp"}[5m]))
+            / sum(rate(mcp_requests_total{namespace="dab", app="nav-etterlevelse-mcp"}[5m])) > 0.10
           for: 5m
           labels:
             severity: warning
@@ -33,7 +33,7 @@ spec:
             description: "OBO-veksling feiler — brukere kan ikke autentisere mot etterlevelse. Sjekk Texas-sidecar og Azure AD."
 
         - alert: EtterlevelseMcpNoTraffic
-          expr: rate(mcp_requests_total{namespace="dab", app="nav-etterlevelse-mcp"}[24h]) == 0
+          expr: sum(rate(mcp_requests_total{namespace="dab", app="nav-etterlevelse-mcp"}[24h])) == 0
           for: 24h
           labels:
             severity: info
