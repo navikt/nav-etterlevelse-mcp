@@ -1,6 +1,5 @@
 {
   "title": "nav-etterlevelse-mcp",
-  "uid": "nav-etterlevelse-mcp",
   "tags": [
     "dab",
     "nav-etterlevelse-mcp"
@@ -16,26 +15,18 @@
   "templating": {
     "list": [
       {
-        "name": "cluster",
-        "type": "custom",
-        "label": "Cluster",
-        "description": "Velg Kubernetes-cluster",
-        "options": [
-          {
-            "text": "dev-gcp",
-            "value": "dev-gcp"
-          },
-          {
-            "text": "prod-gcp",
-            "value": "prod-gcp"
-          }
-        ],
+        "name": "datasource",
+        "type": "datasource",
+        "label": "Datakilde",
+        "description": "Velg Prometheus-datakilden for miljøet (dev-gcp eller prod-gcp)",
+        "query": "prometheus",
         "current": {
           "selected": true,
-          "text": "dev-gcp",
-          "value": "dev-gcp"
+          "text": [],
+          "value": []
         },
-        "query": "dev-gcp,prod-gcp",
+        "refresh": 1,
+        "regex": "",
         "includeAll": false,
         "multi": false
       },
@@ -74,9 +65,13 @@
       },
       "targets": [
         {
-          "expr": "mcp_active_sessions{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\", cluster=\"$cluster\"}",
+          "expr": "mcp_active_sessions{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\"}",
           "legendFormat": "Aktive sesjoner",
-          "refId": "A"
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
         }
       ],
       "fieldConfig": {
@@ -103,6 +98,10 @@
           },
           "unit": "short"
         }
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
       }
     },
     {
@@ -117,9 +116,13 @@
       },
       "targets": [
         {
-          "expr": "sum(increase(auth_refreshes_total{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\", cluster=\"$cluster\"}[24h]))",
+          "expr": "sum(increase(auth_refreshes_total{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\"}[24h]))",
           "legendFormat": "Refresh",
-          "refId": "A"
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
         }
       ],
       "fieldConfig": {
@@ -142,6 +145,10 @@
           },
           "unit": "short"
         }
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
       }
     },
     {
@@ -156,9 +163,13 @@
       },
       "targets": [
         {
-          "expr": "sum(rate(mcp_errors_total{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\", cluster=\"$cluster\"}[1h])) / sum(rate(mcp_requests_total{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\", cluster=\"$cluster\"}[1h])) * 100",
+          "expr": "sum(rate(mcp_errors_total{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\"}[1h])) / sum(rate(mcp_requests_total{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\"}[1h])) * 100",
           "legendFormat": "Feilrate",
-          "refId": "A"
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
         }
       ],
       "fieldConfig": {
@@ -186,6 +197,10 @@
           "unit": "percent",
           "decimals": 1
         }
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
       }
     },
     {
@@ -200,9 +215,13 @@
       },
       "targets": [
         {
-          "expr": "sum(increase(texas_obo_errors_total{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\", cluster=\"$cluster\"}[24h]))",
+          "expr": "sum(increase(texas_obo_errors_total{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\"}[24h]))",
           "legendFormat": "OBO-feil",
-          "refId": "A"
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
         }
       ],
       "fieldConfig": {
@@ -225,6 +244,10 @@
           },
           "unit": "short"
         }
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
       }
     },
     {
@@ -239,9 +262,13 @@
       },
       "targets": [
         {
-          "expr": "sum by (tool) (rate(mcp_requests_total{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\", cluster=\"$cluster\"}[1h]))",
+          "expr": "sum by (tool) (rate(mcp_requests_total{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\"}[1h]))",
           "legendFormat": "{{tool}}",
-          "refId": "A"
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
         }
       ],
       "fieldConfig": {
@@ -255,6 +282,10 @@
           },
           "unit": "ops/s"
         }
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
       }
     },
     {
@@ -269,19 +300,31 @@
       },
       "targets": [
         {
-          "expr": "histogram_quantile(0.50, sum by (le, tool) (rate(mcp_request_duration_seconds_bucket{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\", cluster=\"$cluster\"}[1h])))",
+          "expr": "histogram_quantile(0.50, sum by (le, tool) (rate(mcp_request_duration_seconds_bucket{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\"}[1h])))",
           "legendFormat": "p50 {{tool}}",
-          "refId": "A"
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
         },
         {
-          "expr": "histogram_quantile(0.95, sum by (le, tool) (rate(mcp_request_duration_seconds_bucket{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\", cluster=\"$cluster\"}[1h])))",
+          "expr": "histogram_quantile(0.95, sum by (le, tool) (rate(mcp_request_duration_seconds_bucket{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\"}[1h])))",
           "legendFormat": "p95 {{tool}}",
-          "refId": "B"
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
         },
         {
-          "expr": "histogram_quantile(0.99, sum by (le, tool) (rate(mcp_request_duration_seconds_bucket{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\", cluster=\"$cluster\"}[1h])))",
+          "expr": "histogram_quantile(0.99, sum by (le, tool) (rate(mcp_request_duration_seconds_bucket{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\"}[1h])))",
           "legendFormat": "p99 {{tool}}",
-          "refId": "C"
+          "refId": "C",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
         }
       ],
       "fieldConfig": {
@@ -296,6 +339,10 @@
           "unit": "s",
           "decimals": 2
         }
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
       }
     },
     {
@@ -310,9 +357,13 @@
       },
       "targets": [
         {
-          "expr": "sum by (kravnummer, suksesskriterium_status) (increase(etterlevelse_writes_total{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\", cluster=\"$cluster\"}[24h]))",
+          "expr": "sum by (kravnummer, suksesskriterium_status) (increase(etterlevelse_writes_total{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\"}[24h]))",
           "legendFormat": "K{{kravnummer}} — {{suksesskriterium_status}}",
-          "refId": "A"
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
         }
       ],
       "fieldConfig": {
@@ -323,7 +374,11 @@
           "unit": "short"
         }
       },
-      "description": "Antall skriveoperasjoner per kravnummer og SK-status siste 24 timer"
+      "description": "Antall skriveoperasjoner per kravnummer og SK-status siste 24 timer",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      }
     },
     {
       "id": 8,
@@ -337,9 +392,13 @@
       },
       "targets": [
         {
-          "expr": "sum by (operation, status) (increase(pvk_operations_total{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\", cluster=\"$cluster\"}[24h]))",
+          "expr": "sum by (operation, status) (increase(pvk_operations_total{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\"}[24h]))",
           "legendFormat": "{{operation}} — {{status}}",
-          "refId": "A"
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
         }
       ],
       "fieldConfig": {
@@ -350,7 +409,11 @@
           "unit": "short"
         }
       },
-      "description": "Risikoscenarioer og tiltak opprettet/oppdatert siste 24 timer"
+      "description": "Risikoscenarioer og tiltak opprettet/oppdatert siste 24 timer",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      }
     },
     {
       "id": 9,
@@ -364,9 +427,13 @@
       },
       "targets": [
         {
-          "expr": "sum by (fagomrade) (increase(navet_reads_total{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\", cluster=\"$cluster\"}[24h]))",
+          "expr": "sum by (fagomrade) (increase(navet_reads_total{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\"}[24h]))",
           "legendFormat": "{{fagomrade}}",
-          "refId": "A"
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
         }
       ],
       "fieldConfig": {
@@ -376,6 +443,10 @@
           },
           "unit": "short"
         }
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
       }
     },
     {
@@ -390,11 +461,15 @@
       },
       "targets": [
         {
-          "expr": "sum by (tool, error_type) (increase(mcp_errors_total{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\", cluster=\"$cluster\"}[24h]))",
+          "expr": "sum by (tool, error_type) (increase(mcp_errors_total{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\"}[24h]))",
           "legendFormat": "{{tool}} — {{error_type}}",
           "refId": "A",
           "format": "table",
-          "instant": true
+          "instant": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
         }
       ],
       "fieldConfig": {
@@ -416,6 +491,10 @@
             ]
           }
         }
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
       }
     },
     {
@@ -431,9 +510,13 @@
       "description": "Forholdstall mellom antall skrevne suksesskriterier og antall enkeltvis rapporterte sk_reviewed(godkjent)-hendelser. Over 1.2 samsvarer med alarmen EtterlevelseMcpSkGodkjentUtenEnkeltvisGjennomgang og kan indikere batch-godkjenning i strid med prosesskravet om ett SK om gangen.",
       "targets": [
         {
-          "expr": "sum(increase(etterlevelse_writes_total{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\", cluster=\"$cluster\"}[24h]))\n/ sum(increase(review_workflow_events_total{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\", cluster=\"$cluster\", event=\"sk_reviewed\", decision=\"godkjent\"}[24h]))",
+          "expr": "sum(increase(etterlevelse_writes_total{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\"}[24h]))\n/ sum(increase(review_workflow_events_total{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\", event=\"sk_reviewed\", decision=\"godkjent\"}[24h]))",
           "legendFormat": "skrevet / godkjent",
-          "refId": "A"
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
         }
       ],
       "fieldConfig": {
@@ -458,6 +541,10 @@
             ]
           }
         }
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
       }
     },
     {
@@ -473,14 +560,22 @@
       "description": "Selvrapportert telemetri fra etterlevelse-/PVK-skillen: rapport skrevet/godkjent, SK-beslutninger (godkjent/hoppet_over/redigert) og opplastede krav siste 24 timer.",
       "targets": [
         {
-          "expr": "sum by (event) (increase(review_workflow_events_total{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\", cluster=\"$cluster\", decision=\"none\"}[24h]))",
+          "expr": "sum by (event) (increase(review_workflow_events_total{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\", decision=\"none\"}[24h]))",
           "legendFormat": "{{event}}",
-          "refId": "A"
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
         },
         {
-          "expr": "sum by (decision) (increase(review_workflow_events_total{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\", cluster=\"$cluster\", event=\"sk_reviewed\", decision!=\"none\"}[24h]))",
+          "expr": "sum by (decision) (increase(review_workflow_events_total{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\", event=\"sk_reviewed\", decision!=\"none\"}[24h]))",
           "legendFormat": "sk_reviewed — {{decision}}",
-          "refId": "B"
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
         }
       ],
       "fieldConfig": {
@@ -490,6 +585,10 @@
           },
           "unit": "short"
         }
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
       }
     },
     {
@@ -505,14 +604,22 @@
       "description": "Antall suksesskriterier sendt per write_etterlevelse-kall — proxy for dokumentasjonsmengde per gang.",
       "targets": [
         {
-          "expr": "histogram_quantile(0.50, sum by (le) (rate(etterlevelse_write_batch_size_bucket{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\", cluster=\"$cluster\"}[1h])))",
+          "expr": "histogram_quantile(0.50, sum by (le) (rate(etterlevelse_write_batch_size_bucket{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\"}[1h])))",
           "legendFormat": "p50",
-          "refId": "A"
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
         },
         {
-          "expr": "histogram_quantile(0.90, sum by (le) (rate(etterlevelse_write_batch_size_bucket{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\", cluster=\"$cluster\"}[1h])))",
+          "expr": "histogram_quantile(0.90, sum by (le) (rate(etterlevelse_write_batch_size_bucket{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\"}[1h])))",
           "legendFormat": "p90",
-          "refId": "B"
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
         }
       ],
       "fieldConfig": {
@@ -527,6 +634,10 @@
           "unit": "short",
           "decimals": 1
         }
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
       }
     },
     {
@@ -542,9 +653,13 @@
       "description": "write_type=revised betyr at suksesskriteriet allerede hadde en begrunnelse. Høy andel revised på et krav er en proxy for at kravet er vanskelig/tiltrekker mest iterasjon.",
       "targets": [
         {
-          "expr": "sum by (kravnummer, write_type) (increase(etterlevelse_writes_total{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\", cluster=\"$cluster\"}[7d]))",
+          "expr": "sum by (kravnummer, write_type) (increase(etterlevelse_writes_total{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\"}[7d]))",
           "legendFormat": "K{{kravnummer}} — {{write_type}}",
-          "refId": "A"
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
         }
       ],
       "fieldConfig": {
@@ -554,6 +669,10 @@
           },
           "unit": "short"
         }
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
       }
     }
   ]
