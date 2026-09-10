@@ -65,7 +65,7 @@
       },
       "targets": [
         {
-          "expr": "mcp_active_sessions{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\"}",
+          "expr": "sum(mcp_active_sessions{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\"})",
           "legendFormat": "Aktive sesjoner",
           "refId": "A",
           "datasource": {
