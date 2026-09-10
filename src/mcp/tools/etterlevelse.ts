@@ -118,7 +118,7 @@ const irrelevansForCodes = [
 // Følger frontend sin etterlevelseDokumentasjonToDomainToObject nøyaktig.
 // Frontend sletter kun disse 7 feltene — alt annet (inkl. versjonHistorikk)
 // sendes tilbake i PUT og lagres av backend.
-const etterlevelseDokumentasjonReadOnlyFields = [
+export const etterlevelseDokumentasjonReadOnlyFields = [
   'changeStamp',       // frontend sletter
   'version',           // frontend sletter (optimistic locking)
   'teamsData',         // frontend sletter (teams-UUIDs brukes fra `teams`-feltet)
@@ -178,7 +178,7 @@ export function requireWriteEnabled() {
   return null;
 }
 
-function sanitizeEtterlevelseDokumentasjonForUpdate(document: unknown): Record<string, unknown> {
+export function sanitizeEtterlevelseDokumentasjonForUpdate(document: unknown): Record<string, unknown> {
   if (!isRecord(document)) {
     throw new Error('Etterlevelsesdokumentasjonen kunne ikke leses som et objekt.');
   }
