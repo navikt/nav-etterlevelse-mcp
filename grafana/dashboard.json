@@ -1,424 +1,679 @@
 {
-  "dashboard": {
-    "title": "nav-etterlevelse-mcp",
-    "uid": "nav-etterlevelse-mcp",
-    "tags": [
-      "dab",
-      "nav-etterlevelse-mcp"
-    ],
-    "timezone": "browser",
-    "schemaVersion": 39,
-    "version": 1,
-    "refresh": "30s",
-    "time": {
-      "from": "now-24h",
-      "to": "now"
-    },
-    "templating": {
-      "list": [
-        {
-          "name": "cluster",
-          "type": "custom",
-          "label": "Cluster",
-          "description": "Velg Kubernetes-cluster",
-          "options": [
-            {
-              "text": "dev-gcp",
-              "value": "dev-gcp"
-            },
-            {
-              "text": "prod-gcp",
-              "value": "prod-gcp"
-            }
-          ],
-          "current": {
-            "selected": true,
-            "text": "dev-gcp",
-            "value": "dev-gcp"
-          },
-          "query": "dev-gcp,prod-gcp",
-          "includeAll": false,
-          "multi": false
+  "title": "nav-etterlevelse-mcp",
+  "tags": [
+    "dab",
+    "nav-etterlevelse-mcp"
+  ],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
+  "templating": {
+    "list": [
+      {
+        "name": "datasource",
+        "type": "datasource",
+        "label": "Datakilde",
+        "description": "Velg Prometheus-datakilden for miljøet (dev-gcp eller prod-gcp)",
+        "query": "prometheus",
+        "current": {
+          "selected": true,
+          "text": [],
+          "value": []
         },
-        {
-          "name": "namespace",
-          "type": "custom",
-          "label": "Namespace",
-          "description": "Velg Kubernetes-namespace",
-          "options": [
-            {
-              "text": "dab",
-              "value": "dab"
-            }
-          ],
-          "current": {
-            "selected": true,
+        "refresh": 1,
+        "regex": "",
+        "includeAll": false,
+        "multi": false
+      },
+      {
+        "name": "namespace",
+        "type": "custom",
+        "label": "Namespace",
+        "description": "Velg Kubernetes-namespace",
+        "options": [
+          {
             "text": "dab",
             "value": "dab"
-          },
-          "query": "dab",
-          "includeAll": false,
-          "multi": false
-        }
-      ]
-    },
-    "panels": [
-      {
-        "id": 1,
-        "title": "Aktive sesjoner",
-        "type": "stat",
-        "gridPos": {
-          "x": 0,
-          "y": 0,
-          "w": 6,
-          "h": 4
-        },
-        "targets": [
-          {
-            "expr": "mcp_active_sessions{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\", cluster=\"$cluster\"}",
-            "legendFormat": "Aktive sesjoner",
-            "refId": "A"
           }
         ],
-        "fieldConfig": {
-          "defaults": {
-            "color": {
-              "mode": "thresholds"
-            },
-            "thresholds": {
-              "mode": "absolute",
-              "steps": [
-                {
-                  "color": "green",
-                  "value": null
-                },
-                {
-                  "color": "orange",
-                  "value": 5
-                },
-                {
-                  "color": "red",
-                  "value": 10
-                }
-              ]
-            },
-            "unit": "short"
-          }
-        }
-      },
-      {
-        "id": 2,
-        "title": "Auth refresh siste 24t",
-        "type": "stat",
-        "gridPos": {
-          "x": 6,
-          "y": 0,
-          "w": 6,
-          "h": 4
+        "current": {
+          "selected": true,
+          "text": "dab",
+          "value": "dab"
         },
-        "targets": [
-          {
-            "expr": "sum(increase(auth_refreshes_total{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\", cluster=\"$cluster\"}[24h]))",
-            "legendFormat": "Refresh",
-            "refId": "A"
-          }
-        ],
-        "fieldConfig": {
-          "defaults": {
-            "color": {
-              "mode": "thresholds"
-            },
-            "thresholds": {
-              "mode": "absolute",
-              "steps": [
-                {
-                  "color": "green",
-                  "value": null
-                },
-                {
-                  "color": "red",
-                  "value": 0
-                }
-              ]
-            },
-            "unit": "short"
-          }
-        }
-      },
-      {
-        "id": 3,
-        "title": "Feilrate siste time",
-        "type": "stat",
-        "gridPos": {
-          "x": 12,
-          "y": 0,
-          "w": 6,
-          "h": 4
-        },
-        "targets": [
-          {
-            "expr": "sum(rate(mcp_errors_total{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\", cluster=\"$cluster\"}[1h])) / sum(rate(mcp_requests_total{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\", cluster=\"$cluster\"}[1h])) * 100",
-            "legendFormat": "Feilrate",
-            "refId": "A"
-          }
-        ],
-        "fieldConfig": {
-          "defaults": {
-            "color": {
-              "mode": "thresholds"
-            },
-            "thresholds": {
-              "mode": "absolute",
-              "steps": [
-                {
-                  "color": "green",
-                  "value": null
-                },
-                {
-                  "color": "orange",
-                  "value": 5
-                },
-                {
-                  "color": "red",
-                  "value": 10
-                }
-              ]
-            },
-            "unit": "percent",
-            "decimals": 1
-          }
-        }
-      },
-      {
-        "id": 4,
-        "title": "OBO-feil siste 24t",
-        "type": "stat",
-        "gridPos": {
-          "x": 18,
-          "y": 0,
-          "w": 6,
-          "h": 4
-        },
-        "targets": [
-          {
-            "expr": "sum(increase(texas_obo_errors_total{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\", cluster=\"$cluster\"}[24h]))",
-            "legendFormat": "OBO-feil",
-            "refId": "A"
-          }
-        ],
-        "fieldConfig": {
-          "defaults": {
-            "color": {
-              "mode": "thresholds"
-            },
-            "thresholds": {
-              "mode": "absolute",
-              "steps": [
-                {
-                  "color": "green",
-                  "value": null
-                },
-                {
-                  "color": "red",
-                  "value": 1
-                }
-              ]
-            },
-            "unit": "short"
-          }
-        }
-      },
-      {
-        "id": 5,
-        "title": "Kall per tool siste time",
-        "type": "timeseries",
-        "gridPos": {
-          "x": 0,
-          "y": 4,
-          "w": 12,
-          "h": 8
-        },
-        "targets": [
-          {
-            "expr": "sum by (tool) (rate(mcp_requests_total{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\", cluster=\"$cluster\"}[1h]))",
-            "legendFormat": "{{tool}}",
-            "refId": "A"
-          }
-        ],
-        "fieldConfig": {
-          "defaults": {
-            "color": {
-              "mode": "palette-classic"
-            },
-            "custom": {
-              "drawStyle": "line",
-              "fillOpacity": 10
-            },
-            "unit": "ops/s"
-          }
-        }
-      },
-      {
-        "id": 6,
-        "title": "Responstid p50/p95/p99 per tool",
-        "type": "timeseries",
-        "gridPos": {
-          "x": 12,
-          "y": 4,
-          "w": 12,
-          "h": 8
-        },
-        "targets": [
-          {
-            "expr": "histogram_quantile(0.50, sum by (le, tool) (rate(mcp_request_duration_seconds_bucket{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\", cluster=\"$cluster\"}[1h])))",
-            "legendFormat": "p50 {{tool}}",
-            "refId": "A"
-          },
-          {
-            "expr": "histogram_quantile(0.95, sum by (le, tool) (rate(mcp_request_duration_seconds_bucket{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\", cluster=\"$cluster\"}[1h])))",
-            "legendFormat": "p95 {{tool}}",
-            "refId": "B"
-          },
-          {
-            "expr": "histogram_quantile(0.99, sum by (le, tool) (rate(mcp_request_duration_seconds_bucket{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\", cluster=\"$cluster\"}[1h])))",
-            "legendFormat": "p99 {{tool}}",
-            "refId": "C"
-          }
-        ],
-        "fieldConfig": {
-          "defaults": {
-            "color": {
-              "mode": "palette-classic"
-            },
-            "custom": {
-              "drawStyle": "line",
-              "fillOpacity": 5
-            },
-            "unit": "s",
-            "decimals": 2
-          }
-        }
-      },
-      {
-        "id": 7,
-        "title": "Etterlevelse-skriv per krav og status",
-        "type": "bar",
-        "gridPos": {
-          "x": 0,
-          "y": 12,
-          "w": 12,
-          "h": 8
-        },
-        "targets": [
-          {
-            "expr": "sum by (kravnummer, suksesskriterium_status) (increase(etterlevelse_writes_total{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\", cluster=\"$cluster\"}[24h]))",
-            "legendFormat": "K{{kravnummer}} — {{suksesskriterium_status}}",
-            "refId": "A"
-          }
-        ],
-        "fieldConfig": {
-          "defaults": {
-            "color": {
-              "mode": "palette-classic"
-            },
-            "unit": "short"
-          }
-        },
-        "description": "Antall skriveoperasjoner per kravnummer og SK-status siste 24 timer"
-      },
-      {
-        "id": 8,
-        "title": "PVK-operasjoner",
-        "type": "bar",
-        "gridPos": {
-          "x": 12,
-          "y": 12,
-          "w": 12,
-          "h": 8
-        },
-        "targets": [
-          {
-            "expr": "sum by (operation, status) (increase(pvk_operations_total{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\", cluster=\"$cluster\"}[24h]))",
-            "legendFormat": "{{operation}} — {{status}}",
-            "refId": "A"
-          }
-        ],
-        "fieldConfig": {
-          "defaults": {
-            "color": {
-              "mode": "palette-classic"
-            },
-            "unit": "short"
-          }
-        },
-        "description": "Risikoscenarioer og tiltak opprettet/oppdatert siste 24 timer"
-      },
-      {
-        "id": 9,
-        "title": "Navet-bruk per fagområde",
-        "type": "bar",
-        "gridPos": {
-          "x": 0,
-          "y": 20,
-          "w": 12,
-          "h": 6
-        },
-        "targets": [
-          {
-            "expr": "sum by (fagomrade) (increase(navet_reads_total{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\", cluster=\"$cluster\"}[24h]))",
-            "legendFormat": "{{fagomrade}}",
-            "refId": "A"
-          }
-        ],
-        "fieldConfig": {
-          "defaults": {
-            "color": {
-              "mode": "palette-classic"
-            },
-            "unit": "short"
-          }
-        }
-      },
-      {
-        "id": 10,
-        "title": "Feil per tool og feiltype",
-        "type": "table",
-        "gridPos": {
-          "x": 12,
-          "y": 20,
-          "w": 12,
-          "h": 6
-        },
-        "targets": [
-          {
-            "expr": "sum by (tool, error_type) (increase(mcp_errors_total{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\", cluster=\"$cluster\"}[24h]))",
-            "legendFormat": "{{tool}} — {{error_type}}",
-            "refId": "A",
-            "format": "table",
-            "instant": true
-          }
-        ],
-        "fieldConfig": {
-          "defaults": {
-            "color": {
-              "mode": "thresholds"
-            },
-            "thresholds": {
-              "mode": "absolute",
-              "steps": [
-                {
-                  "color": "green",
-                  "value": null
-                },
-                {
-                  "color": "red",
-                  "value": 1
-                }
-              ]
-            }
-          }
-        }
+        "query": "dab",
+        "includeAll": false,
+        "multi": false
       }
     ]
-  }
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Aktive sesjoner",
+      "type": "stat",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "expr": "sum(mcp_active_sessions{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\"})",
+          "legendFormat": "Aktive sesjoner",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 5
+              },
+              {
+                "color": "red",
+                "value": 10
+              }
+            ]
+          },
+          "unit": "short"
+        }
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      }
+    },
+    {
+      "id": 2,
+      "title": "Auth refresh siste 24t",
+      "type": "stat",
+      "gridPos": {
+        "x": 6,
+        "y": 0,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "expr": "sum(increase(auth_refreshes_total{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\"}[24h]))",
+          "legendFormat": "Refresh",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 0
+              }
+            ]
+          },
+          "unit": "short"
+        }
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      }
+    },
+    {
+      "id": 3,
+      "title": "Feilrate siste time",
+      "type": "stat",
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(mcp_errors_total{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\"}[1h])) / sum(rate(mcp_requests_total{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\"}[1h])) * 100",
+          "legendFormat": "Feilrate",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 5
+              },
+              {
+                "color": "red",
+                "value": 10
+              }
+            ]
+          },
+          "unit": "percent",
+          "decimals": 1
+        }
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      }
+    },
+    {
+      "id": 4,
+      "title": "OBO-feil siste 24t",
+      "type": "stat",
+      "gridPos": {
+        "x": 18,
+        "y": 0,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "expr": "sum(increase(texas_obo_errors_total{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\"}[24h]))",
+          "legendFormat": "OBO-feil",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "short"
+        }
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      }
+    },
+    {
+      "id": 5,
+      "title": "Kall per tool siste time",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 0,
+        "y": 4,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "expr": "sum by (tool) (rate(mcp_requests_total{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\"}[1h]))",
+          "legendFormat": "{{tool}}",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10
+          },
+          "unit": "ops/s"
+        }
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      }
+    },
+    {
+      "id": 6,
+      "title": "Responstid p50/p95/p99 per tool",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 12,
+        "y": 4,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum by (le, tool) (rate(mcp_request_duration_seconds_bucket{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\"}[1h])))",
+          "legendFormat": "p50 {{tool}}",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum by (le, tool) (rate(mcp_request_duration_seconds_bucket{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\"}[1h])))",
+          "legendFormat": "p95 {{tool}}",
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum by (le, tool) (rate(mcp_request_duration_seconds_bucket{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\"}[1h])))",
+          "legendFormat": "p99 {{tool}}",
+          "refId": "C",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 5
+          },
+          "unit": "s",
+          "decimals": 2
+        }
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      }
+    },
+    {
+      "id": 7,
+      "title": "Etterlevelse-skriv per krav og status",
+      "type": "barchart",
+      "gridPos": {
+        "x": 0,
+        "y": 12,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "expr": "sum by (kravnummer, suksesskriterium_status) (increase(etterlevelse_writes_total{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\"}[24h]))",
+          "legendFormat": "K{{kravnummer}} — {{suksesskriterium_status}}",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "short"
+        }
+      },
+      "description": "Antall skriveoperasjoner per kravnummer og SK-status siste 24 timer",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      }
+    },
+    {
+      "id": 8,
+      "title": "PVK-operasjoner",
+      "type": "barchart",
+      "gridPos": {
+        "x": 12,
+        "y": 12,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "expr": "sum by (operation, status) (increase(pvk_operations_total{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\"}[24h]))",
+          "legendFormat": "{{operation}} — {{status}}",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "short"
+        }
+      },
+      "description": "Risikoscenarioer og tiltak opprettet/oppdatert siste 24 timer",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      }
+    },
+    {
+      "id": 9,
+      "title": "Navet-bruk per fagområde",
+      "type": "barchart",
+      "gridPos": {
+        "x": 0,
+        "y": 20,
+        "w": 12,
+        "h": 6
+      },
+      "targets": [
+        {
+          "expr": "sum by (fagomrade) (increase(navet_reads_total{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\"}[24h]))",
+          "legendFormat": "{{fagomrade}}",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "short"
+        }
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      }
+    },
+    {
+      "id": 10,
+      "title": "Feil per tool og feiltype",
+      "type": "table",
+      "gridPos": {
+        "x": 12,
+        "y": 20,
+        "w": 12,
+        "h": 6
+      },
+      "targets": [
+        {
+          "expr": "sum by (tool, error_type) (increase(mcp_errors_total{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\"}[24h]))",
+          "legendFormat": "{{tool}} — {{error_type}}",
+          "refId": "A",
+          "format": "table",
+          "instant": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        }
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      }
+    },
+    {
+      "id": 11,
+      "title": "SK-godkjenning vs. faktisk skriving (24t)",
+      "type": "stat",
+      "gridPos": {
+        "x": 0,
+        "y": 26,
+        "w": 6,
+        "h": 4
+      },
+      "description": "Forholdstall mellom antall skrevne suksesskriterier og antall enkeltvis rapporterte sk_reviewed(godkjent)-hendelser. Over 1.2 samsvarer med alarmen EtterlevelseMcpSkGodkjentUtenEnkeltvisGjennomgang og kan indikere batch-godkjenning i strid med prosesskravet om ett SK om gangen.",
+      "targets": [
+        {
+          "expr": "sum(increase(etterlevelse_writes_total{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\"}[24h]))\n/ sum(increase(review_workflow_events_total{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\", event=\"sk_reviewed\", decision=\"godkjent\"}[24h]))",
+          "legendFormat": "skrevet / godkjent",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 2,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 1.2
+              }
+            ]
+          }
+        }
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      }
+    },
+    {
+      "id": 12,
+      "title": "Gjennomgangs-hendelser (log_review_event)",
+      "type": "barchart",
+      "gridPos": {
+        "x": 6,
+        "y": 26,
+        "w": 18,
+        "h": 8
+      },
+      "description": "Selvrapportert telemetri fra etterlevelse-/PVK-skillen: rapport skrevet/godkjent, SK-beslutninger (godkjent/hoppet_over/redigert) og opplastede krav siste 24 timer.",
+      "targets": [
+        {
+          "expr": "sum by (event) (increase(review_workflow_events_total{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\", decision=\"none\"}[24h]))",
+          "legendFormat": "{{event}}",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        },
+        {
+          "expr": "sum by (decision) (increase(review_workflow_events_total{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\", event=\"sk_reviewed\", decision!=\"none\"}[24h]))",
+          "legendFormat": "sk_reviewed — {{decision}}",
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "short"
+        }
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      }
+    },
+    {
+      "id": 13,
+      "title": "SK-batch-størrelse per skriving (p50/p90)",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 0,
+        "y": 34,
+        "w": 12,
+        "h": 8
+      },
+      "description": "Antall suksesskriterier sendt per write_etterlevelse-kall — proxy for dokumentasjonsmengde per gang.",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum by (le) (rate(etterlevelse_write_batch_size_bucket{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\"}[1h])))",
+          "legendFormat": "p50",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        },
+        {
+          "expr": "histogram_quantile(0.90, sum by (le) (rate(etterlevelse_write_batch_size_bucket{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\"}[1h])))",
+          "legendFormat": "p90",
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 5
+          },
+          "unit": "short",
+          "decimals": 1
+        }
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      }
+    },
+    {
+      "id": 14,
+      "title": "Skriving: nye vs. reviderte SK-svar per krav (7d)",
+      "type": "barchart",
+      "gridPos": {
+        "x": 12,
+        "y": 34,
+        "w": 12,
+        "h": 8
+      },
+      "description": "write_type=revised betyr at suksesskriteriet allerede hadde en begrunnelse. Høy andel revised på et krav er en proxy for at kravet er vanskelig/tiltrekker mest iterasjon.",
+      "targets": [
+        {
+          "expr": "sum by (kravnummer, write_type) (increase(etterlevelse_writes_total{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\"}[7d]))",
+          "legendFormat": "K{{kravnummer}} — {{write_type}}",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "short"
+        }
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      }
+    }
+  ]
 }
