@@ -234,7 +234,8 @@ export function determineWriteType(
   existingSKBs: Array<Record<string, unknown>>,
   suksesskriterieId: unknown,
 ): EtterlevelseWriteType {
-  const oldSKB = existingSKBs.find((e) => e.suksesskriterieId === suksesskriterieId);
+  const targetId = Number(suksesskriterieId);
+  const oldSKB = existingSKBs.find((e) => Number(e.suksesskriterieId) === targetId);
   const hadBegrunnelse = Boolean(oldSKB && typeof oldSKB.begrunnelse === 'string' && oldSKB.begrunnelse);
   return hadBegrunnelse ? 'revised' : 'created';
 }
