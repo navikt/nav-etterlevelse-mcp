@@ -418,6 +418,139 @@
             }
           }
         }
+      },
+      {
+        "id": 11,
+        "title": "SK-godkjenning vs. faktisk skriving (24t)",
+        "type": "stat",
+        "gridPos": {
+          "x": 0,
+          "y": 26,
+          "w": 6,
+          "h": 4
+        },
+        "description": "Forholdstall mellom antall skrevne suksesskriterier og antall enkeltvis rapporterte sk_reviewed(godkjent)-hendelser. Over 1.2 samsvarer med alarmen EtterlevelseMcpSkGodkjentUtenEnkeltvisGjennomgang og kan indikere batch-godkjenning i strid med prosesskravet om ett SK om gangen.",
+        "targets": [
+          {
+            "expr": "sum(increase(etterlevelse_writes_total{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\", cluster=\"$cluster\"}[24h]))\n/ sum(increase(review_workflow_events_total{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\", cluster=\"$cluster\", event=\"sk_reviewed\", decision=\"godkjent\"}[24h]))",
+            "legendFormat": "skrevet / godkjent",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "none",
+            "decimals": 2,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "yellow",
+                  "value": 1
+                },
+                {
+                  "color": "red",
+                  "value": 1.2
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 12,
+        "title": "Gjennomgangs-hendelser (log_review_event)",
+        "type": "bar",
+        "gridPos": {
+          "x": 6,
+          "y": 26,
+          "w": 18,
+          "h": 8
+        },
+        "description": "Selvrapportert telemetri fra etterlevelse-/PVK-skillen: rapport skrevet/godkjent, SK-beslutninger (godkjent/hoppet_over/redigert) og opplastede krav siste 24 timer.",
+        "targets": [
+          {
+            "expr": "sum by (event, decision) (increase(review_workflow_events_total{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\", cluster=\"$cluster\"}[24h]))",
+            "legendFormat": "{{event}} — {{decision}}",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "unit": "short"
+          }
+        }
+      },
+      {
+        "id": 13,
+        "title": "SK-batch-størrelse per skriving (p50/p90)",
+        "type": "timeseries",
+        "gridPos": {
+          "x": 0,
+          "y": 34,
+          "w": 12,
+          "h": 8
+        },
+        "description": "Antall suksesskriterier sendt per write_etterlevelse-kall — proxy for dokumentasjonsmengde per gang.",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.50, sum by (le) (rate(etterlevelse_write_batch_size_bucket{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\", cluster=\"$cluster\"}[1h])))",
+            "legendFormat": "p50",
+            "refId": "A"
+          },
+          {
+            "expr": "histogram_quantile(0.90, sum by (le) (rate(etterlevelse_write_batch_size_bucket{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\", cluster=\"$cluster\"}[1h])))",
+            "legendFormat": "p90",
+            "refId": "B"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {
+              "drawStyle": "line",
+              "fillOpacity": 5
+            },
+            "unit": "short",
+            "decimals": 1
+          }
+        }
+      },
+      {
+        "id": 14,
+        "title": "Skriving: nye vs. reviderte SK-svar per krav (7d)",
+        "type": "bar",
+        "gridPos": {
+          "x": 12,
+          "y": 34,
+          "w": 12,
+          "h": 8
+        },
+        "description": "write_type=revised betyr at suksesskriteriet allerede hadde en begrunnelse. Høy andel revised på et krav er en proxy for at kravet er vanskelig/tiltrekker mest iterasjon.",
+        "targets": [
+          {
+            "expr": "sum by (kravnummer, write_type) (increase(etterlevelse_writes_total{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\", cluster=\"$cluster\"}[7d]))",
+            "legendFormat": "K{{kravnummer}} — {{write_type}}",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "unit": "short"
+          }
+        }
       }
     ]
   }
