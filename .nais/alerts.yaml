@@ -41,3 +41,16 @@ spec:
           annotations:
             summary: "Ingen trafikk til nav-etterlevelse-mcp siste 24 timer"
             description: "Enten er løsningen ikke i bruk, eller noe er galt med tilkoblingen. Verifiser at MCP-serveren svarer."
+
+        - alert: EtterlevelseMcpSkGodkjentUtenEnkeltvisGjennomgang
+          expr: |
+            sum(increase(etterlevelse_writes_total{namespace="dab", app="nav-etterlevelse-mcp"}[24h]))
+            > 1.2 * sum(increase(review_workflow_events_total{namespace="dab", app="nav-etterlevelse-mcp", event="sk_reviewed", decision="godkjent"}[24h]))
+          for: 1h
+          labels:
+            severity: warning
+            team: dab
+          annotations:
+            summary: "Flere suksesskriterier lastet opp enn rapportert enkeltvis godkjent"
+            description: "Antall skrevne suksesskriterier (etterlevelse_writes_total) overstiger antall sk_reviewed(godkjent)-hendelser med over 20% siste 24t. Kan indikere at brukere/agent godkjenner flere SK-er samlet i strid med kravet om ett SK om gangen, eller at skillen ikke rapporterer log_review_event konsekvent."
+            action: "Sammenlign etterlevelse_writes_total og review_workflow_events_total{event=\"sk_reviewed\"} i Grafana over tid. Vurder om skill-instruksen for interaktiv SK-gjennomgang må styrkes ytterligere."

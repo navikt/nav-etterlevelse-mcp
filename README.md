@@ -42,6 +42,7 @@ bevart for auditing.
 | `list_nom_avdelinger` | List alle avdelinger fra NOM |
 | `search_slack_channel` | Søk etter Slack-kanaler (for varslingsadresser) |
 | `lock_document` | Lås et dokument for skriveoperasjoner i gjeldende sesjon |
+| `log_review_event` | Rapporter et steg i gjennomgangsprosessen for observability (ren telemetri, ingen etterlevelsesdata) |
 
 ### Etterlevelse — skriv *(krever feature-toggle)*
 

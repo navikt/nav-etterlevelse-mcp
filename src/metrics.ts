@@ -63,6 +63,19 @@ export const behandlingskatalogReadsTotal = new Counter({
   registers: [registry],
 });
 
+// --- Selvrapportert arbeidsflyt (skill-telemetri) ---
+
+// Ren telemetri fra skillen selv — ikke MCP-observerte fakta. Brukes til å måle
+// om den påkrevde interaktive gjennomgangsprosessen (ett SK om gangen, rapport
+// før opplasting) faktisk følges, siden dette er usynlig for MCP-serveren som
+// bare ser tool-kall, ikke samtaleflyten rundt dem.
+export const reviewWorkflowEventsTotal = new Counter({
+  name: 'review_workflow_events_total',
+  help: 'Selvrapporterte arbeidsflyt-hendelser fra etterlevelse-/PVK-skillen',
+  labelNames: ['event', 'decision'] as const,
+  registers: [registry],
+});
+
 // --- Tekniske feil og drift ---
 
 export const mcpErrorsTotal = new Counter({

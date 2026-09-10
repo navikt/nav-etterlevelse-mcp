@@ -3,7 +3,7 @@ import * as z from 'zod/v4';
 import { authStore } from '../../auth/store.js';
 import { config } from '../../config.js';
 import { instrumentedRegisterTool } from '../instrumentedRegisterTool.js';
-import { etterlevelseWritesTotal, etterlevelseDocsCreatedTotal, pvkOperationsTotal } from '../../metrics.js';
+import { etterlevelseWritesTotal, etterlevelseDocsCreatedTotal, pvkOperationsTotal, reviewWorkflowEventsTotal } from '../../metrics.js';
 import type { SessionContext } from '../server.js';
 import { isWriteEnabled } from '../../unleash.js';
 
@@ -176,6 +176,26 @@ export function requireWriteEnabled() {
     );
   }
   return null;
+}
+
+export type ReviewWorkflowEvent = 'report_generated' | 'report_approved' | 'sk_reviewed' | 'krav_uploaded';
+export type ReviewWorkflowDecision = 'godkjent' | 'hoppet_over' | 'redigert';
+
+// Ren telemetri fra skillen selv (selvrapportert, ikke MCP-observert). Se
+// review_workflow_events_total i metrics.ts for begrunnelse.
+export function recordReviewEvent(
+  event: ReviewWorkflowEvent,
+  decision?: ReviewWorkflowDecision,
+): { logged: true; event: ReviewWorkflowEvent; decision: ReviewWorkflowDecision | null } {
+  if (decision !== undefined && event !== 'sk_reviewed') {
+    throw new Error(`decision skal kun oppgis for event="sk_reviewed", ikke for event="${event}".`);
+  }
+  if (event === 'sk_reviewed' && decision === undefined) {
+    throw new Error('decision er påkrevd for event="sk_reviewed" (godkjent, hoppet_over eller redigert).');
+  }
+
+  reviewWorkflowEventsTotal.inc({ event, decision: decision ?? 'none' });
+  return { logged: true, event, decision: decision ?? null };
 }
 
 export function sanitizeEtterlevelseDokumentasjonForUpdate(document: unknown): Record<string, unknown> {
@@ -2369,6 +2389,42 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
           return toolResult({ avdelinger: [], message: 'Ingen avdelinger funnet i NOM.' });
         }
         return toolResult({ avdelinger });
+      } catch (error) {
+        return toolError(error);
+      }
+    },
+  );
+
+  instrumentedRegisterTool(server,
+    'log_review_event',
+    {
+      description:
+        'Rapporter et steg i gjennomgangsprosessen for observability. Ren telemetri — skriver ' +
+        'ikke etterlevelsesdata og krever verken dokumentlås eller write-enabled-toggle. ' +
+        'Brukes til å måle om den påkrevde interaktive gjennomgangsprosessen (rapport → ' +
+        'godkjenning → ett suksesskriterium om gangen → opplasting per krav) faktisk følges — ' +
+        'noe MCP-serveren ellers ikke kan observere, siden den kun ser tool-kall, ikke samtaleflyten.',
+      inputSchema: {
+        event: z
+          .enum(['report_generated', 'report_approved', 'sk_reviewed', 'krav_uploaded'])
+          .describe(
+            'report_generated: rapporten er skrevet og klar for team. ' +
+              'report_approved: teamet har gitt eksplisitt klarsignal til opplasting. ' +
+              'sk_reviewed: ett suksesskriterium er behandlet i den interaktive gjennomgangen. ' +
+              'krav_uploaded: et krav er lastet opp via write_etterlevelse.',
+          ),
+        decision: z
+          .enum(['godkjent', 'hoppet_over', 'redigert'])
+          .optional()
+          .describe(
+            'Påkrevd for event=sk_reviewed (hvilket valg G/H/R brukeren tok), og ugyldig for alle andre event-typer.',
+          ),
+      },
+      annotations: readOnlyAnnotations,
+    },
+    async ({ event, decision }) => {
+      try {
+        return toolResult(recordReviewEvent(event, decision));
       } catch (error) {
         return toolError(error);
       }
