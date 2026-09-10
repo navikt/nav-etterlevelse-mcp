@@ -3,7 +3,7 @@ import * as z from 'zod/v4';
 import { authStore } from '../../auth/store.js';
 import { config } from '../../config.js';
 import { instrumentedRegisterTool } from '../instrumentedRegisterTool.js';
-import { etterlevelseWritesTotal, etterlevelseDocsCreatedTotal, pvkOperationsTotal, reviewWorkflowEventsTotal } from '../../metrics.js';
+import { etterlevelseWritesTotal, etterlevelseWriteBatchSize, etterlevelseDocsCreatedTotal, pvkOperationsTotal, reviewWorkflowEventsTotal } from '../../metrics.js';
 import type { SessionContext } from '../server.js';
 import { isWriteEnabled } from '../../unleash.js';
 
@@ -223,6 +223,20 @@ export function sanitizeEtterlevelseDokumentasjonForUpdate(document: unknown): R
   }
 
   return cleaned;
+}
+
+export type EtterlevelseWriteType = 'created' | 'revised';
+
+// Skiller førstegangsskriving fra revisjon av et suksesskriterium — brukt som
+// write_type-label på etterlevelse_writes_total (proxy for hvilke krav som
+// tiltrekker mest iterasjon/vanskelighetsgrad).
+export function determineWriteType(
+  existingSKBs: Array<Record<string, unknown>>,
+  suksesskriterieId: unknown,
+): EtterlevelseWriteType {
+  const oldSKB = existingSKBs.find((e) => e.suksesskriterieId === suksesskriterieId);
+  const hadBegrunnelse = Boolean(oldSKB && typeof oldSKB.begrunnelse === 'string' && oldSKB.begrunnelse);
+  return hadBegrunnelse ? 'revised' : 'created';
 }
 
 function stripHtml(html: string): string {
@@ -1171,26 +1185,30 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
           suksesskriterieBegrunnelser: saniterteSKB,
         });
 
-        // Instrumenter per SK for metrikker
-        for (const skb of saniterteSKB) {
-          etterlevelseWritesTotal.inc({
-            kravnummer: String(kravNummer),
-            kravversjon: String(kravVersjon),
-            suksesskriterium_id: String(skb.suksesskriterieId),
-            suksesskriterium_status: String(skb.suksesskriterieStatus),
-          });
-        }
-
-        // Build summary with krav context for human review
-        const kravNavn = typeof krav.navn === 'string' ? krav.navn : `K${kravNummer}.${kravVersjon}`;
-        const hensikt = typeof krav.hensikt === 'string' ? stripHtml(krav.hensikt) : '';
-        const beskrivelse = typeof krav.beskrivelse === 'string' ? stripHtml(krav.beskrivelse) : '';
-
         // getEtterlevelse returnerer ett objekt (ikke en liste) — bruk isRecord, ikke extractArray
         const existingRecord = isRecord(existingRaw) ? existingRaw : null;
         const existingSKBs = existingRecord && Array.isArray(existingRecord.suksesskriterieBegrunnelser)
           ? (existingRecord.suksesskriterieBegrunnelser as Record<string, unknown>[])
           : [];
+
+        // Instrumenter per SK for metrikker. write_type skiller førstegangsskriving
+        // fra revisjon (proxy for hvilke krav som tiltrekker mest iterasjon).
+        for (const skb of saniterteSKB) {
+          const writeType = determineWriteType(existingSKBs, skb.suksesskriterieId);
+          etterlevelseWritesTotal.inc({
+            kravnummer: String(kravNummer),
+            kravversjon: String(kravVersjon),
+            suksesskriterium_id: String(skb.suksesskriterieId),
+            suksesskriterium_status: String(skb.suksesskriterieStatus),
+            write_type: writeType,
+          });
+        }
+        etterlevelseWriteBatchSize.observe(saniterteSKB.length);
+
+        // Build summary with krav context for human review
+        const kravNavn = typeof krav.navn === 'string' ? krav.navn : `K${kravNummer}.${kravVersjon}`;
+        const hensikt = typeof krav.hensikt === 'string' ? stripHtml(krav.hensikt) : '';
+        const beskrivelse = typeof krav.beskrivelse === 'string' ? stripHtml(krav.beskrivelse) : '';
 
         const W = 76;
         const lines: string[] = [];

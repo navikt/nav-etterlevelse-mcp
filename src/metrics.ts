@@ -32,7 +32,14 @@ export const mcpActiveSessions = new Gauge({
 export const etterlevelseWritesTotal = new Counter({
   name: 'etterlevelse_writes_total',
   help: 'Skriveoperasjoner mot etterlevelse per krav og SK',
-  labelNames: ['kravnummer', 'kravversjon', 'suksesskriterium_id', 'suksesskriterium_status'] as const,
+  labelNames: ['kravnummer', 'kravversjon', 'suksesskriterium_id', 'suksesskriterium_status', 'write_type'] as const,
+  registers: [registry],
+});
+
+export const etterlevelseWriteBatchSize = new Histogram({
+  name: 'etterlevelse_write_batch_size',
+  help: 'Antall suksesskriterier skrevet per write_etterlevelse-kall (proxy for dokumentasjonsmengde per gang)',
+  buckets: [1, 2, 3, 5, 8, 13, 21],
   registers: [registry],
 });
 
