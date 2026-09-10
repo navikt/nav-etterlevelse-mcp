@@ -348,7 +348,7 @@
     {
       "id": 7,
       "title": "Etterlevelse-skriv per krav og status",
-      "type": "bar",
+      "type": "barchart",
       "gridPos": {
         "x": 0,
         "y": 12,
@@ -383,7 +383,7 @@
     {
       "id": 8,
       "title": "PVK-operasjoner",
-      "type": "bar",
+      "type": "barchart",
       "gridPos": {
         "x": 12,
         "y": 12,
@@ -418,7 +418,7 @@
     {
       "id": 9,
       "title": "Navet-bruk per fagområde",
-      "type": "bar",
+      "type": "barchart",
       "gridPos": {
         "x": 0,
         "y": 20,
@@ -550,7 +550,7 @@
     {
       "id": 12,
       "title": "Gjennomgangs-hendelser (log_review_event)",
-      "type": "bar",
+      "type": "barchart",
       "gridPos": {
         "x": 6,
         "y": 26,
@@ -643,7 +643,7 @@
     {
       "id": 14,
       "title": "Skriving: nye vs. reviderte SK-svar per krav (7d)",
-      "type": "bar",
+      "type": "barchart",
       "gridPos": {
         "x": 12,
         "y": 34,
