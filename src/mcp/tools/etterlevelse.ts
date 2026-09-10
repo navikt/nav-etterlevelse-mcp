@@ -152,7 +152,7 @@ const ytterligereEgenskaperCodes = [
 const ytterligereEgenskaperDescription =
   'Ytterligere DPIA-triggere. Gyldige koder: ' + ytterligereEgenskaperCodes.join(', ');
 
-function requireDocumentLock(ctx: SessionContext, targetDocumentId?: string) {
+export function requireDocumentLock(ctx: SessionContext, targetDocumentId?: string) {
   const { lockedDocumentId, lockedDocumentTitle } = ctx.tokenData;
   if (!lockedDocumentId) {
     return toolError(
@@ -168,7 +168,7 @@ function requireDocumentLock(ctx: SessionContext, targetDocumentId?: string) {
   return null;
 }
 
-function requireWriteEnabled() {
+export function requireWriteEnabled() {
   if (!isWriteEnabled()) {
     return toolError(
       'Skriveoperasjoner er deaktivert via feature-toggle (nav-etterlevelse-mcp.write-enabled). ' +

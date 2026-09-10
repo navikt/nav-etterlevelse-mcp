@@ -83,7 +83,7 @@ interface TimedEntry<T> {
  * request hits the same instance. To support horizontal scaling, replace this
  * class with a Redis/Valkey-backed implementation.
  */
-class InMemoryAuthStore {
+export class InMemoryAuthStore {
   private readonly authSessions = new Map<string, TimedEntry<AuthSession>>();
   private readonly authCodes = new Map<string, TimedEntry<AuthCodeRecord>>();
   private readonly mcpTokens = new Map<string, TimedEntry<McpTokenData>>();
