@@ -21,6 +21,10 @@ describe('InMemoryAuthStore', () => {
   let store: InMemoryAuthStore;
 
   beforeEach(() => {
+    // Aktiver fake timers før store opprettes, slik at konstruktørens
+    // setInterval-cleanup fanges opp av fake timers og aldri kjører på ekte
+    // wall-clock-tid i bakgrunnen under testkjøringen.
+    vi.useFakeTimers();
     store = new InMemoryAuthStore();
   });
 
@@ -57,7 +61,6 @@ describe('InMemoryAuthStore', () => {
   });
 
   it('mcp-tokens slutter å være gyldige etter TTL-en utløper', () => {
-    vi.useFakeTimers();
     store.saveMcpSession('access-1', 'refresh-1', 'client-1', tokenData());
 
     expect(store.getMcpToken('access-1')).toBeDefined();
