@@ -57,4 +57,18 @@ describe('recordReviewEvent', () => {
 
     expect(incMock).toHaveBeenCalledWith({ event: 'krav_uploaded', decision: 'none' });
   });
+
+  it('kaster og teller ikke hvis decision oppgis for en event-type som ikke er sk_reviewed', () => {
+    expect(() => recordReviewEvent('report_generated', 'godkjent')).toThrow(
+      /decision skal kun oppgis for event="sk_reviewed"/,
+    );
+    expect(() => recordReviewEvent('report_approved', 'hoppet_over')).toThrow();
+    expect(() => recordReviewEvent('krav_uploaded', 'redigert')).toThrow();
+    expect(incMock).not.toHaveBeenCalled();
+  });
+
+  it('kaster og teller ikke hvis sk_reviewed mangler decision', () => {
+    expect(() => recordReviewEvent('sk_reviewed')).toThrow(/decision er påkrevd for event="sk_reviewed"/);
+    expect(incMock).not.toHaveBeenCalled();
+  });
 });

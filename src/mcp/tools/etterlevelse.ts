@@ -187,6 +187,13 @@ export function recordReviewEvent(
   event: ReviewWorkflowEvent,
   decision?: ReviewWorkflowDecision,
 ): { logged: true; event: ReviewWorkflowEvent; decision: ReviewWorkflowDecision | null } {
+  if (decision !== undefined && event !== 'sk_reviewed') {
+    throw new Error(`decision skal kun oppgis for event="sk_reviewed", ikke for event="${event}".`);
+  }
+  if (event === 'sk_reviewed' && decision === undefined) {
+    throw new Error('decision er påkrevd for event="sk_reviewed" (godkjent, hoppet_over eller redigert).');
+  }
+
   reviewWorkflowEventsTotal.inc({ event, decision: decision ?? 'none' });
   return { logged: true, event, decision: decision ?? null };
 }
@@ -2409,12 +2416,18 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
         decision: z
           .enum(['godkjent', 'hoppet_over', 'redigert'])
           .optional()
-          .describe('Kun for event=sk_reviewed: hvilket valg (G/H/R) brukeren tok.'),
+          .describe(
+            'Påkrevd for event=sk_reviewed (hvilket valg G/H/R brukeren tok), og ugyldig for alle andre event-typer.',
+          ),
       },
       annotations: readOnlyAnnotations,
     },
     async ({ event, decision }) => {
-      return toolResult(recordReviewEvent(event, decision));
+      try {
+        return toolResult(recordReviewEvent(event, decision));
+      } catch (error) {
+        return toolError(error);
+      }
     },
   );
 
