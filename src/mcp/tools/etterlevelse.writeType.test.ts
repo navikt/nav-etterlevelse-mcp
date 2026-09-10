@@ -32,4 +32,15 @@ describe('determineWriteType', () => {
     expect(determineWriteType(existing, 2)).toBe('created');
     expect(determineWriteType(existing, 3)).toBe('created');
   });
+
+  it('matcher selv om suksesskriterieId har ulik type (string vs. number) mellom eksisterende og innsendt', () => {
+    // getEtterlevelse returnerer rå backend-JSON (unknown), som andre steder i koden
+    // (EtterlevelseClient, get_krav_for_gjennomgang) håndterer kan ha suksesskriterieId
+    // som streng selv om write_etterlevelse-skjemaet krever number.
+    const existingWithStringId = [{ suksesskriterieId: '1', begrunnelse: 'Tidligere tekst' }];
+    expect(determineWriteType(existingWithStringId, 1)).toBe('revised');
+
+    const existingWithNumberId = [{ suksesskriterieId: 1, begrunnelse: 'Tidligere tekst' }];
+    expect(determineWriteType(existingWithNumberId, '1')).toBe('revised');
+  });
 });
