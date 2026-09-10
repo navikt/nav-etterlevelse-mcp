@@ -474,9 +474,14 @@
         "description": "Selvrapportert telemetri fra etterlevelse-/PVK-skillen: rapport skrevet/godkjent, SK-beslutninger (godkjent/hoppet_over/redigert) og opplastede krav siste 24 timer.",
         "targets": [
           {
-            "expr": "sum by (event, decision) (increase(review_workflow_events_total{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\", cluster=\"$cluster\"}[24h]))",
-            "legendFormat": "{{event}} — {{decision}}",
+            "expr": "sum by (event) (increase(review_workflow_events_total{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\", cluster=\"$cluster\", decision=\"none\"}[24h]))",
+            "legendFormat": "{{event}}",
             "refId": "A"
+          },
+          {
+            "expr": "sum by (decision) (increase(review_workflow_events_total{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\", cluster=\"$cluster\", event=\"sk_reviewed\", decision!=\"none\"}[24h]))",
+            "legendFormat": "sk_reviewed — {{decision}}",
+            "refId": "B"
           }
         ],
         "fieldConfig": {
