@@ -240,6 +240,42 @@ export function determineWriteType(
   return hadBegrunnelse ? 'revised' : 'created';
 }
 
+export interface SuksesskriterieBegrunnelseForBatchCheck {
+  suksesskriterieStatus: unknown;
+  begrunnelse: unknown;
+}
+
+// Den ene sanksjonerte unntaket fra ett-SK-om-gangen-kravet: alle SK-er i kallet
+// settes IKKE_RELEVANT med nøyaktig samme begrunnelse (typisk "systemet er ikke
+// relevant for dette temaet" — ingenting å vurdere individuelt per SK).
+export function isHomogeneousIkkeRelevantBatch(
+  skbs: SuksesskriterieBegrunnelseForBatchCheck[],
+): boolean {
+  if (skbs.length <= 1) {
+    return false;
+  }
+  const first = skbs[0];
+  return skbs.every(
+    (skb) => skb.suksesskriterieStatus === 'IKKE_RELEVANT' && skb.begrunnelse === first.begrunnelse,
+  );
+}
+
+// Gir agenten umiddelbar in-band-tilbakemelding når write_etterlevelse mottar
+// flere nyskrevne SK-begrunnelser i samme kall — det tydeligste tegnet på at
+// gjennomgangsprosessen (ett SK om gangen, med G/H/R-godkjenning) ikke er fulgt.
+// Returnerer null når kallet er innenfor kontrakten (1 SK, eller det sanksjonerte
+// IKKE_RELEVANT-unntaket).
+export function buildBatchWarning(skbs: SuksesskriterieBegrunnelseForBatchCheck[]): string | null {
+  if (skbs.length <= 1 || isHomogeneousIkkeRelevantBatch(skbs)) {
+    return null;
+  }
+  return (
+    `⚠  Denne skrivingen inneholder ${skbs.length} suksesskriterie-begrunnelser i ett kall. ` +
+    'Gjennomgangsprosessen krever at hvert suksesskriterium presenteres og godkjennes enkeltvis ' +
+    '(G/H/R) før skriving — unntatt når alle settes IKKE_RELEVANT med identisk begrunnelse.'
+  );
+}
+
 function stripHtml(html: string): string {
   // Bruk split-på-vinkelparentes for å garantere at ingen '<'-tegn overlever
   // (CodeQL CWE-116 / incomplete-multi-char-sanitization)
@@ -1105,6 +1141,9 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
       description:
         'Skriv/oppdater en etterlevelsesbesvarelse for et krav. Krever aktiv sesjonslås (kall lock_document først). ' +
         'Henter kravets hensikt og eksisterende begrunnelse og returnerer dem i svaret for menneskelig gjennomgang. ' +
+        '⛔ Presenter og innhent godkjenning (G/H/R) for suksesskriteriene ett om gangen før dette kallet — kall som ' +
+        'inneholder flere nyskrevne SK-begrunnelser i én operasjon bryter gjennomgangsprosessen og flagges i svaret. ' +
+        'Unntak: alle suksesskriterier kan settes IKKE_RELEVANT med identisk begrunnelse i ett samlet kall. ' +
         `OPPFYLT og FERDIG/FERDIGSTILT kan ikke settes via agenten — sett disse manuelt i ${etterlevelseFrontendUrl} ` +
         'etter at du har lest suksesskriterieteksten og kravets hensikt.',
       inputSchema: {
@@ -1205,6 +1244,7 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
           });
         }
         etterlevelseWriteBatchSize.observe(saniterteSKB.length);
+        const batchWarning = buildBatchWarning(saniterteSKB);
 
         // Build summary with krav context for human review
         const kravNavn = typeof krav.navn === 'string' ? krav.navn : `K${kravNummer}.${kravVersjon}`;
@@ -1216,6 +1256,10 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
         lines.push(`✅  K${kravNummer}.${kravVersjon} — ${kravNavn} er oppdatert`);
         lines.push(`    Status: ${status}`);
         if (statusBegrunnelse) lines.push(`    Statusbegrunnelse: ${statusBegrunnelse}`);
+        if (batchWarning) {
+          lines.push('');
+          lines.push(batchWarning);
+        }
 
         if (hensikt) {
           lines.push('');
@@ -1258,6 +1302,7 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
         return toolResult({
           success: true,
           summary: lines.join('\n'),
+          batchWarning,
           result: writeResult,
         });
       } catch (error) {
