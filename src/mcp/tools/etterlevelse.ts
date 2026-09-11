@@ -245,7 +245,7 @@ export interface SuksesskriterieBegrunnelseForBatchCheck {
   begrunnelse: unknown;
 }
 
-// Den ene sanksjonerte unntaket fra ett-SK-om-gangen-kravet: alle SK-er i kallet
+// Det ene sanksjonerte unntaket fra ett-SK-om-gangen-kravet: alle SK-er i kallet
 // settes IKKE_RELEVANT med nøyaktig samme begrunnelse (typisk "systemet er ikke
 // relevant for dette temaet" — ingenting å vurdere individuelt per SK).
 export function isHomogeneousIkkeRelevantBatch(
