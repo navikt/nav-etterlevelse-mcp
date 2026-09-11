@@ -240,6 +240,59 @@ export function determineWriteType(
   return hadBegrunnelse ? 'revised' : 'created';
 }
 
+export interface SuksesskriterieBegrunnelseForBatchCheck {
+  suksesskriterieStatus: unknown;
+  begrunnelse: unknown;
+}
+
+// Det ene sanksjonerte unntaket fra ett-SK-om-gangen-kravet: alle SK-er i kallet
+// settes IKKE_RELEVANT med nøyaktig samme begrunnelse (typisk "systemet er ikke
+// relevant for dette temaet" — ingenting å vurdere individuelt per SK).
+export function isHomogeneousIkkeRelevantBatch(
+  skbs: SuksesskriterieBegrunnelseForBatchCheck[],
+): boolean {
+  if (skbs.length <= 1) {
+    return false;
+  }
+  const first = skbs[0];
+  return skbs.every(
+    (skb) => skb.suksesskriterieStatus === 'IKKE_RELEVANT' && skb.begrunnelse === first.begrunnelse,
+  );
+}
+
+// Gir agenten umiddelbar in-band-tilbakemelding når write_etterlevelse mottar
+// flere nyskrevne SK-begrunnelser enn det som faktisk er rapportert enkeltvis
+// godkjent (log_review_event sk_reviewed/godkjent) siden forrige opplasting.
+// Viktig: selve arraylengden alene er IKKE et batching-signal — steg 8 i
+// gjennomgangsflyten laster opp *alle* individuelt godkjente SK-er for et
+// krav i ett samlet write_etterlevelse-kall, som er korrekt og forventet.
+// Signalet er avviket mellom antall skrevne SK-er og antall rapporterte
+// individuelle godkjenninger siden sist — det avslører når den interaktive
+// ett-SK-om-gangen-visningen (G/H/R) ble hoppet over i samtalen.
+// Returnerer null for enkeltstående skrivinger (ingen sesjonssporing nødvendig
+// for det trivielle tilfellet), det sanksjonerte IKKE_RELEVANT-unntaket, eller
+// når nok individuelle godkjenninger er rapportert.
+export function buildBatchWarning(
+  skbs: SuksesskriterieBegrunnelseForBatchCheck[],
+  reviewedIndividually: number,
+): string | null {
+  if (skbs.length <= 1 || isHomogeneousIkkeRelevantBatch(skbs) || skbs.length <= reviewedIndividually) {
+    return null;
+  }
+  return (
+    `⚠  Denne skrivingen inneholder ${skbs.length} suksesskriterie-begrunnelser, men kun ` +
+    `${reviewedIndividually} er rapportert enkeltvis godkjent via log_review_event siden forrige ` +
+    'opplasting. Gjennomgangsprosessen krever at hvert suksesskriterium presenteres og godkjennes ' +
+    'enkeltvis (G/H/R) før skriving — unntatt når alle settes IKKE_RELEVANT med identisk begrunnelse.'
+  );
+}
+
+// Forbruker sesjonens "reviewed pending"-teller ved en skriving — floor på 0
+// slik at telleren aldri blir negativ og lekker over til neste krav sin skriving.
+export function consumePendingReviews(pendingBefore: number, writtenCount: number): number {
+  return Math.max(0, pendingBefore - writtenCount);
+}
+
 function stripHtml(html: string): string {
   // Bruk split-på-vinkelparentes for å garantere at ingen '<'-tegn overlever
   // (CodeQL CWE-116 / incomplete-multi-char-sanitization)
@@ -1105,6 +1158,10 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
       description:
         'Skriv/oppdater en etterlevelsesbesvarelse for et krav. Krever aktiv sesjonslås (kall lock_document først). ' +
         'Henter kravets hensikt og eksisterende begrunnelse og returnerer dem i svaret for menneskelig gjennomgang. ' +
+        '⛔ Presenter og innhent godkjenning (G/H/R) for suksesskriteriene ett om gangen i samtalen før dette kallet, ' +
+        'og kall log_review_event(sk_reviewed, godkjent) for hver enkelt godkjenning. Svaret flagger et avvik hvis ' +
+        'antall skrevne SK-er overstiger antall rapporterte enkeltgodkjenninger siden forrige opplasting. ' +
+        'Unntak: alle suksesskriterier kan settes IKKE_RELEVANT med identisk begrunnelse i ett samlet kall. ' +
         `OPPFYLT og FERDIG/FERDIGSTILT kan ikke settes via agenten — sett disse manuelt i ${etterlevelseFrontendUrl} ` +
         'etter at du har lest suksesskriterieteksten og kravets hensikt.',
       inputSchema: {
@@ -1205,6 +1262,11 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
           });
         }
         etterlevelseWriteBatchSize.observe(saniterteSKB.length);
+        const pendingReviewed = ctx.tokenData.skReviewedPending ?? 0;
+        const batchWarning = buildBatchWarning(saniterteSKB, pendingReviewed);
+        authStore.updateMcpToken(ctx.mcpAccessToken, {
+          skReviewedPending: consumePendingReviews(pendingReviewed, saniterteSKB.length),
+        });
 
         // Build summary with krav context for human review
         const kravNavn = typeof krav.navn === 'string' ? krav.navn : `K${kravNummer}.${kravVersjon}`;
@@ -1216,6 +1278,10 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
         lines.push(`✅  K${kravNummer}.${kravVersjon} — ${kravNavn} er oppdatert`);
         lines.push(`    Status: ${status}`);
         if (statusBegrunnelse) lines.push(`    Statusbegrunnelse: ${statusBegrunnelse}`);
+        if (batchWarning) {
+          lines.push('');
+          lines.push(batchWarning);
+        }
 
         if (hensikt) {
           lines.push('');
@@ -1258,6 +1324,7 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
         return toolResult({
           success: true,
           summary: lines.join('\n'),
+          batchWarning,
           result: writeResult,
         });
       } catch (error) {
@@ -2443,7 +2510,13 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
     },
     async ({ event, decision }) => {
       try {
-        return toolResult(recordReviewEvent(event, decision));
+        const result = recordReviewEvent(event, decision);
+        if (event === 'sk_reviewed' && decision === 'godkjent') {
+          authStore.updateMcpToken(ctx.mcpAccessToken, {
+            skReviewedPending: (ctx.tokenData.skReviewedPending ?? 0) + 1,
+          });
+        }
+        return toolResult(result);
       } catch (error) {
         return toolError(error);
       }
