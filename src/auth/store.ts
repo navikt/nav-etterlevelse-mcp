@@ -34,6 +34,14 @@ export interface McpTokenData {
   lockedPvkDokumentId?: string;
   /** Tittel på det låste dokumentet — brukes i feilmeldinger. */
   lockedDocumentTitle?: string;
+  /**
+   * Antall suksesskriterier rapportert enkeltvis godkjent (log_review_event,
+   * sk_reviewed/godkjent) siden forrige write_etterlevelse-opplasting i denne
+   * sesjonen. Brukes til å oppdage om en skriving inneholder flere svar enn
+   * det som faktisk ble presentert/godkjent individuelt i samtalen — se
+   * buildBatchWarning i mcp/tools/etterlevelse.ts.
+   */
+  skReviewedPending?: number;
 }
 
 export interface ClientRegistration {
