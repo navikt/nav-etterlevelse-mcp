@@ -348,7 +348,7 @@
     {
       "id": 7,
       "title": "Etterlevelse-skriv per krav og status",
-      "type": "barchart",
+      "type": "timeseries",
       "gridPos": {
         "x": 0,
         "y": 12,
@@ -371,7 +371,15 @@
           "color": {
             "mode": "palette-classic"
           },
-          "unit": "short"
+          "unit": "short",
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 80,
+            "lineWidth": 1,
+            "stacking": {
+              "mode": "normal"
+            }
+          }
         }
       },
       "description": "Antall skriveoperasjoner per kravnummer og SK-status siste 24 timer",
@@ -383,7 +391,7 @@
     {
       "id": 8,
       "title": "PVK-operasjoner",
-      "type": "barchart",
+      "type": "timeseries",
       "gridPos": {
         "x": 12,
         "y": 12,
@@ -406,7 +414,15 @@
           "color": {
             "mode": "palette-classic"
           },
-          "unit": "short"
+          "unit": "short",
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 80,
+            "lineWidth": 1,
+            "stacking": {
+              "mode": "normal"
+            }
+          }
         }
       },
       "description": "Risikoscenarioer og tiltak opprettet/oppdatert siste 24 timer",
@@ -418,7 +434,7 @@
     {
       "id": 9,
       "title": "Navet-bruk per fagområde",
-      "type": "barchart",
+      "type": "timeseries",
       "gridPos": {
         "x": 0,
         "y": 20,
@@ -441,7 +457,15 @@
           "color": {
             "mode": "palette-classic"
           },
-          "unit": "short"
+          "unit": "short",
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 80,
+            "lineWidth": 1,
+            "stacking": {
+              "mode": "normal"
+            }
+          }
         }
       },
       "datasource": {
@@ -550,7 +574,7 @@
     {
       "id": 12,
       "title": "Gjennomgangs-hendelser (log_review_event)",
-      "type": "barchart",
+      "type": "timeseries",
       "gridPos": {
         "x": 6,
         "y": 26,
@@ -583,7 +607,15 @@
           "color": {
             "mode": "palette-classic"
           },
-          "unit": "short"
+          "unit": "short",
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 80,
+            "lineWidth": 1,
+            "stacking": {
+              "mode": "normal"
+            }
+          }
         }
       },
       "datasource": {
@@ -643,7 +675,7 @@
     {
       "id": 14,
       "title": "Skriving: nye vs. reviderte SK-svar per krav (7d)",
-      "type": "barchart",
+      "type": "timeseries",
       "gridPos": {
         "x": 12,
         "y": 34,
@@ -667,7 +699,15 @@
           "color": {
             "mode": "palette-classic"
           },
-          "unit": "short"
+          "unit": "short",
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 80,
+            "lineWidth": 1,
+            "stacking": {
+              "mode": "normal"
+            }
+          }
         }
       },
       "datasource": {
