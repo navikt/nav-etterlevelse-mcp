@@ -373,7 +373,11 @@
           "color": {
             "mode": "palette-classic"
           },
-          "unit": "short"
+          "unit": "short",
+          "custom": {
+            "xTickLabelRotation": -45,
+            "xTickLabelSpacing": 100
+          }
         }
       },
       "description": "Antall skriveoperasjoner per kravnummer og SK-status siste 24 timer",
@@ -421,7 +425,11 @@
           "color": {
             "mode": "palette-classic"
           },
-          "unit": "short"
+          "unit": "short",
+          "custom": {
+            "xTickLabelRotation": -45,
+            "xTickLabelSpacing": 100
+          }
         }
       },
       "description": "Risikoscenarioer og tiltak opprettet/oppdatert siste 24 timer",
@@ -469,7 +477,11 @@
           "color": {
             "mode": "palette-classic"
           },
-          "unit": "short"
+          "unit": "short",
+          "custom": {
+            "xTickLabelRotation": -45,
+            "xTickLabelSpacing": 100
+          }
         }
       },
       "datasource": {
@@ -643,7 +655,11 @@
           "color": {
             "mode": "palette-classic"
           },
-          "unit": "short"
+          "unit": "short",
+          "custom": {
+            "xTickLabelRotation": -45,
+            "xTickLabelSpacing": 100
+          }
         }
       },
       "datasource": {
@@ -748,7 +764,11 @@
           "color": {
             "mode": "palette-classic"
           },
-          "unit": "short"
+          "unit": "short",
+          "custom": {
+            "xTickLabelRotation": -45,
+            "xTickLabelSpacing": 100
+          }
         }
       },
       "datasource": {
