@@ -358,12 +358,14 @@
       "targets": [
         {
           "expr": "sum by (kravnummer, suksesskriterium_status) (increase(etterlevelse_writes_total{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\"}[24h]))",
-          "legendFormat": "K{{kravnummer}} — {{suksesskriterium_status}}",
+          "legendFormat": "__auto",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
             "uid": "${datasource}"
-          }
+          },
+          "instant": true,
+          "format": "table"
         }
       ],
       "fieldConfig": {
@@ -378,7 +380,18 @@
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
-      }
+      },
+      "transformations": [
+        {
+          "id": "groupingToMatrix",
+          "options": {
+            "columnField": "suksesskriterium_status",
+            "rowField": "kravnummer",
+            "valueField": "Value",
+            "emptyValue": 0
+          }
+        }
+      ]
     },
     {
       "id": 8,
@@ -393,12 +406,14 @@
       "targets": [
         {
           "expr": "sum by (operation, status) (increase(pvk_operations_total{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\"}[24h]))",
-          "legendFormat": "{{operation}} — {{status}}",
+          "legendFormat": "__auto",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
             "uid": "${datasource}"
-          }
+          },
+          "instant": true,
+          "format": "table"
         }
       ],
       "fieldConfig": {
@@ -413,7 +428,18 @@
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
-      }
+      },
+      "transformations": [
+        {
+          "id": "groupingToMatrix",
+          "options": {
+            "columnField": "status",
+            "rowField": "operation",
+            "valueField": "Value",
+            "emptyValue": 0
+          }
+        }
+      ]
     },
     {
       "id": 9,
@@ -428,12 +454,14 @@
       "targets": [
         {
           "expr": "sum by (fagomrade) (increase(navet_reads_total{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\"}[24h]))",
-          "legendFormat": "{{fagomrade}}",
+          "legendFormat": "__auto",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
             "uid": "${datasource}"
-          }
+          },
+          "instant": true,
+          "format": "table"
         }
       ],
       "fieldConfig": {
@@ -447,7 +475,35 @@
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
-      }
+      },
+      "transformations": [
+        {
+          "id": "labelsToFields",
+          "options": {
+            "mode": "columns",
+            "keepLabels": [
+              "fagomrade"
+            ]
+          }
+        },
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            },
+            "indexByName": {},
+            "renameByName": {
+              "fagomrade": "Fagområde",
+              "Value": "Antall kall"
+            }
+          }
+        }
+      ]
     },
     {
       "id": 10,
@@ -561,21 +617,25 @@
       "targets": [
         {
           "expr": "sum by (event) (increase(review_workflow_events_total{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\", decision=\"none\"}[24h]))",
-          "legendFormat": "{{event}}",
+          "legendFormat": "__auto",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
             "uid": "${datasource}"
-          }
+          },
+          "instant": true,
+          "format": "table"
         },
         {
           "expr": "sum by (decision) (increase(review_workflow_events_total{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\", event=\"sk_reviewed\", decision!=\"none\"}[24h]))",
-          "legendFormat": "sk_reviewed — {{decision}}",
+          "legendFormat": "__auto",
           "refId": "B",
           "datasource": {
             "type": "prometheus",
             "uid": "${datasource}"
-          }
+          },
+          "instant": true,
+          "format": "table"
         }
       ],
       "fieldConfig": {
@@ -589,7 +649,26 @@
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
-      }
+      },
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            },
+            "indexByName": {},
+            "renameByName": {
+              "event": "kategori",
+              "decision": "kategori"
+            }
+          }
+        },
+        {
+          "id": "merge",
+          "options": {}
+        }
+      ]
     },
     {
       "id": 13,
@@ -654,12 +733,14 @@
       "targets": [
         {
           "expr": "sum by (kravnummer, write_type) (increase(etterlevelse_writes_total{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\"}[7d]))",
-          "legendFormat": "K{{kravnummer}} — {{write_type}}",
+          "legendFormat": "__auto",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
             "uid": "${datasource}"
-          }
+          },
+          "instant": true,
+          "format": "table"
         }
       ],
       "fieldConfig": {
@@ -673,7 +754,18 @@
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
-      }
+      },
+      "transformations": [
+        {
+          "id": "groupingToMatrix",
+          "options": {
+            "columnField": "write_type",
+            "rowField": "kravnummer",
+            "valueField": "Value",
+            "emptyValue": 0
+          }
+        }
+      ]
     }
   ]
 }
