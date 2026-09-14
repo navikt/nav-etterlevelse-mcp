@@ -628,7 +628,7 @@
       "description": "Selvrapportert telemetri fra etterlevelse-/PVK-skillen: rapport skrevet/godkjent, SK-beslutninger (godkjent/hoppet_over/redigert) og opplastede krav siste 24 timer.",
       "targets": [
         {
-          "expr": "sum by (event) (increase(review_workflow_events_total{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\", decision=\"none\"}[24h]))",
+          "expr": "label_replace(sum by (event) (increase(review_workflow_events_total{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\", decision=\"none\"}[24h])), \"kategori\", \"$1\", \"event\", \"(.*)\")",
           "legendFormat": "__auto",
           "refId": "A",
           "datasource": {
@@ -639,7 +639,7 @@
           "format": "table"
         },
         {
-          "expr": "sum by (decision) (increase(review_workflow_events_total{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\", event=\"sk_reviewed\", decision!=\"none\"}[24h]))",
+          "expr": "label_replace(sum by (decision) (increase(review_workflow_events_total{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\", event=\"sk_reviewed\", decision!=\"none\"}[24h])), \"kategori\", \"$1\", \"decision\", \"(.*)\")",
           "legendFormat": "__auto",
           "refId": "B",
           "datasource": {
@@ -668,21 +668,23 @@
       },
       "transformations": [
         {
+          "id": "merge",
+          "options": {}
+        },
+        {
           "id": "organize",
           "options": {
             "excludeByName": {
-              "Time": true
+              "Time": true,
+              "event": true,
+              "decision": true
             },
             "indexByName": {},
             "renameByName": {
-              "event": "kategori",
-              "decision": "kategori"
+              "kategori": "Kategori",
+              "Value": "Antall"
             }
           }
-        },
-        {
-          "id": "merge",
-          "options": {}
         }
       ]
     },
