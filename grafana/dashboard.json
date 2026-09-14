@@ -348,7 +348,7 @@
     {
       "id": 7,
       "title": "Etterlevelse-skriv per krav og status",
-      "type": "barchart",
+      "type": "timeseries",
       "gridPos": {
         "x": 0,
         "y": 12,
@@ -358,14 +358,12 @@
       "targets": [
         {
           "expr": "sum by (kravnummer, suksesskriterium_status) (increase(etterlevelse_writes_total{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\"}[24h]))",
-          "legendFormat": "__auto",
+          "legendFormat": "K{{kravnummer}} — {{suksesskriterium_status}}",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
             "uid": "${datasource}"
-          },
-          "instant": true,
-          "format": "table"
+          }
         }
       ],
       "fieldConfig": {
@@ -375,8 +373,12 @@
           },
           "unit": "short",
           "custom": {
-            "xTickLabelRotation": -45,
-            "xTickLabelSpacing": 100
+            "drawStyle": "bars",
+            "fillOpacity": 80,
+            "lineWidth": 1,
+            "stacking": {
+              "mode": "normal"
+            }
           }
         }
       },
@@ -384,23 +386,12 @@
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
-      },
-      "transformations": [
-        {
-          "id": "groupingToMatrix",
-          "options": {
-            "columnField": "suksesskriterium_status",
-            "rowField": "kravnummer",
-            "valueField": "Value",
-            "emptyValue": 0
-          }
-        }
-      ]
+      }
     },
     {
       "id": 8,
       "title": "PVK-operasjoner",
-      "type": "barchart",
+      "type": "timeseries",
       "gridPos": {
         "x": 12,
         "y": 12,
@@ -410,14 +401,12 @@
       "targets": [
         {
           "expr": "sum by (operation, status) (increase(pvk_operations_total{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\"}[24h]))",
-          "legendFormat": "__auto",
+          "legendFormat": "{{operation}} — {{status}}",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
             "uid": "${datasource}"
-          },
-          "instant": true,
-          "format": "table"
+          }
         }
       ],
       "fieldConfig": {
@@ -427,8 +416,12 @@
           },
           "unit": "short",
           "custom": {
-            "xTickLabelRotation": -45,
-            "xTickLabelSpacing": 100
+            "drawStyle": "bars",
+            "fillOpacity": 80,
+            "lineWidth": 1,
+            "stacking": {
+              "mode": "normal"
+            }
           }
         }
       },
@@ -436,23 +429,12 @@
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
-      },
-      "transformations": [
-        {
-          "id": "groupingToMatrix",
-          "options": {
-            "columnField": "status",
-            "rowField": "operation",
-            "valueField": "Value",
-            "emptyValue": 0
-          }
-        }
-      ]
+      }
     },
     {
       "id": 9,
       "title": "Navet-bruk per fagområde",
-      "type": "barchart",
+      "type": "timeseries",
       "gridPos": {
         "x": 0,
         "y": 20,
@@ -462,14 +444,12 @@
       "targets": [
         {
           "expr": "sum by (fagomrade) (increase(navet_reads_total{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\"}[24h]))",
-          "legendFormat": "__auto",
+          "legendFormat": "{{fagomrade}}",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
             "uid": "${datasource}"
-          },
-          "instant": true,
-          "format": "table"
+          }
         }
       ],
       "fieldConfig": {
@@ -479,43 +459,19 @@
           },
           "unit": "short",
           "custom": {
-            "xTickLabelRotation": -45,
-            "xTickLabelSpacing": 100
+            "drawStyle": "bars",
+            "fillOpacity": 80,
+            "lineWidth": 1,
+            "stacking": {
+              "mode": "normal"
+            }
           }
         }
       },
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
-      },
-      "transformations": [
-        {
-          "id": "labelsToFields",
-          "options": {
-            "mode": "columns",
-            "keepLabels": [
-              "fagomrade"
-            ]
-          }
-        },
-        {
-          "id": "merge",
-          "options": {}
-        },
-        {
-          "id": "organize",
-          "options": {
-            "excludeByName": {
-              "Time": true
-            },
-            "indexByName": {},
-            "renameByName": {
-              "fagomrade": "Fagområde",
-              "Value": "Antall kall"
-            }
-          }
-        }
-      ]
+      }
     },
     {
       "id": 10,
@@ -618,7 +574,7 @@
     {
       "id": 12,
       "title": "Gjennomgangs-hendelser (log_review_event)",
-      "type": "barchart",
+      "type": "timeseries",
       "gridPos": {
         "x": 6,
         "y": 26,
@@ -628,26 +584,22 @@
       "description": "Selvrapportert telemetri fra etterlevelse-/PVK-skillen: rapport skrevet/godkjent, SK-beslutninger (godkjent/hoppet_over/redigert) og opplastede krav siste 24 timer.",
       "targets": [
         {
-          "expr": "label_replace(sum by (event) (increase(review_workflow_events_total{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\", decision=\"none\"}[24h])), \"kategori\", \"$1\", \"event\", \"(.*)\")",
-          "legendFormat": "__auto",
+          "expr": "sum by (event) (increase(review_workflow_events_total{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\", decision=\"none\"}[24h]))",
+          "legendFormat": "{{event}}",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
             "uid": "${datasource}"
-          },
-          "instant": true,
-          "format": "table"
+          }
         },
         {
-          "expr": "label_replace(sum by (decision) (increase(review_workflow_events_total{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\", event=\"sk_reviewed\", decision!=\"none\"}[24h])), \"kategori\", \"$1\", \"decision\", \"(.*)\")",
-          "legendFormat": "__auto",
+          "expr": "sum by (decision) (increase(review_workflow_events_total{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\", event=\"sk_reviewed\", decision!=\"none\"}[24h]))",
+          "legendFormat": "sk_reviewed — {{decision}}",
           "refId": "B",
           "datasource": {
             "type": "prometheus",
             "uid": "${datasource}"
-          },
-          "instant": true,
-          "format": "table"
+          }
         }
       ],
       "fieldConfig": {
@@ -657,36 +609,19 @@
           },
           "unit": "short",
           "custom": {
-            "xTickLabelRotation": -45,
-            "xTickLabelSpacing": 100
+            "drawStyle": "bars",
+            "fillOpacity": 80,
+            "lineWidth": 1,
+            "stacking": {
+              "mode": "normal"
+            }
           }
         }
       },
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
-      },
-      "transformations": [
-        {
-          "id": "merge",
-          "options": {}
-        },
-        {
-          "id": "organize",
-          "options": {
-            "excludeByName": {
-              "Time": true,
-              "event": true,
-              "decision": true
-            },
-            "indexByName": {},
-            "renameByName": {
-              "kategori": "Kategori",
-              "Value": "Antall"
-            }
-          }
-        }
-      ]
+      }
     },
     {
       "id": 13,
@@ -740,7 +675,7 @@
     {
       "id": 14,
       "title": "Skriving: nye vs. reviderte SK-svar per krav (7d)",
-      "type": "barchart",
+      "type": "timeseries",
       "gridPos": {
         "x": 12,
         "y": 34,
@@ -751,14 +686,12 @@
       "targets": [
         {
           "expr": "sum by (kravnummer, write_type) (increase(etterlevelse_writes_total{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\"}[7d]))",
-          "legendFormat": "__auto",
+          "legendFormat": "K{{kravnummer}} — {{write_type}}",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
             "uid": "${datasource}"
-          },
-          "instant": true,
-          "format": "table"
+          }
         }
       ],
       "fieldConfig": {
@@ -768,26 +701,19 @@
           },
           "unit": "short",
           "custom": {
-            "xTickLabelRotation": -45,
-            "xTickLabelSpacing": 100
+            "drawStyle": "bars",
+            "fillOpacity": 80,
+            "lineWidth": 1,
+            "stacking": {
+              "mode": "normal"
+            }
           }
         }
       },
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
-      },
-      "transformations": [
-        {
-          "id": "groupingToMatrix",
-          "options": {
-            "columnField": "write_type",
-            "rowField": "kravnummer",
-            "valueField": "Value",
-            "emptyValue": 0
-          }
-        }
-      ]
+      }
     }
   ]
 }
