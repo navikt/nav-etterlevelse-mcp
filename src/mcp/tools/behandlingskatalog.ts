@@ -78,6 +78,52 @@ export function registerBehandlingskatalogTools(
   );
 
   instrumentedRegisterTool(server, 
+    'search_dp_behandlinger',
+    {
+      description:
+        'Søk etter behandlinger der Nav opptrer som databehandler (ikke behandlingsansvarlig), ' +
+        'registrert under «Nav som databehandler» i behandlingskatalogen.',
+      inputSchema: {
+        search: z
+          .string()
+          .trim()
+          .min(3, 'Søket må inneholde minst 3 tegn (krav fra behandlingskatalogen)')
+          .describe('Søk på D-nummer eller navn (minst 3 tegn)'),
+      },
+      annotations: readOnlyAnnotations,
+    },
+    async ({ search }) => {
+      try {
+        behandlingskatalogReadsTotal.inc({ operation: 'search_dp_behandlinger' });
+        return toolResult(await client.searchDpBehandlinger(search));
+      } catch (error) {
+        return toolError(error);
+      }
+    },
+  );
+
+  instrumentedRegisterTool(server, 
+    'get_dp_behandling',
+    {
+      description:
+        'Hent en behandling der Nav opptrer som databehandler (ikke behandlingsansvarlig) ' +
+        'med UUID eller D-nummer.',
+      inputSchema: {
+        id: z.string().min(1).describe('UUID eller D-nummer, for eksempel D123'),
+      },
+      annotations: readOnlyAnnotations,
+    },
+    async ({ id }) => {
+      try {
+        behandlingskatalogReadsTotal.inc({ operation: 'get_dp_behandling' });
+        return toolResult(await client.getDpBehandling(id));
+      } catch (error) {
+        return toolError(error);
+      }
+    },
+  );
+
+  instrumentedRegisterTool(server, 
     'get_processor',
     {
       description: 'Hent en databehandler på UUID.',

@@ -1382,8 +1382,10 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
           .array(z.string())
           .optional()
           .describe(
-            'UUID-liste over databehandler-behandlinger fra behandlingskatalogen. ' +
-              'Bruk search_behandlinger for å finne riktig UUID fra B-nummer eller navn.',
+            'UUID-liste over behandlinger der Nav opptrer som databehandler (D-nummer), ' +
+              'fra «Nav som databehandler» i behandlingskatalogen. Bruk search_dp_behandlinger ' +
+              'for å finne riktig UUID fra D-nummer eller navn. Minst ett av behandlingIds eller ' +
+              'dpBehandlingIds må være satt.',
           ),
         irrelevansFor: z
           .array(z.enum(irrelevansForCodes))
