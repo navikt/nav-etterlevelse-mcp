@@ -167,13 +167,14 @@ export class BehandlingskatalogClient {
   }
 
   async getDpBehandling(id: string): Promise<unknown> {
-    if (/^D\d+$/i.test(id.trim())) {
+    const trimmedId = id.trim();
+    if (/^D\d+$/i.test(trimmedId)) {
       // Skill-gotcha: bruk søkeendepunkt for D-nummer-oppslag — ikke hent alle og filtrer.
       // Polly sitt søk matcher mønsteret d[0-9]+ på hele søkestrengen (se DpProcessController#search),
-      // så vi sender inn id.trim() med D-prefiks, i tråd med B-nummer-varianten over.
-      const payload = await this.get(`/dpprocess/search/${encodeURIComponent(id.trim())}`);
+      // så vi sender inn trimmedId med D-prefiks, i tråd med B-nummer-varianten over.
+      const payload = await this.get(`/dpprocess/search/${encodeURIComponent(trimmedId)}`);
       const items = extractArray<Record<string, unknown>>(payload);
-      const numericId = id.replace(/^D/i, '');
+      const numericId = trimmedId.replace(/^D/i, '');
       const match = items.find((item) => asString(item.dpProcessNumber) === numericId);
       if (!match) {
         throw new Error(`Fant ikke behandling med nummer ${id}`);
@@ -188,7 +189,7 @@ export class BehandlingskatalogClient {
       return isRecord(fullPayload) ? this.mapDpBehandling(fullPayload) : fullPayload;
     }
 
-    const payload = await this.get(`/dpprocess/${id}`);
+    const payload = await this.get(`/dpprocess/${encodeURIComponent(trimmedId)}`);
     if (!isRecord(payload)) {
       return payload;
     }

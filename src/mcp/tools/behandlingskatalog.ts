@@ -84,7 +84,11 @@ export function registerBehandlingskatalogTools(
         'Søk etter behandlinger der Nav opptrer som databehandler (ikke behandlingsansvarlig), ' +
         'registrert under «Nav som databehandler» i behandlingskatalogen.',
       inputSchema: {
-        search: z.string().min(1).describe('Søk på D-nummer eller navn'),
+        search: z
+          .string()
+          .trim()
+          .min(3, 'Søket må inneholde minst 3 tegn (krav fra behandlingskatalogen)')
+          .describe('Søk på D-nummer eller navn (minst 3 tegn)'),
       },
       annotations: readOnlyAnnotations,
     },

@@ -75,6 +75,26 @@ describe('BehandlingskatalogClient — D-nummer (DpBehandling)', () => {
     });
   });
 
+  it('getDpBehandling trimmer whitespace før D-nummer-matching', async () => {
+    const calledUrls: string[] = [];
+    const fetchMock = vi.fn(async (url: string | URL) => {
+      const urlString = url.toString();
+      calledUrls.push(urlString);
+      if (urlString.includes('/dpprocess/search/')) {
+        return jsonResponse([{ id: 'dp-uuid-1', dpProcessNumber: '123', name: 'Utsendelse av vedtaksbrev' }]);
+      }
+      return jsonResponse({ id: 'dp-uuid-1', dpProcessNumber: 123, name: 'Utsendelse av vedtaksbrev' });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const client = new BehandlingskatalogClient('fake-token', 'https://test.local/api');
+    const result = await client.getDpBehandling('  D123  ');
+
+    expect(calledUrls[0]).toContain('/dpprocess/search/D123');
+    expect(calledUrls[1]).toContain('/dpprocess/dp-uuid-1');
+    expect(result).toMatchObject({ id: 'dp-uuid-1', number: 'D123' });
+  });
+
   it('getDpBehandling henter direkte på UUID uten søkeoppslag', async () => {
     const calledUrls: string[] = [];
     const fetchMock = vi.fn(async (url: string | URL) => {
