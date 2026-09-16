@@ -1,5 +1,9 @@
 # nav-etterlevelse-mcp
 
+> ⚠️ **Status: kun dev.** Løsningen er foreløpig kun operativ og godkjent for bruk i `dev-gcp`.
+> Prod-instansen er deployert, men **ikke godkjent/åpnet for bruk** ennå — ikke bruk
+> `https://nav-etterlevelse-mcp.intern.nav.no/mcp` før dette er avklart.
+
 MCP-server (Model Context Protocol) som gir AI-agenter (GitHub Copilot CLI, OpenCode) strukturert og
 schema-validert tilgang til NAVs etterlevelsesløsning og behandlingskatalog.
 
@@ -131,8 +135,8 @@ Legg til MCP-serveren:
 ```bash
 opencode mcp add
 # Velg "remote", skriv inn URL:
-# Prod: https://nav-etterlevelse-mcp.intern.nav.no/mcp
 # Dev:  https://nav-etterlevelse-mcp.intern.dev.nav.no/mcp
+# Prod: https://nav-etterlevelse-mcp.intern.nav.no/mcp (ikke godkjent for bruk ennå, se statusvarsel øverst)
 ```
 I copilot CLI kan du bruke `mcp`-kommandoene direkte, f.eks.:
 ```bash
@@ -142,7 +146,8 @@ name: nav-etterlevelse-mcp
 servertype: HTTP
 remote server: https://nav-etterlevelse-mcp.intern.nav.no/mcp
 ```
-Copilot validerer mcp servere mot mcp-registry, så det er ikke mulig å legge til dev-instansen
+Copilot validerer mcp servere mot mcp-registry, så det er ikke mulig å legge til dev-instansen.
+Merk at prod-URL-en over foreløpig ikke skal tas i bruk, se statusvarsel øverst i denne README-en.
 
 Autentiser:
 
