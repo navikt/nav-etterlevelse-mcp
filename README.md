@@ -110,7 +110,15 @@ Tilgang innvilges per fagområde av #tech-azure. Se [implementasjonsplan](docs/n
 |------|-------------|
 | `search_behandlinger` | Søk behandlinger på navn eller B-nummer |
 | `get_behandling` | Hent full behandlingsinfo (UUID eller B-nummer) |
+| `search_dp_behandlinger` | Søk behandlinger der Nav er databehandler, på navn eller D-nummer |
+| `get_dp_behandling` | Hent full behandlingsinfo der Nav er databehandler (UUID eller D-nummer) |
 | `get_processor` | Hent databehandler-info |
+
+**B-nummer vs. D-nummer:** Behandlingskatalogen skiller mellom vanlige behandlinger der Nav er
+behandlingsansvarlig (`Process`, B-nummer, f.eks. B580) og behandlinger der Nav kun opptrer som
+databehandler for en annen behandlingsansvarlig (`DpProcess`, D-nummer, f.eks. D123, registrert
+under «Nav som databehandler»). Et etterlevelsesdokument kan kobles til enten `behandlingIds`
+(B-nummer) eller `dpBehandlingIds` (D-nummer) — minst ett av dem må være satt.
 
 ## Tilgangsbegrensninger
 

@@ -157,6 +157,45 @@ export class BehandlingskatalogClient {
     return this.mapBehandling(payload);
   }
 
+  async searchDpBehandlinger(search: string): Promise<unknown[]> {
+    // Skill-gotcha: bruk dedikert søkeendepunkt — ikke hent alle og filtrer client-side.
+    // Polly krever minst 3 tegn i søket (se DpProcessController#search).
+    const payload = await this.get(`/dpprocess/search/${encodeURIComponent(search)}`);
+
+    const items = extractArray<Record<string, unknown>>(payload);
+    return items.map((item) => this.mapDpBehandlingSummary(item));
+  }
+
+  async getDpBehandling(id: string): Promise<unknown> {
+    if (/^D\d+$/i.test(id.trim())) {
+      // Skill-gotcha: bruk søkeendepunkt for D-nummer-oppslag — ikke hent alle og filtrer.
+      // Polly sitt søk matcher mønsteret d[0-9]+ på hele søkestrengen (se DpProcessController#search),
+      // så vi sender inn id.trim() med D-prefiks, i tråd med B-nummer-varianten over.
+      const payload = await this.get(`/dpprocess/search/${encodeURIComponent(id.trim())}`);
+      const items = extractArray<Record<string, unknown>>(payload);
+      const numericId = id.replace(/^D/i, '');
+      const match = items.find((item) => asString(item.dpProcessNumber) === numericId);
+      if (!match) {
+        throw new Error(`Fant ikke behandling med nummer ${id}`);
+      }
+
+      const dpProcessId = asString(match.id);
+      if (!dpProcessId) {
+        throw new Error(`Fant behandling ${id}, men mangler UUID i API-responsen`);
+      }
+
+      const fullPayload = await this.get(`/dpprocess/${dpProcessId}`);
+      return isRecord(fullPayload) ? this.mapDpBehandling(fullPayload) : fullPayload;
+    }
+
+    const payload = await this.get(`/dpprocess/${id}`);
+    if (!isRecord(payload)) {
+      return payload;
+    }
+
+    return this.mapDpBehandling(payload);
+  }
+
   async getProcessor(id: string): Promise<unknown> {
     const payload = await this.get(`/processor/${id}`);
     if (!isRecord(payload)) {
@@ -188,6 +227,37 @@ export class BehandlingskatalogClient {
       retention: payload.retention ?? null,
       dataProcessing: payload.dataProcessing ?? payload.dataBehandling ?? null,
       dpia: payload.dpia ?? null,
+      raw: payload,
+    };
+  }
+
+  // DpProcess (D-nummer) — behandlinger der Nav opptrer som databehandler, ikke
+  // behandlingsansvarlig. Egen entitet i behandlingskatalogen (polly), parallell til
+  // Process/B-nummer, men med et annet feltsett (se DpProcessResponse i polly).
+  private mapDpBehandlingSummary(item: Record<string, unknown>): Record<string, unknown> {
+    const dpProcessNumber = asString(item.dpProcessNumber);
+    return {
+      id: asString(item.id) ?? '',
+      number: dpProcessNumber ? `D${dpProcessNumber}` : '',
+      name: asString(item.name) ?? asString(item.navn) ?? 'Uten navn',
+      purposeDescription: asString(item.purposeDescription) ?? '',
+    };
+  }
+
+  private mapDpBehandling(payload: Record<string, unknown>): Record<string, unknown> {
+    const dpProcessNumber = asString(payload.dpProcessNumber);
+    return {
+      id: asString(payload.id) ?? null,
+      number: dpProcessNumber ? `D${dpProcessNumber}` : null,
+      name: asString(payload.name) ?? null,
+      description: asString(payload.description) ?? null,
+      purposeDescription: asString(payload.purposeDescription) ?? null,
+      affiliation: payload.affiliation ?? null,
+      dataProcessingAgreements: extractStringArray(payload.dataProcessingAgreements),
+      subDataProcessing: payload.subDataProcessing ?? null,
+      art9: payload.art9 ?? null,
+      art10: payload.art10 ?? null,
+      retention: payload.retention ?? null,
       raw: payload,
     };
   }
