@@ -262,16 +262,21 @@ export function isHomogeneousIkkeRelevantBatch(
 
 // Gir agenten umiddelbar in-band-tilbakemelding når write_etterlevelse mottar
 // flere nyskrevne SK-begrunnelser enn det som faktisk er rapportert enkeltvis
-// godkjent (log_review_event sk_reviewed/godkjent) siden forrige opplasting.
+// vurdert (log_review_event sk_reviewed med godkjent/hoppet_over/redigert)
+// siden forrige opplasting.
 // Viktig: selve arraylengden alene er IKKE et batching-signal — steg 8 i
-// gjennomgangsflyten laster opp *alle* individuelt godkjente SK-er for et
+// gjennomgangsflyten laster opp *alle* individuelt vurderte SK-er for et
 // krav i ett samlet write_etterlevelse-kall, som er korrekt og forventet.
 // Signalet er avviket mellom antall skrevne SK-er og antall rapporterte
-// individuelle godkjenninger siden sist — det avslører når den interaktive
+// individuelle vurderinger siden sist — det avslører når den interaktive
 // ett-SK-om-gangen-visningen (G/H/R) ble hoppet over i samtalen.
+// Alle tre beslutningstypene (G/H/R) teller likt som "vurdert": et redigert
+// eller hoppet-over SK er like mye et tegn på at gjennomgangsprosessen faktisk
+// ble fulgt som en godkjenning — å kun telle godkjent ga falske positiver på
+// legitimt redigerte SK-er, noe som lærer agenten at advarselen er støy.
 // Returnerer null for enkeltstående skrivinger (ingen sesjonssporing nødvendig
 // for det trivielle tilfellet), det sanksjonerte IKKE_RELEVANT-unntaket, eller
-// når nok individuelle godkjenninger er rapportert.
+// når nok individuelle vurderinger er rapportert.
 export function buildBatchWarning(
   skbs: SuksesskriterieBegrunnelseForBatchCheck[],
   reviewedIndividually: number,
@@ -281,9 +286,10 @@ export function buildBatchWarning(
   }
   return (
     `⚠  Denne skrivingen inneholder ${skbs.length} suksesskriterie-begrunnelser, men kun ` +
-    `${reviewedIndividually} er rapportert enkeltvis godkjent via log_review_event siden forrige ` +
-    'opplasting. Gjennomgangsprosessen krever at hvert suksesskriterium presenteres og godkjennes ' +
-    'enkeltvis (G/H/R) før skriving — unntatt når alle settes IKKE_RELEVANT med identisk begrunnelse.'
+    `${reviewedIndividually} er rapportert enkeltvis vurdert (godkjent/hoppet over/redigert) via ` +
+    'log_review_event siden forrige opplasting. Gjennomgangsprosessen krever at hvert suksesskriterium ' +
+    'presenteres og tas stilling til enkeltvis (G/H/R) før skriving — unntatt når alle settes ' +
+    'IKKE_RELEVANT med identisk begrunnelse.'
   );
 }
 
@@ -1158,9 +1164,10 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
       description:
         'Skriv/oppdater en etterlevelsesbesvarelse for et krav. Krever aktiv sesjonslås (kall lock_document først). ' +
         'Henter kravets hensikt og eksisterende begrunnelse og returnerer dem i svaret for menneskelig gjennomgang. ' +
-        '⛔ Presenter og innhent godkjenning (G/H/R) for suksesskriteriene ett om gangen i samtalen før dette kallet, ' +
-        'og kall log_review_event(sk_reviewed, godkjent) for hver enkelt godkjenning. Svaret flagger et avvik hvis ' +
-        'antall skrevne SK-er overstiger antall rapporterte enkeltgodkjenninger siden forrige opplasting. ' +
+        '⛔ Presenter og innhent beslutning (G/H/R) for suksesskriteriene ett om gangen i samtalen før dette kallet, ' +
+        'og kall log_review_event(sk_reviewed, <godkjent|hoppet_over|redigert>) for hver enkelt beslutning. Svaret ' +
+        'flagger et avvik hvis antall skrevne SK-er overstiger antall rapporterte enkeltvurderinger siden forrige ' +
+        'opplasting. ' +
         'Unntak: alle suksesskriterier kan settes IKKE_RELEVANT med identisk begrunnelse i ett samlet kall. ' +
         `OPPFYLT og FERDIG/FERDIGSTILT kan ikke settes via agenten — sett disse manuelt i ${etterlevelseFrontendUrl} ` +
         'etter at du har lest suksesskriterieteksten og kravets hensikt.',
@@ -2513,7 +2520,12 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
     async ({ event, decision }) => {
       try {
         const result = recordReviewEvent(event, decision);
-        if (event === 'sk_reviewed' && decision === 'godkjent') {
+        if (event === 'sk_reviewed' && decision !== undefined) {
+          // Alle tre beslutningstypene (godkjent/hoppet_over/redigert) teller som
+          // "vurdert" — hvert av dem betyr at SK-et faktisk ble presentert og tatt
+          // stilling til i den interaktive gjennomgangen. Å kun telle "godkjent"
+          // ga falske positiver på batchvarselet for legitimt redigerte/hoppet-over
+          // SK-er, noe som undergraver tilliten til advarselen.
           authStore.updateMcpToken(ctx.mcpAccessToken, {
             skReviewedPending: (ctx.tokenData.skReviewedPending ?? 0) + 1,
           });
