@@ -46,7 +46,6 @@ bevart for auditing.
 | `list_nom_avdelinger` | List alle avdelinger fra NOM |
 | `search_slack_channel` | Søk etter Slack-kanaler (for varslingsadresser) |
 | `lock_document` | Lås et dokument for skriveoperasjoner i gjeldende sesjon |
-| `log_review_event` | Rapporter et steg i gjennomgangsprosessen for observability (ren telemetri, ingen etterlevelsesdata) |
 
 ### Etterlevelse — skriv *(krever feature-toggle)*
 
@@ -54,7 +53,8 @@ bevart for auditing.
 |------|-------------|
 | `create_etterlevelse_dokumentasjon` | Opprett nytt etterlevelsesdokument |
 | `write_etterlevelse_dokumentasjon` | Oppdater dokumentegenskaper |
-| `write_etterlevelse` | Svar på ett krav |
+| `write_suksesskriterium` | Skriv/oppdater begrunnelsen for ETT suksesskriterium om gangen (fletter inn i eksisterende besvarelse). Oppdager automatisk samtidig redigering (f.eks. fra etterlevelse-frontend) via sesjonssporet versjonskontroll — ingen input påkrevd fra kalleren |
+| `write_krav_status` | Sett status for et helt krav (f.eks. IKKE_RELEVANT) uten å røre suksesskriterie-begrunnelsene. Oppdager automatisk samtidig redigering (f.eks. fra etterlevelse-frontend) via sesjonssporet versjonskontroll — ingen input påkrevd fra kalleren |
 | `delete_etterlevelse` | Slett en etterlevelsesbesvarelse |
 | `write_behandlingens_livsloep` | Opprett/oppdater behandlingens livsløp (støtter filvedlegg) |
 | `delete_behandlingens_livsloep` | Slett behandlingens livsløp |
