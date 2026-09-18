@@ -36,7 +36,7 @@ export interface McpTokenData {
   lockedDocumentTitle?: string;
   /**
    * Siste kjente `version`-nummer for etterlevelser denne sesjonen har lest eller skrevet,
-   * nøkkelt på `${etterlevelseDokumentasjonId}::K${kravNummer}.${kravVersjon}`. Brukes til
+   * nøkkelen på `${etterlevelseDokumentasjonId}::K${kravNummer}.${kravVersjon}`. Brukes til
    * klientside optimistisk låsing i write_suksesskriterium/write_krav_status: backend
    * validerer ikke selv en klient-oppgitt version (se kommentarer i etterlevelseClient.ts),
    * så MCP-serveren sporer dette selv per sesjon for å oppdage om noen andre — f.eks. en

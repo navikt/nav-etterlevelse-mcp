@@ -489,6 +489,14 @@ export class EtterlevelseClient {
   // i etterlevelse-frontend — endret kravet i mellomtiden, og vi avbryter i stedet
   // for å risikere å overskrive endringen deres stille.
   //
+  // VIKTIG begrensning: dette er en preflight-sjekk, IKKE en atomisk låsing. GET-et
+  // over og PUT/POST-et under er separate HTTP-kall, så en annen skriver kan i
+  // prinsippet endre kravet i vinduet mellom dem — backend tilbyr ingen atomisk
+  // compare-and-set. Sjekken reduserer derfor risikovinduet betydelig (fra "hele
+  // sesjonens levetid" til millisekunder rundt selve skrivingen), men eliminerer
+  // det ikke fullstendig. Å lukke det helt krever en endring i backend (f.eks.
+  // If-Match/ETag-støtte på PUT-endepunktet).
+  //
   // 403 Forbidden fra backend for dette endepunktet skyldes bekreftet KUN manglende
   // team/ressurser på etterlevelsesdokumentasjonen (se EtterlevelseController) —
   // ikke versjonskonflikt — så vi videresender backends feilmelding uendret i det
@@ -509,7 +517,7 @@ export class EtterlevelseClient {
           `Kravet er endret av noen andre siden du sist leste det (forventet version ${expectedVersion}, ` +
             `fant ${currentVersion}). Dette skjer typisk hvis en bruker jobber med det samme kravet i ` +
             'etterlevelse-frontend samtidig. Les inn kravet på nytt (get_etterlevelse), vurder de nye ' +
-            'endringene, og prøv skrivingen igjen uten expectedVersion eller med oppdatert verdi.',
+            'endringene, og prøv skrivingen igjen.',
           409,
         );
       }

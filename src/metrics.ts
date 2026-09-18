@@ -36,13 +36,6 @@ export const etterlevelseWritesTotal = new Counter({
   registers: [registry],
 });
 
-export const etterlevelseWriteBatchSize = new Histogram({
-  name: 'etterlevelse_write_batch_size',
-  help: 'Antall suksesskriterier skrevet per write_etterlevelse-kall (proxy for dokumentasjonsmengde per gang)',
-  buckets: [1, 2, 3, 5, 8, 13, 21],
-  registers: [registry],
-});
-
 export const etterlevelseDocsCreatedTotal = new Counter({
   name: 'etterlevelse_docs_created_total',
   help: 'Antall nye etterlevelsesdokumentasjoner opprettet',

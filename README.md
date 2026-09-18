@@ -53,8 +53,8 @@ bevart for auditing.
 |------|-------------|
 | `create_etterlevelse_dokumentasjon` | Opprett nytt etterlevelsesdokument |
 | `write_etterlevelse_dokumentasjon` | Oppdater dokumentegenskaper |
-| `write_suksesskriterium` | Skriv/oppdater begrunnelsen for ETT suksesskriterium om gangen (fletter inn i eksisterende besvarelse). Støtter valgfri `expectedVersion` for å oppdage samtidig redigering (f.eks. fra etterlevelse-frontend) |
-| `write_krav_status` | Sett status for et helt krav (f.eks. IKKE_RELEVANT) uten å røre suksesskriterie-begrunnelsene. Støtter valgfri `expectedVersion` for å oppdage samtidig redigering (f.eks. fra etterlevelse-frontend) |
+| `write_suksesskriterium` | Skriv/oppdater begrunnelsen for ETT suksesskriterium om gangen (fletter inn i eksisterende besvarelse). Oppdager automatisk samtidig redigering (f.eks. fra etterlevelse-frontend) via sesjonssporet versjonskontroll — ingen input påkrevd fra kalleren |
+| `write_krav_status` | Sett status for et helt krav (f.eks. IKKE_RELEVANT) uten å røre suksesskriterie-begrunnelsene. Oppdager automatisk samtidig redigering (f.eks. fra etterlevelse-frontend) via sesjonssporet versjonskontroll — ingen input påkrevd fra kalleren |
 | `delete_etterlevelse` | Slett en etterlevelsesbesvarelse |
 | `write_behandlingens_livsloep` | Opprett/oppdater behandlingens livsløp (støtter filvedlegg) |
 | `delete_behandlingens_livsloep` | Slett behandlingens livsløp |

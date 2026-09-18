@@ -624,55 +624,6 @@
       }
     },
     {
-      "id": 13,
-      "title": "SK-batch-størrelse per skriving (p50/p90)",
-      "type": "timeseries",
-      "gridPos": {
-        "x": 0,
-        "y": 34,
-        "w": 12,
-        "h": 8
-      },
-      "description": "Antall suksesskriterier sendt per write_etterlevelse-kall — proxy for dokumentasjonsmengde per gang.",
-      "targets": [
-        {
-          "expr": "histogram_quantile(0.50, sum by (le) (rate(etterlevelse_write_batch_size_bucket{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\"}[1h])))",
-          "legendFormat": "p50",
-          "refId": "A",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${datasource}"
-          }
-        },
-        {
-          "expr": "histogram_quantile(0.90, sum by (le) (rate(etterlevelse_write_batch_size_bucket{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\"}[1h])))",
-          "legendFormat": "p90",
-          "refId": "B",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${datasource}"
-          }
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "drawStyle": "line",
-            "fillOpacity": 5
-          },
-          "unit": "short",
-          "decimals": 1
-        }
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      }
-    },
-    {
       "id": 14,
       "title": "Skriving: nye vs. reviderte SK-svar per krav (7d)",
       "type": "timeseries",

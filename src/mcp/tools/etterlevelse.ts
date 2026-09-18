@@ -3,7 +3,7 @@ import * as z from 'zod/v4';
 import { authStore } from '../../auth/store.js';
 import { config } from '../../config.js';
 import { instrumentedRegisterTool } from '../instrumentedRegisterTool.js';
-import { etterlevelseWritesTotal, etterlevelseWriteBatchSize, etterlevelseDocsCreatedTotal, pvkOperationsTotal } from '../../metrics.js';
+import { etterlevelseWritesTotal, etterlevelseDocsCreatedTotal, pvkOperationsTotal } from '../../metrics.js';
 import type { SessionContext } from '../server.js';
 import { isWriteEnabled } from '../../unleash.js';
 
@@ -1227,7 +1227,6 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
           suksesskriterium_status: String(suksesskriterieStatus),
           write_type: writeType,
         });
-        etterlevelseWriteBatchSize.observe(1);
 
         // Build summary with krav context for human review
         const kravNavn = typeof krav.navn === 'string' ? krav.navn : `K${kravNummer}.${kravVersjon}`;
