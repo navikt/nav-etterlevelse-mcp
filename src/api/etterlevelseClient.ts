@@ -138,6 +138,18 @@ function toSuksesskriterieBegrunnelseBody(
   return body;
 }
 
+// Bærer HTTP-statuskoden videre slik at kallere kan skille feiltyper fra hverandre
+// og reagere deretter (f.eks. 403 for manglende team/ressurser på dokumentet).
+export class EtterlevelseApiError extends Error {
+  constructor(
+    message: string,
+    public readonly status: number,
+  ) {
+    super(message);
+    this.name = 'EtterlevelseApiError';
+  }
+}
+
 export interface BehandlingensLivsloepFil {
   navn: string;
   type: 'image/png' | 'image/jpeg' | 'application/pdf';
@@ -177,7 +189,7 @@ export class EtterlevelseClient {
 
     if (!response.ok) {
       upstreamErrorsTotal.inc({ backend: 'etterlevelse' });
-      throw new Error(`Etterlevelse API svarte ${response.status}: ${bodyText}`);
+      throw new EtterlevelseApiError(`Etterlevelse API svarte ${response.status}: ${bodyText}`, response.status);
     }
 
     return payload;
@@ -197,7 +209,7 @@ export class EtterlevelseClient {
     const bodyText = await response.text();
     if (!response.ok) {
       upstreamErrorsTotal.inc({ backend: 'etterlevelse' });
-      throw new Error(`Etterlevelse API svarte ${response.status}: ${bodyText}`);
+      throw new EtterlevelseApiError(`Etterlevelse API svarte ${response.status}: ${bodyText}`, response.status);
     }
     return bodyText ? (JSON.parse(bodyText) as unknown) : null;
   }
@@ -216,7 +228,7 @@ export class EtterlevelseClient {
     const bodyText = await response.text();
     if (!response.ok) {
       upstreamErrorsTotal.inc({ backend: 'etterlevelse' });
-      throw new Error(`Etterlevelse API svarte ${response.status}: ${bodyText}`);
+      throw new EtterlevelseApiError(`Etterlevelse API svarte ${response.status}: ${bodyText}`, response.status);
     }
     return bodyText ? (JSON.parse(bodyText) as unknown) : null;
   }
@@ -443,43 +455,176 @@ export class EtterlevelseClient {
     return items.find((item) => Number(item.kravVersjon) === input.kravVersjon) ?? null;
   }
 
-  async upsertEtterlevelse(input: {
-    etterlevelseDokumentasjonId: string;
-    kravNummer: number;
-    kravVersjon: number;
-    status: 'UNDER_ARBEID' | 'IKKE_RELEVANT';
-    statusBegrunnelse?: string;
-    suksesskriterieBegrunnelser: Array<{
+  // Sender den fullstendige etterlevelse-body-en til backend, enten som PUT mot en
+  // eksisterende etterlevelse, eller som POST hvis kravet ikke har en etterlevelse
+  // fra før.
+  //
+  // Merk: EtterlevelseRequest-DTO-en på backend har ikke noe version-felt, og
+  // backends ObjectMapper er konfigurert med FAIL_ON_UNKNOWN_PROPERTIES=false —
+  // et evt. version-felt i body blir dermed stille ignorert. Backend gjør ingen
+  // egen sjekk av versjon fra klienten (se writeEtterlevelseWithVersionCheck for
+  // hvordan vi likevel oppdager samtidig redigering på klientsiden).
+  private async putOrPostEtterlevelse(
+    existing: unknown,
+    body: Record<string, unknown>,
+  ): Promise<unknown> {
+    if (isRecord(existing) && typeof existing.id === 'string') {
+      // id må være i body — API-et validerer at path-id og body-id stemmer overens
+      body.id = existing.id;
+      return this.put(`/etterlevelse/${existing.id}`, body);
+    }
+
+    return this.post('/etterlevelse', body);
+  }
+
+  // Leser eksisterende etterlevelse, bygger request-body via buildBody, og skriver.
+  //
+  // Optimistisk låsing gjøres på KLIENTSIDEN, ikke av backend: backend laster
+  // etterlevelsen på nytt fra databasen og lagrer i samme transaksjon på
+  // PUT /etterlevelse/{id} (se EtterlevelseService.save), så en versjon sendt fra
+  // klienten kan aldri utløse en konflikt der. Hvis expectedVersion er oppgitt
+  // (fra en tidligere lesing, f.eks. via get_etterlevelse eller
+  // get_krav_for_gjennomgang), sjekker vi derfor selv om den ferske lesingen rett
+  // før skriving har samme version. Avviker den, har noen andre — f.eks. en bruker
+  // i etterlevelse-frontend — endret kravet i mellomtiden, og vi avbryter i stedet
+  // for å risikere å overskrive endringen deres stille.
+  //
+  // 403 Forbidden fra backend for dette endepunktet skyldes bekreftet KUN manglende
+  // team/ressurser på etterlevelsesdokumentasjonen (se EtterlevelseController) —
+  // ikke versjonskonflikt — så vi videresender backends feilmelding uendret i det
+  // tilfellet i stedet for å gjette på årsak.
+  private async writeEtterlevelseWithVersionCheck(
+    fetchExisting: () => Promise<unknown>,
+    buildBody: (existing: unknown) => Record<string, unknown>,
+    expectedVersion?: number,
+  ): Promise<unknown> {
+    const existing = await fetchExisting();
+
+    if (expectedVersion !== undefined) {
+      const currentVersion = isRecord(existing) && typeof existing.version === 'number'
+        ? existing.version
+        : undefined;
+      if (currentVersion !== undefined && currentVersion !== expectedVersion) {
+        throw new EtterlevelseApiError(
+          `Kravet er endret av noen andre siden du sist leste det (forventet version ${expectedVersion}, ` +
+            `fant ${currentVersion}). Dette skjer typisk hvis en bruker jobber med det samme kravet i ` +
+            'etterlevelse-frontend samtidig. Les inn kravet på nytt (get_etterlevelse), vurder de nye ' +
+            'endringene, og prøv skrivingen igjen uten expectedVersion eller med oppdatert verdi.',
+          409,
+        );
+      }
+    }
+
+    const body = buildBody(existing);
+    return this.putOrPostEtterlevelse(existing, body);
+  }
+
+  // Bygger request-body for ETT suksesskriterium, basert på en gitt snapshot av
+  // eksisterende etterlevelse. Backend erstatter hele suksesskriterieBegrunnelser-
+  // listen ved oppdatering (EtterlevelseRequest.mergeInto gjør ingen fletting av
+  // lister). Flett derfor inn eksisterende SK-er som ikke er del av dette kallet,
+  // slik at de ikke slettes. Rører ikke krav-nivå status/statusBegrunnelse — de
+  // videreføres uendret fra eksisterende etterlevelse.
+  private buildSuksesskriteriumBody(
+    existing: unknown,
+    input: {
+      etterlevelseDokumentasjonId: string;
+      kravNummer: number;
+      kravVersjon: number;
       suksesskriterieId: number;
       begrunnelse: string;
       suksesskriterieStatus: 'UNDER_ARBEID' | 'IKKE_RELEVANT' | 'IKKE_OPPFYLT';
-    }>;
-  }): Promise<unknown> {
-    const existing = await this.getEtterlevelse({
-      etterlevelseDokumentasjonId: input.etterlevelseDokumentasjonId,
-      kravNummer: input.kravNummer,
-      kravVersjon: input.kravVersjon,
-    });
-
-    // Etterlevelse-status: UNDER_REDIGERING er gyldig for det øverste statusfeltet.
-    // UNDER_ARBEID er kun gyldig for suksesskriterieStatus.
-    const etterlevelseStatus = input.status === 'UNDER_ARBEID' ? 'UNDER_REDIGERING' : input.status;
-
-    // Backend erstatter hele suksesskriterieBegrunnelser-listen ved oppdatering
-    // (EtterlevelseRequest.mergeInto gjør ingen fletting av lister). Flett derfor
-    // inn eksisterende SK-er som ikke er del av dette kallet, slik at de ikke slettes.
+    },
+  ): Record<string, unknown> {
     const existingSKBs =
       isRecord(existing) && Array.isArray(existing.suksesskriterieBegrunnelser)
         ? (existing.suksesskriterieBegrunnelser as Record<string, unknown>[])
         : [];
-    const updatedIds = new Set(input.suksesskriterieBegrunnelser.map((skb) => skb.suksesskriterieId));
     const untouchedExistingSKBs = existingSKBs
-      .filter((skb) => !updatedIds.has(Number(skb.suksesskriterieId)))
+      .filter((skb) => Number(skb.suksesskriterieId) !== input.suksesskriterieId)
       .map(toSuksesskriterieBegrunnelseBody)
       .filter((skb): skb is SuksesskriterieBegrunnelseBody => skb !== null);
-    const suksesskriterieBegrunnelser = [...untouchedExistingSKBs, ...input.suksesskriterieBegrunnelser];
+    const updatedSKB: SuksesskriterieBegrunnelseBody = {
+      suksesskriterieId: input.suksesskriterieId,
+      begrunnelse: input.begrunnelse,
+      suksesskriterieStatus: input.suksesskriterieStatus,
+    };
+    const suksesskriterieBegrunnelser = [...untouchedExistingSKBs, updatedSKB];
 
-    const body: Record<string, unknown> = {
+    // Viderefør eksisterende krav-nivå status uendret. Finnes ingen etterlevelse
+    // fra før, opprettes den som UNDER_REDIGERING (kravet er nå under arbeid).
+    const etterlevelseStatus = isRecord(existing) && typeof existing.status === 'string'
+      ? existing.status
+      : 'UNDER_REDIGERING';
+    const statusBegrunnelse = isRecord(existing) && typeof existing.statusBegrunnelse === 'string'
+      ? existing.statusBegrunnelse
+      : '';
+    const etterleves = isRecord(existing) && typeof existing.etterleves === 'boolean'
+      ? existing.etterleves
+      : true;
+
+    return {
+      etterlevelseDokumentasjonId: input.etterlevelseDokumentasjonId,
+      kravNummer: input.kravNummer,
+      kravVersjon: input.kravVersjon,
+      etterleves,
+      status: etterlevelseStatus,
+      statusBegrunnelse,
+      suksesskriterieBegrunnelser,
+    };
+  }
+
+  // Skriver begrunnelsen for ETT suksesskriterium om gangen. Se
+  // writeEtterlevelseWithVersionCheck for håndtering av samtidig redigering
+  // (f.eks. fra etterlevelse-frontend) via expectedVersion.
+  async writeSuksesskriterium(input: {
+    etterlevelseDokumentasjonId: string;
+    kravNummer: number;
+    kravVersjon: number;
+    suksesskriterieId: number;
+    begrunnelse: string;
+    suksesskriterieStatus: 'UNDER_ARBEID' | 'IKKE_RELEVANT' | 'IKKE_OPPFYLT';
+    expectedVersion?: number;
+  }): Promise<unknown> {
+    return this.writeEtterlevelseWithVersionCheck(
+      () =>
+        this.getEtterlevelse({
+          etterlevelseDokumentasjonId: input.etterlevelseDokumentasjonId,
+          kravNummer: input.kravNummer,
+          kravVersjon: input.kravVersjon,
+        }),
+      (existing) => this.buildSuksesskriteriumBody(existing, input),
+      input.expectedVersion,
+    );
+  }
+
+  // Bygger request-body for en krav-status-oppdatering, basert på en gitt snapshot
+  // av eksisterende etterlevelse. Rører ikke suksesskriterieBegrunnelser-listen —
+  // den sendes uendret videre (mappet til eksplisitt request-shape) slik at den
+  // ikke slettes ved PUT.
+  private buildKravStatusBody(
+    existing: unknown,
+    input: {
+      etterlevelseDokumentasjonId: string;
+      kravNummer: number;
+      kravVersjon: number;
+      status: 'UNDER_ARBEID' | 'IKKE_RELEVANT';
+      statusBegrunnelse?: string;
+    },
+  ): Record<string, unknown> {
+    // Etterlevelse-status: UNDER_REDIGERING er gyldig for det øverste statusfeltet.
+    // UNDER_ARBEID er kun gyldig for suksesskriterieStatus.
+    const etterlevelseStatus = input.status === 'UNDER_ARBEID' ? 'UNDER_REDIGERING' : input.status;
+
+    const existingSKBs =
+      isRecord(existing) && Array.isArray(existing.suksesskriterieBegrunnelser)
+        ? (existing.suksesskriterieBegrunnelser as Record<string, unknown>[])
+        : [];
+    const suksesskriterieBegrunnelser = existingSKBs
+      .map(toSuksesskriterieBegrunnelseBody)
+      .filter((skb): skb is SuksesskriterieBegrunnelseBody => skb !== null);
+
+    return {
       etterlevelseDokumentasjonId: input.etterlevelseDokumentasjonId,
       kravNummer: input.kravNummer,
       kravVersjon: input.kravVersjon,
@@ -488,18 +633,29 @@ export class EtterlevelseClient {
       statusBegrunnelse: input.statusBegrunnelse ?? '',
       suksesskriterieBegrunnelser,
     };
+  }
 
-    if (isRecord(existing) && typeof existing.id === 'string') {
-      // id må være i body — API-et validerer at path-id og body-id stemmer overens
-      body.id = existing.id;
-      // Inkluder version for optimistisk låsing — uten dette får vi 403 Forbidden
-      if (typeof existing.version === 'number') {
-        body.version = existing.version;
-      }
-      return this.put(`/etterlevelse/${existing.id}`, body);
-    }
-
-    return this.post('/etterlevelse', body);
+  // Oppdaterer kun krav-nivå status/statusBegrunnelse. Se
+  // writeEtterlevelseWithVersionCheck for håndtering av samtidig redigering
+  // (f.eks. fra etterlevelse-frontend) via expectedVersion.
+  async writeKravStatus(input: {
+    etterlevelseDokumentasjonId: string;
+    kravNummer: number;
+    kravVersjon: number;
+    status: 'UNDER_ARBEID' | 'IKKE_RELEVANT';
+    statusBegrunnelse?: string;
+    expectedVersion?: number;
+  }): Promise<unknown> {
+    return this.writeEtterlevelseWithVersionCheck(
+      () =>
+        this.getEtterlevelse({
+          etterlevelseDokumentasjonId: input.etterlevelseDokumentasjonId,
+          kravNummer: input.kravNummer,
+          kravVersjon: input.kravVersjon,
+        }),
+      (existing) => this.buildKravStatusBody(existing, input),
+      input.expectedVersion,
+    );
   }
 
   async deleteEtterlevelse(id: string): Promise<void> {

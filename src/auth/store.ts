@@ -35,13 +35,14 @@ export interface McpTokenData {
   /** Tittel på det låste dokumentet — brukes i feilmeldinger. */
   lockedDocumentTitle?: string;
   /**
-   * Antall suksesskriterier rapportert enkeltvis godkjent (log_review_event,
-   * sk_reviewed/godkjent) siden forrige write_etterlevelse-opplasting i denne
-   * sesjonen. Brukes til å oppdage om en skriving inneholder flere svar enn
-   * det som faktisk ble presentert/godkjent individuelt i samtalen — se
-   * buildBatchWarning i mcp/tools/etterlevelse.ts.
+   * Siste kjente `version`-nummer for etterlevelser denne sesjonen har lest eller skrevet,
+   * nøkkelt på `${etterlevelseDokumentasjonId}::K${kravNummer}.${kravVersjon}`. Brukes til
+   * klientside optimistisk låsing i write_suksesskriterium/write_krav_status: backend
+   * validerer ikke selv en klient-oppgitt version (se kommentarer i etterlevelseClient.ts),
+   * så MCP-serveren sporer dette selv per sesjon for å oppdage om noen andre — f.eks. en
+   * bruker i etterlevelse-frontend — har endret kravet siden sist vi så det.
    */
-  skReviewedPending?: number;
+  knownEtterlevelseVersions?: Record<string, number>;
 }
 
 export interface ClientRegistration {
