@@ -3,7 +3,7 @@ import * as z from 'zod/v4';
 import { authStore } from '../../auth/store.js';
 import { config } from '../../config.js';
 import { instrumentedRegisterTool } from '../instrumentedRegisterTool.js';
-import { etterlevelseWritesTotal, etterlevelseWriteBatchSize, etterlevelseDocsCreatedTotal, pvkOperationsTotal, reviewWorkflowEventsTotal } from '../../metrics.js';
+import { etterlevelseWritesTotal, etterlevelseDocsCreatedTotal, pvkOperationsTotal } from '../../metrics.js';
 import type { SessionContext } from '../server.js';
 import { isWriteEnabled } from '../../unleash.js';
 
@@ -152,6 +152,56 @@ const ytterligereEgenskaperCodes = [
 const ytterligereEgenskaperDescription =
   'Ytterligere DPIA-triggere. Gyldige koder: ' + ytterligereEgenskaperCodes.join(', ');
 
+// Nøkkel for sesjonssporet etterlevelse-version — se knownEtterlevelseVersions i McpTokenData.
+function etterlevelseVersionKey(
+  etterlevelseDokumentasjonId: string,
+  kravNummer: number,
+  kravVersjon: number,
+): string {
+  return `${etterlevelseDokumentasjonId}::K${kravNummer}.${kravVersjon}`;
+}
+
+// Slår opp sist kjente version for dette kravet i denne sesjonen (satt av en tidligere
+// lesing eller skriving). Brukes som expectedVersion for klientside optimistisk låsing i
+// writeSuksesskriterium/writeKravStatus, uten at agenten selv må huske/oppgi den.
+function getKnownEtterlevelseVersion(
+  ctx: SessionContext,
+  etterlevelseDokumentasjonId: string,
+  kravNummer: number,
+  kravVersjon: number,
+): number | undefined {
+  const key = etterlevelseVersionKey(etterlevelseDokumentasjonId, kravNummer, kravVersjon);
+  return ctx.tokenData.knownEtterlevelseVersions?.[key];
+}
+
+// Oppdaterer sesjonens sist kjente version for dette kravet, hentet fra en lese- eller
+// skriveresponsens `version`-felt. Kalles etter enhver GET/PUT/POST mot en enkelt
+// etterlevelse, slik at påfølgende skrivinger i samme sesjon (også mot samme krav som
+// nettopp ble skrevet) sammenlignes mot riktig, oppdatert version — ikke en utdatert
+// verdi fra en tidligere lesing.
+//
+// Muterer ctx.tokenData direkte (i stedet for authStore.updateMcpToken): i produksjon er
+// ctx.tokenData samme objektreferanse som ligger i authStore (se getMcpToken), så
+// mutasjonen er synlig for senere kall i samme sesjon uten en ekstra oppslags-runde. Dette
+// er en lavrisiko cache (feil her gir i verste fall en unødvendig avvist skriving, ikke et
+// sikkerhetsproblem), så vi trenger ikke authStore sin TTL/utløps-validering her.
+function recordKnownEtterlevelseVersion(
+  ctx: SessionContext,
+  etterlevelseDokumentasjonId: string,
+  kravNummer: number,
+  kravVersjon: number,
+  record: unknown,
+): void {
+  if (!isRecord(record) || typeof record.version !== 'number') {
+    return;
+  }
+  const key = etterlevelseVersionKey(etterlevelseDokumentasjonId, kravNummer, kravVersjon);
+  ctx.tokenData.knownEtterlevelseVersions = {
+    ...ctx.tokenData.knownEtterlevelseVersions,
+    [key]: record.version,
+  };
+}
+
 export function requireDocumentLock(ctx: SessionContext, targetDocumentId?: string) {
   const { lockedDocumentId, lockedDocumentTitle } = ctx.tokenData;
   if (!lockedDocumentId) {
@@ -176,26 +226,6 @@ export function requireWriteEnabled() {
     );
   }
   return null;
-}
-
-export type ReviewWorkflowEvent = 'report_generated' | 'report_approved' | 'sk_reviewed' | 'krav_uploaded';
-export type ReviewWorkflowDecision = 'godkjent' | 'hoppet_over' | 'redigert';
-
-// Ren telemetri fra skillen selv (selvrapportert, ikke MCP-observert). Se
-// review_workflow_events_total i metrics.ts for begrunnelse.
-export function recordReviewEvent(
-  event: ReviewWorkflowEvent,
-  decision?: ReviewWorkflowDecision,
-): { logged: true; event: ReviewWorkflowEvent; decision: ReviewWorkflowDecision | null } {
-  if (decision !== undefined && event !== 'sk_reviewed') {
-    throw new Error(`decision skal kun oppgis for event="sk_reviewed", ikke for event="${event}".`);
-  }
-  if (event === 'sk_reviewed' && decision === undefined) {
-    throw new Error('decision er påkrevd for event="sk_reviewed" (godkjent, hoppet_over eller redigert).');
-  }
-
-  reviewWorkflowEventsTotal.inc({ event, decision: decision ?? 'none' });
-  return { logged: true, event, decision: decision ?? null };
 }
 
 export function sanitizeEtterlevelseDokumentasjonForUpdate(document: unknown): Record<string, unknown> {
@@ -238,65 +268,6 @@ export function determineWriteType(
   const oldSKB = existingSKBs.find((e) => Number(e.suksesskriterieId) === targetId);
   const hadBegrunnelse = Boolean(oldSKB && typeof oldSKB.begrunnelse === 'string' && oldSKB.begrunnelse);
   return hadBegrunnelse ? 'revised' : 'created';
-}
-
-export interface SuksesskriterieBegrunnelseForBatchCheck {
-  suksesskriterieStatus: unknown;
-  begrunnelse: unknown;
-}
-
-// Det ene sanksjonerte unntaket fra ett-SK-om-gangen-kravet: alle SK-er i kallet
-// settes IKKE_RELEVANT med nøyaktig samme begrunnelse (typisk "systemet er ikke
-// relevant for dette temaet" — ingenting å vurdere individuelt per SK).
-export function isHomogeneousIkkeRelevantBatch(
-  skbs: SuksesskriterieBegrunnelseForBatchCheck[],
-): boolean {
-  if (skbs.length <= 1) {
-    return false;
-  }
-  const first = skbs[0];
-  return skbs.every(
-    (skb) => skb.suksesskriterieStatus === 'IKKE_RELEVANT' && skb.begrunnelse === first.begrunnelse,
-  );
-}
-
-// Gir agenten umiddelbar in-band-tilbakemelding når write_etterlevelse mottar
-// flere nyskrevne SK-begrunnelser enn det som faktisk er rapportert enkeltvis
-// vurdert (log_review_event sk_reviewed med godkjent/hoppet_over/redigert)
-// siden forrige opplasting.
-// Viktig: selve arraylengden alene er IKKE et batching-signal — steg 8 i
-// gjennomgangsflyten laster opp *alle* individuelt vurderte SK-er for et
-// krav i ett samlet write_etterlevelse-kall, som er korrekt og forventet.
-// Signalet er avviket mellom antall skrevne SK-er og antall rapporterte
-// individuelle vurderinger siden sist — det avslører når den interaktive
-// ett-SK-om-gangen-visningen (G/H/R) ble hoppet over i samtalen.
-// Alle tre beslutningstypene (G/H/R) teller likt som "vurdert": et redigert
-// eller hoppet-over SK er like mye et tegn på at gjennomgangsprosessen faktisk
-// ble fulgt som en godkjenning — å kun telle godkjent ga falske positiver på
-// legitimt redigerte SK-er, noe som lærer agenten at advarselen er støy.
-// Returnerer null for enkeltstående skrivinger (ingen sesjonssporing nødvendig
-// for det trivielle tilfellet), det sanksjonerte IKKE_RELEVANT-unntaket, eller
-// når nok individuelle vurderinger er rapportert.
-export function buildBatchWarning(
-  skbs: SuksesskriterieBegrunnelseForBatchCheck[],
-  reviewedIndividually: number,
-): string | null {
-  if (skbs.length <= 1 || isHomogeneousIkkeRelevantBatch(skbs) || skbs.length <= reviewedIndividually) {
-    return null;
-  }
-  return (
-    `⚠  Denne skrivingen inneholder ${skbs.length} suksesskriterie-begrunnelser, men kun ` +
-    `${reviewedIndividually} er rapportert enkeltvis vurdert (godkjent/hoppet over/redigert) via ` +
-    'log_review_event siden forrige opplasting. Gjennomgangsprosessen krever at hvert suksesskriterium ' +
-    'presenteres og tas stilling til enkeltvis (G/H/R) før skriving — unntatt når alle settes ' +
-    'IKKE_RELEVANT med identisk begrunnelse.'
-  );
-}
-
-// Forbruker sesjonens "reviewed pending"-teller ved en skriving — floor på 0
-// slik at telleren aldri blir negativ og lekker over til neste krav sin skriving.
-export function consumePendingReviews(pendingBefore: number, writtenCount: number): number {
-  return Math.max(0, pendingBefore - writtenCount);
 }
 
 function stripHtml(html: string): string {
@@ -658,6 +629,9 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
               kravVersjon,
             })
           : undefined;
+        if (etterlevelseDokumentasjonId && kravNummer !== undefined && kravVersjon !== undefined) {
+          recordKnownEtterlevelseVersion(ctx, etterlevelseDokumentasjonId, kravNummer, kravVersjon, existingRaw);
+        }
 
         const title = asString(kravRecord.navn) ?? krav;
         const contextLines = [
@@ -725,13 +699,13 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
     },
     async ({ etterlevelseDokumentasjonId, kravNummer, kravVersjon }) => {
       try {
-        return toolResult(
-          await client.getEtterlevelse({
-            etterlevelseDokumentasjonId,
-            kravNummer,
-            kravVersjon,
-          }),
-        );
+        const result = await client.getEtterlevelse({
+          etterlevelseDokumentasjonId,
+          kravNummer,
+          kravVersjon,
+        });
+        recordKnownEtterlevelseVersion(ctx, etterlevelseDokumentasjonId, kravNummer, kravVersjon, result);
+        return toolResult(result);
       } catch (error) {
         return toolError(error);
       }
@@ -1158,18 +1132,16 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
     },
   );
 
-  instrumentedRegisterTool(server, 
-    'write_etterlevelse',
+  instrumentedRegisterTool(server,
+    'write_suksesskriterium',
     {
       description:
-        'Skriv/oppdater en etterlevelsesbesvarelse for et krav. Krever aktiv sesjonslås (kall lock_document først). ' +
-        'Henter kravets hensikt og eksisterende begrunnelse og returnerer dem i svaret for menneskelig gjennomgang. ' +
-        '⛔ Presenter og innhent beslutning (G/H/R) for suksesskriteriene ett om gangen i samtalen før dette kallet, ' +
-        'og kall log_review_event(sk_reviewed, <godkjent|hoppet_over|redigert>) for hver enkelt beslutning. Svaret ' +
-        'flagger et avvik hvis antall skrevne SK-er overstiger antall rapporterte enkeltvurderinger siden forrige ' +
-        'opplasting. ' +
-        'Unntak: alle suksesskriterier kan settes IKKE_RELEVANT med identisk begrunnelse i ett samlet kall. ' +
-        `OPPFYLT og FERDIG/FERDIGSTILT kan ikke settes via agenten — sett disse manuelt i ${etterlevelseFrontendUrl} ` +
+        'Skriv/oppdater begrunnelsen for ETT suksesskriterium om gangen. Krever aktiv sesjonslås ' +
+        '(kall lock_document først). Henter kravets hensikt og eksisterende begrunnelse og returnerer ' +
+        'dem i svaret for menneskelig gjennomgang. ' +
+        'Bruk write_krav_status for å sette hele kravets status (f.eks. IKKE_RELEVANT) uten å røre ' +
+        'suksesskriterie-begrunnelsene. ' +
+        `OPPFYLT kan ikke settes via agenten — sett dette manuelt i ${etterlevelseFrontendUrl} ` +
         'etter at du har lest suksesskriterieteksten og kravets hensikt.',
       inputSchema: {
         etterlevelseDokumentasjonId: z
@@ -1178,22 +1150,11 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
           .describe('UUID for dokumentasjonen — må matche låst dokument'),
         kravNummer: z.number().int().describe('Kravnummer'),
         kravVersjon: z.number().int().describe('Kravversjon'),
-        status: z
-          .enum(['UNDER_ARBEID', 'IKKE_RELEVANT'])
-          .describe('Status. FERDIG/FERDIGSTILT settes manuelt i UI etter gjennomgang.'),
-        statusBegrunnelse: z.string().optional().describe('Begrunnelse for status'),
-        suksesskriterieBegrunnelser: z
-          .array(
-            z.object({
-              suksesskriterieId: z.number().int(),
-              begrunnelse: z.string(),
-              suksesskriterieStatus: z
-                .enum(['UNDER_ARBEID', 'IKKE_RELEVANT', 'IKKE_OPPFYLT'])
-                .describe('OPPFYLT settes manuelt i UI etter at suksesskriterieteksten er lest og vurdert.'),
-            }),
-          )
-          .min(1)
-          .describe('Begrunnelser per suksesskriterium'),
+        suksesskriterieId: z.number().int().describe('ID for suksesskriteriet som skal oppdateres'),
+        begrunnelse: z.string().describe('Begrunnelse for suksesskriteriet'),
+        suksesskriterieStatus: z
+          .enum(['UNDER_ARBEID', 'IKKE_RELEVANT', 'IKKE_OPPFYLT'])
+          .describe('OPPFYLT settes manuelt i UI etter at suksesskriterieteksten er lest og vurdert.'),
       },
       annotations: writeAnnotations,
     },
@@ -1201,9 +1162,9 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
       etterlevelseDokumentasjonId,
       kravNummer,
       kravVersjon,
-      status,
-      statusBegrunnelse,
-      suksesskriterieBegrunnelser,
+      suksesskriterieId,
+      begrunnelse,
+      suksesskriterieStatus,
     }) => {
       const writeGuardError = requireWriteEnabled();
       if (writeGuardError) return writeGuardError;
@@ -1227,28 +1188,30 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
           );
         }
 
-        // Respekter behovForBegrunnelse: fjern begrunnelsestekst for SK-er der feltet ikke vises i UI
+        // Respekter behovForBegrunnelse: fjern begrunnelsestekst hvis feltet ikke vises i UI
         const suksesskriterier = Array.isArray(krav.suksesskriterier)
           ? (krav.suksesskriterier as Record<string, unknown>[])
           : [];
-        const saniterteSKB = suksesskriterieBegrunnelser.map((skb: Record<string, unknown>) => {
-          const def = suksesskriterier.find(
-            (sk) => sk.id === skb.suksesskriterieId || sk.id === String(skb.suksesskriterieId),
-          );
-          if (def && def.behovForBegrunnelse === false) {
-            return { ...skb, begrunnelse: '' };
-          }
-          return skb;
-        });
+        const def = suksesskriterier.find(
+          (sk) => sk.id === suksesskriterieId || sk.id === String(suksesskriterieId),
+        );
+        const saniertBegrunnelse = def && def.behovForBegrunnelse === false ? '' : begrunnelse;
 
-        const writeResult = await client.upsertEtterlevelse({
+        // expectedVersion hentes fra sesjonens sist kjente version for dette kravet
+        // (satt av en tidligere lesing eller skriving i DENNE sesjonen) — ikke oppgitt av
+        // agenten. Dette unngår at en tidlig lesing (f.eks. get_krav_for_gjennomgang) blir
+        // brukt som stale baseline etter at vi selv har skrevet kravet en gang.
+        const expectedVersion = getKnownEtterlevelseVersion(ctx, etterlevelseDokumentasjonId, kravNummer, kravVersjon);
+        const writeResult = await client.writeSuksesskriterium({
           etterlevelseDokumentasjonId,
           kravNummer,
           kravVersjon,
-          status,
-          statusBegrunnelse,
-          suksesskriterieBegrunnelser: saniterteSKB,
+          suksesskriterieId,
+          begrunnelse: saniertBegrunnelse,
+          suksesskriterieStatus,
+          expectedVersion,
         });
+        recordKnownEtterlevelseVersion(ctx, etterlevelseDokumentasjonId, kravNummer, kravVersjon, writeResult);
 
         // getEtterlevelse returnerer ett objekt (ikke en liste) — bruk isRecord, ikke extractArray
         const existingRecord = isRecord(existingRaw) ? existingRaw : null;
@@ -1256,23 +1219,13 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
           ? (existingRecord.suksesskriterieBegrunnelser as Record<string, unknown>[])
           : [];
 
-        // Instrumenter per SK for metrikker. write_type skiller førstegangsskriving
-        // fra revisjon (proxy for hvilke krav som tiltrekker mest iterasjon).
-        for (const skb of saniterteSKB) {
-          const writeType = determineWriteType(existingSKBs, skb.suksesskriterieId);
-          etterlevelseWritesTotal.inc({
-            kravnummer: String(kravNummer),
-            kravversjon: String(kravVersjon),
-            suksesskriterium_id: String(skb.suksesskriterieId),
-            suksesskriterium_status: String(skb.suksesskriterieStatus),
-            write_type: writeType,
-          });
-        }
-        etterlevelseWriteBatchSize.observe(saniterteSKB.length);
-        const pendingReviewed = ctx.tokenData.skReviewedPending ?? 0;
-        const batchWarning = buildBatchWarning(saniterteSKB, pendingReviewed);
-        authStore.updateMcpToken(ctx.mcpAccessToken, {
-          skReviewedPending: consumePendingReviews(pendingReviewed, saniterteSKB.length),
+        const writeType = determineWriteType(existingSKBs, suksesskriterieId);
+        etterlevelseWritesTotal.inc({
+          kravnummer: String(kravNummer),
+          kravversjon: String(kravVersjon),
+          suksesskriterium_id: String(suksesskriterieId),
+          suksesskriterium_status: String(suksesskriterieStatus),
+          write_type: writeType,
         });
 
         // Build summary with krav context for human review
@@ -1280,43 +1233,26 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
         const hensikt = typeof krav.hensikt === 'string' ? stripHtml(krav.hensikt) : '';
         const beskrivelse = typeof krav.beskrivelse === 'string' ? stripHtml(krav.beskrivelse) : '';
 
+        const oldSKB = existingSKBs.find((e) => Number(e.suksesskriterieId) === suksesskriterieId);
+        const oldBegrunnelse =
+          oldSKB && typeof oldSKB.begrunnelse === 'string' && oldSKB.begrunnelse ? oldSKB.begrunnelse : '(tom)';
+        const tekst =
+          def && typeof def.navn === 'string' ? stripHtml(def.navn) : `Suksesskriterium ${suksesskriterieId}`;
+
         const W = 76;
         const lines: string[] = [];
-        lines.push(`✅  K${kravNummer}.${kravVersjon} — ${kravNavn} er oppdatert`);
-        lines.push(`    Status: ${status}`);
-        if (statusBegrunnelse) lines.push(`    Statusbegrunnelse: ${statusBegrunnelse}`);
-        if (batchWarning) {
-          lines.push('');
-          lines.push(batchWarning);
-        }
+        lines.push(`✅  K${kravNummer}.${kravVersjon} — ${kravNavn}: suksesskriterium oppdatert`);
 
         if (hensikt) {
           lines.push('');
           lines.push(boxSection('KRAVETS HENSIKT', hensikt, W));
         }
 
-        for (const [i, skb] of saniterteSKB.entries()) {
-          const def = suksesskriterier.find(
-            (sk) => sk.id === skb.suksesskriterieId || sk.id === String(skb.suksesskriterieId),
-          );
-          const tekst =
-            def && typeof def.navn === 'string'
-              ? stripHtml(def.navn)
-              : `Suksesskriterium ${skb.suksesskriterieId}`;
-          const oldSKB = existingSKBs.find(
-            (e) => e.suksesskriterieId === skb.suksesskriterieId,
-          );
-          const oldBegrunnelse =
-            oldSKB && typeof oldSKB.begrunnelse === 'string' && oldSKB.begrunnelse
-              ? oldSKB.begrunnelse
-              : '(tom)';
-
-          lines.push('');
-          lines.push(boxSection(`SUKSESSKRITERIUM ${i + 1} av ${suksesskriterieBegrunnelser.length}`, tekst, W));
-          lines.push(`  Var    : ${wordWrap(oldBegrunnelse, W - 11, ' '.repeat(11)).trimStart()}`);
-          lines.push(`  Skrevet: ${wordWrap(skb.begrunnelse, W - 11, ' '.repeat(11)).trimStart()}`);
-          lines.push(`  Status : ${skb.suksesskriterieStatus}`);
-        }
+        lines.push('');
+        lines.push(boxSection('SUKSESSKRITERIUM', tekst, W));
+        lines.push(`  Var    : ${wordWrap(oldBegrunnelse, W - 11, ' '.repeat(11)).trimStart()}`);
+        lines.push(`  Skrevet: ${wordWrap(saniertBegrunnelse, W - 11, ' '.repeat(11)).trimStart()}`);
+        lines.push(`  Status : ${suksesskriterieStatus}`);
 
         if (beskrivelse) {
           lines.push('');
@@ -1331,7 +1267,86 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
         return toolResult({
           success: true,
           summary: lines.join('\n'),
-          batchWarning,
+          result: writeResult,
+        });
+      } catch (error) {
+        return toolError(error);
+      }
+    },
+  );
+
+  instrumentedRegisterTool(server,
+    'write_krav_status',
+    {
+      description:
+        'Sett status for et helt krav (f.eks. IKKE_RELEVANT) uten å røre suksesskriterie-begrunnelsene. ' +
+        'Krever aktiv sesjonslås (kall lock_document først). Bruk write_suksesskriterium for å skrive ' +
+        'begrunnelser per suksesskriterium. ' +
+        `OPPFYLT og FERDIG/FERDIGSTILT kan ikke settes via agenten — sett disse manuelt i ${etterlevelseFrontendUrl} ` +
+        'etter at du har lest suksesskriterieteksten og kravets hensikt.',
+      inputSchema: {
+        etterlevelseDokumentasjonId: z
+          .string()
+          .min(1)
+          .describe('UUID for dokumentasjonen — må matche låst dokument'),
+        kravNummer: z.number().int().describe('Kravnummer'),
+        kravVersjon: z.number().int().describe('Kravversjon'),
+        status: z
+          .enum(['UNDER_ARBEID', 'IKKE_RELEVANT'])
+          .describe('Status. FERDIG/FERDIGSTILT settes manuelt i UI etter gjennomgang.'),
+        statusBegrunnelse: z.string().optional().describe('Begrunnelse for status'),
+      },
+      annotations: writeAnnotations,
+    },
+    async ({ etterlevelseDokumentasjonId, kravNummer, kravVersjon, status, statusBegrunnelse }) => {
+      const writeGuardError = requireWriteEnabled();
+      if (writeGuardError) return writeGuardError;
+
+      const guardError = requireDocumentLock(ctx, etterlevelseDokumentasjonId);
+      if (guardError) return guardError;
+
+      try {
+        const kravRaw = await client.getKrav(`K${kravNummer}.${kravVersjon}`);
+        const krav = isRecord(kravRaw) ? kravRaw : {};
+
+        // Advar om UTGAATT-krav
+        if (krav.status === 'UTGAATT') {
+          return toolError(
+            `K${kravNummer}.${kravVersjon} har status UTGAATT. ` +
+              'Finn den aktive versjonen via list_krav og bruk den i stedet.',
+          );
+        }
+
+        // expectedVersion hentes fra sesjonens sist kjente version for dette kravet (se
+        // write_suksesskriterium over for begrunnelse).
+        const expectedVersion = getKnownEtterlevelseVersion(ctx, etterlevelseDokumentasjonId, kravNummer, kravVersjon);
+        const writeResult = await client.writeKravStatus({
+          etterlevelseDokumentasjonId,
+          kravNummer,
+          kravVersjon,
+          status,
+          statusBegrunnelse,
+          expectedVersion,
+        });
+        recordKnownEtterlevelseVersion(ctx, etterlevelseDokumentasjonId, kravNummer, kravVersjon, writeResult);
+
+        const kravNavn = typeof krav.navn === 'string' ? krav.navn : `K${kravNummer}.${kravVersjon}`;
+        const hensikt = typeof krav.hensikt === 'string' ? stripHtml(krav.hensikt) : '';
+
+        const W = 76;
+        const lines: string[] = [];
+        lines.push(`✅  K${kravNummer}.${kravVersjon} — ${kravNavn}: status oppdatert`);
+        lines.push(`    Status: ${status}`);
+        if (statusBegrunnelse) lines.push(`    Statusbegrunnelse: ${statusBegrunnelse}`);
+
+        if (hensikt) {
+          lines.push('');
+          lines.push(boxSection('KRAVETS HENSIKT', hensikt, W));
+        }
+
+        return toolResult({
+          success: true,
+          summary: lines.join('\n'),
           result: writeResult,
         });
       } catch (error) {
@@ -2484,53 +2499,6 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
           return toolResult({ avdelinger: [], message: 'Ingen avdelinger funnet i NOM.' });
         }
         return toolResult({ avdelinger });
-      } catch (error) {
-        return toolError(error);
-      }
-    },
-  );
-
-  instrumentedRegisterTool(server,
-    'log_review_event',
-    {
-      description:
-        'Rapporter et steg i gjennomgangsprosessen for observability. Ren telemetri — skriver ' +
-        'ikke etterlevelsesdata og krever verken dokumentlås eller write-enabled-toggle. ' +
-        'Brukes til å måle om den påkrevde interaktive gjennomgangsprosessen (rapport → ' +
-        'godkjenning → ett suksesskriterium om gangen → opplasting per krav) faktisk følges — ' +
-        'noe MCP-serveren ellers ikke kan observere, siden den kun ser tool-kall, ikke samtaleflyten.',
-      inputSchema: {
-        event: z
-          .enum(['report_generated', 'report_approved', 'sk_reviewed', 'krav_uploaded'])
-          .describe(
-            'report_generated: rapporten er skrevet og klar for team. ' +
-              'report_approved: teamet har gitt eksplisitt klarsignal til opplasting. ' +
-              'sk_reviewed: ett suksesskriterium er behandlet i den interaktive gjennomgangen. ' +
-              'krav_uploaded: et krav er lastet opp via write_etterlevelse.',
-          ),
-        decision: z
-          .enum(['godkjent', 'hoppet_over', 'redigert'])
-          .optional()
-          .describe(
-            'Påkrevd for event=sk_reviewed (hvilket valg G/H/R brukeren tok), og ugyldig for alle andre event-typer.',
-          ),
-      },
-      annotations: readOnlyAnnotations,
-    },
-    async ({ event, decision }) => {
-      try {
-        const result = recordReviewEvent(event, decision);
-        if (event === 'sk_reviewed' && decision !== undefined) {
-          // Alle tre beslutningstypene (godkjent/hoppet_over/redigert) teller som
-          // "vurdert" — hvert av dem betyr at SK-et faktisk ble presentert og tatt
-          // stilling til i den interaktive gjennomgangen. Å kun telle "godkjent"
-          // ga falske positiver på batchvarselet for legitimt redigerte/hoppet-over
-          // SK-er, noe som undergraver tilliten til advarselen.
-          authStore.updateMcpToken(ctx.mcpAccessToken, {
-            skReviewedPending: (ctx.tokenData.skReviewedPending ?? 0) + 1,
-          });
-        }
-        return toolResult(result);
       } catch (error) {
         return toolError(error);
       }

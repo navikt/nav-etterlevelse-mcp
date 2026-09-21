@@ -36,13 +36,6 @@ export const etterlevelseWritesTotal = new Counter({
   registers: [registry],
 });
 
-export const etterlevelseWriteBatchSize = new Histogram({
-  name: 'etterlevelse_write_batch_size',
-  help: 'Antall suksesskriterier skrevet per write_etterlevelse-kall (proxy for dokumentasjonsmengde per gang)',
-  buckets: [1, 2, 3, 5, 8, 13, 21],
-  registers: [registry],
-});
-
 export const etterlevelseDocsCreatedTotal = new Counter({
   name: 'etterlevelse_docs_created_total',
   help: 'Antall nye etterlevelsesdokumentasjoner opprettet',
@@ -67,19 +60,6 @@ export const behandlingskatalogReadsTotal = new Counter({
   name: 'behandlingskatalog_reads_total',
   help: 'Lesing fra behandlingskatalog per operasjon',
   labelNames: ['operation'] as const,
-  registers: [registry],
-});
-
-// --- Selvrapportert arbeidsflyt (skill-telemetri) ---
-
-// Ren telemetri fra skillen selv — ikke MCP-observerte fakta. Brukes til å måle
-// om den påkrevde interaktive gjennomgangsprosessen (ett SK om gangen, rapport
-// før opplasting) faktisk følges, siden dette er usynlig for MCP-serveren som
-// bare ser tool-kall, ikke samtaleflyten rundt dem.
-export const reviewWorkflowEventsTotal = new Counter({
-  name: 'review_workflow_events_total',
-  help: 'Selvrapporterte arbeidsflyt-hendelser fra etterlevelse-/PVK-skillen',
-  labelNames: ['event', 'decision'] as const,
   registers: [registry],
 });
 
