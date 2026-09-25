@@ -1286,7 +1286,8 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
         'FØR du presenterer et forslag for brukeren, ett SK om gangen. Returnerer en ferdig formatert ' +
         '"presentasjon" (kravets hensikt, SK-beskrivelse, eksisterende besvarelse) og et engangs ' +
         '"reviewToken" som write_suksesskriterium krever for akkurat dette suksesskriteriet. ' +
-        'Krever aktiv sesjonslås (kall lock_document først).',
+        'Krever aktiv sesjonslås (kall lock_document først). Krever feature-toggle for skriving ' +
+        '(nav-etterlevelse-mcp.write-enabled) siden tokenet kun er nyttig for en påfølgende skriving.',
       inputSchema: {
         etterlevelseDokumentasjonId: z
           .string()
@@ -1296,7 +1297,10 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
         kravVersjon: z.number().int().describe('Kravversjon'),
         suksesskriterieId: z.number().int().describe('ID for suksesskriteriet som skal presenteres'),
       },
-      annotations: readOnlyAnnotations,
+      // Ikke readOnlyAnnotations: verktøyet krever requireWriteEnabled() og reserverer et
+      // engangs skrivetoken i sesjonstilstanden. Det kaller ingen skrive-endepunkt mot
+      // backend (destructiveHint: false), men det er del av skriveflyten, ikke lese-flyten.
+      annotations: writeAnnotations,
     },
     async ({ etterlevelseDokumentasjonId, kravNummer, kravVersjon, suksesskriterieId }) => {
       const writeGuardError = requireWriteEnabled();
