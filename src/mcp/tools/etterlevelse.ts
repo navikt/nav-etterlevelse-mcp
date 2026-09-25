@@ -724,7 +724,9 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
     {
       description:
         'Hent et krav enten med UUID eller formatet K123.1. ' +
-        'Før du presenterer eller foreslår en besvarelse, bruk get_krav_for_gjennomgang slik at kravets hensikt og SK-beskrivelser vises til brukeren.',
+        'Før du presenterer eller foreslår en besvarelse, bruk get_krav_for_gjennomgang for kravkontekst ' +
+        '(hensikt m.m.) og begin_sk_review (ett suksesskriterium om gangen) for selve SK-beskrivelsen som ' +
+        'skal vises til brukeren.',
       inputSchema: {
         id: z.string().min(1).describe('UUID eller krav-id på format K123.1'),
       },
@@ -744,8 +746,10 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
     {
       description:
         'Forbered interaktiv gjennomgang av ett krav. Returnerer og formaterer kravets hensikt, utdypende beskrivelse, ' +
-        'varsel, relevans, rettskilder, dokumentasjon og alle suksesskriteriers navn og beskrivelse. ' +
-        'Hvis dokumentasjonId oppgis, inkluderes også eksisterende besvarelse. Vis summary-feltet til brukeren før du presenterer et forslag.',
+        'varsel, relevans, rettskilder, dokumentasjon og alle suksesskriteriers id/navn/behovForBegrunnelse ' +
+        '(IKKE selve SK-beskrivelsen — den hentes ett SK om gangen via begin_sk_review, som er den ' +
+        'obligatoriske porten før en skriving). Hvis dokumentasjonId oppgis, inkluderes også eksisterende ' +
+        'besvarelse. Vis summary-feltet til brukeren før du kaller begin_sk_review for første SK.',
       inputSchema: {
         krav: z
           .string()
@@ -801,17 +805,24 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
             contextLines.push('', boxSection(label, text));
           }
         }
-        contextLines.push('', 'SUKSESSKRITERIER');
+        // SK-beskrivelser vises IKKE her (verken i summary eller i det rå krav-objektet under) —
+        // de hentes ett om gangen via begin_sk_review, som er den obligatoriske porten før en
+        // skriving. Å liste alle beskrivelsene her ville invitert til å planlegge/presentere hele
+        // bolken samlet, noe hele per-SK-gjennomgangen skal forhindre. id + navn +
+        // behovForBegrunnelse beholdes — agenten trenger id-en for å kalle begin_sk_review.
+        contextLines.push('', 'SUKSESSKRITERIER (id + navn — beskrivelse hentes via begin_sk_review)');
+        const trimmedSuccessCriteria = successCriteria.map((criterion) => {
+          const { beskrivelse: _beskrivelse, ...rest } = criterion;
+          return rest;
+        });
         for (const [index, criterion] of successCriteria.entries()) {
           const criterionId = asString(criterion.id) ?? `#${index + 1}`;
           const criterionName = asString(criterion.navn) ?? `Suksesskriterium ${criterionId}`;
-          const criterionDescription = asString(criterion.beskrivelse);
           const needsJustification = criterion.behovForBegrunnelse;
           contextLines.push('', boxSection(
             `SUKSESSKRITERIUM ${index + 1}`,
             [
-              criterionName,
-              criterionDescription ? stripHtml(criterionDescription) : '(Ingen beskrivelse registrert)',
+              `SK${criterionId} — ${criterionName}`,
               needsJustification !== undefined ? `Behov for begrunnelse: ${String(needsJustification)}` : '',
             ].filter(Boolean).join('\n'),
           ));
@@ -819,10 +830,14 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
         if (existingRaw !== undefined) {
           contextLines.push('', boxSection('EKSISTERENDE BESVARELSE', JSON.stringify(existingRaw, null, 2)));
         }
-        contextLines.push('', 'Vis denne kravkonteksten før analyse og forslag til besvarelse.');
+        contextLines.push(
+          '',
+          'Vis denne kravkonteksten. Kall begin_sk_review for ETT suksesskriterium om gangen for å ' +
+            'få full SK-beskrivelse og presentere et forslag — ikke batch-presenter flere SK-er samlet.',
+        );
 
         return toolResult({
-          krav: kravRaw,
+          krav: { ...kravRecord, suksesskriterier: trimmedSuccessCriteria },
           eksisterendeBesvarelse: existingRaw,
           summary: contextLines.join('\n'),
         });
