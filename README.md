@@ -53,7 +53,8 @@ bevart for auditing.
 |------|-------------|
 | `create_etterlevelse_dokumentasjon` | Opprett nytt etterlevelsesdokument |
 | `write_etterlevelse_dokumentasjon` | Oppdater dokumentegenskaper |
-| `write_suksesskriterium` | Skriv/oppdater begrunnelsen for ETT suksesskriterium om gangen (fletter inn i eksisterende besvarelse). Oppdager automatisk samtidig redigering (f.eks. fra etterlevelse-frontend) via sesjonssporet versjonskontroll — ingen input påkrevd fra kalleren |
+| `begin_sk_review` | Start den obligatoriske per-SK-gjennomgangen for ETT suksesskriterium — krever aktiv sesjonslås og feature-toggle for skriving. Returnerer en ferdig formatert presentasjon og et engangs `reviewToken` som `write_suksesskriterium` krever for akkurat dette SK-et. Kaller ingen skrive-endepunkt selv (`destructiveHint: false`), men hører til skriveflyten siden tokenet kun er nyttig for en påfølgende skriving |
+| `write_suksesskriterium` | Skriv/oppdater begrunnelsen for ETT suksesskriterium om gangen (fletter inn i eksisterende besvarelse). Krever et gyldig `reviewToken` fra `begin_sk_review` for akkurat dette SK-et — kall `begin_sk_review` og vent på brukerens svar først. Oppdager automatisk samtidig redigering (f.eks. fra etterlevelse-frontend) via sesjonssporet versjonskontroll — ingen input påkrevd fra kalleren |
 | `write_krav_status` | Sett status for et helt krav (f.eks. IKKE_RELEVANT) uten å røre suksesskriterie-begrunnelsene. Oppdager automatisk samtidig redigering (f.eks. fra etterlevelse-frontend) via sesjonssporet versjonskontroll — ingen input påkrevd fra kalleren |
 | `delete_etterlevelse` | Slett en etterlevelsesbesvarelse |
 | `write_behandlingens_livsloep` | Opprett/oppdater behandlingens livsløp (støtter filvedlegg) |
