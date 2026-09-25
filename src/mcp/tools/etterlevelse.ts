@@ -304,10 +304,48 @@ function validateSkReviewToken(
   return { ok: true };
 }
 
-// Konsumerer (fjerner) sesjonens aktive reviewToken. Kalles kun etter en vellykket
-// write_suksesskriterium, slik at samme token ikke kan gjenbrukes til et nytt kall.
-function consumeSkReviewToken(ctx: SessionContext): void {
+// Validerer OG reserverer (fjerner) et reviewToken atomisk — synkront, uten noen `await`
+// mellom sjekk og fjerning. Dette er nødvendig fordi to samtidige write_suksesskriterium-kall
+// (f.eks. agenten feilaktig fyrer av flere skrivinger uten å vente) ellers begge kunne bestå
+// en ren lese-validering før noen av dem rakk å konsumere tokenet — siden konsumering tidligere
+// skjedde først etter en asynkron backend-skriving. Ved å reservere før vi awaiter noe som helst,
+// kan kun ÉN av to samtidige kall lykkes med samme token; JS er single-threaded, så det finnes
+// intet interleaving-punkt mellom sjekk og fjerning her. Returnerer en `release`-funksjon som
+// kalleren MÅ kalle hvis skrivingen etterpå feiler (f.eks. UTGAATT-krav, backend-feil), slik at
+// brukeren kan prøve på nytt uten å måtte kalle begin_sk_review på nytt.
+function reserveSkReviewToken(
+  ctx: SessionContext,
+  reviewToken: string,
+  etterlevelseDokumentasjonId: string,
+  kravNummer: number,
+  kravVersjon: number,
+  suksesskriterieId: number,
+): { ok: true; release: () => void } | { ok: false; error: ReturnType<typeof toolError>; outcome: string } {
+  const validation = validateSkReviewToken(
+    ctx,
+    reviewToken,
+    etterlevelseDokumentasjonId,
+    kravNummer,
+    kravVersjon,
+    suksesskriterieId,
+  );
+  if (!validation.ok) {
+    return validation;
+  }
+
+  const reserved = ctx.tokenData.activeSkReviewToken;
   ctx.tokenData.activeSkReviewToken = undefined;
+
+  return {
+    ok: true,
+    release: () => {
+      // Gjenopprett kun hvis ingen nyere begin_sk_review har lagt inn et annet token i
+      // mellomtiden — ellers ville vi risikere å overskrive en påfølgende, gyldig reservasjon.
+      if (!ctx.tokenData.activeSkReviewToken) {
+        ctx.tokenData.activeSkReviewToken = reserved;
+      }
+    },
+  };
 }
 
 export function requireDocumentLock(ctx: SessionContext, targetDocumentId?: string) {
@@ -1334,8 +1372,8 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
         lines.push(
           boxSection(
             'EKSISTERENDE BESVARELSE',
-            existingBegrunnelse
-              ? `Status: ${existingStatus ?? 'ukjent'}\n${existingBegrunnelse}`
+            existingSKB
+              ? `Status: ${existingStatus ?? 'ukjent'}\n${existingBegrunnelse ?? '(ingen begrunnelsestekst)'}`
               : 'Ingen eksisterende besvarelse',
             W,
           ),
@@ -1435,7 +1473,7 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
       const guardError = requireDocumentLock(ctx, etterlevelseDokumentasjonId);
       if (guardError) return guardError;
 
-      const tokenCheck = validateSkReviewToken(
+      const tokenCheck = reserveSkReviewToken(
         ctx,
         reviewToken,
         etterlevelseDokumentasjonId,
@@ -1448,6 +1486,9 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
         return tokenCheck.error;
       }
 
+      // Tokenet er nå reservert (fjernet fra sesjonen). Gjenopprett det ved enhver retur eller
+      // feil under — kun en faktisk vellykket skriving skal konsumere det permanent.
+      let writeSucceeded = false;
       try {
         const [kravRaw, existingRaw] = await Promise.all([
           client.getKrav(`K${kravNummer}.${kravVersjon}`),
@@ -1487,8 +1528,8 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
           suksesskriterieStatus,
           expectedVersion,
         });
+        writeSucceeded = true;
         recordKnownEtterlevelseVersion(ctx, etterlevelseDokumentasjonId, kravNummer, kravVersjon, writeResult);
-        consumeSkReviewToken(ctx);
 
         // getEtterlevelse returnerer ett objekt (ikke en liste) — bruk isRecord, ikke extractArray
         const existingRecord = isRecord(existingRaw) ? existingRaw : null;
@@ -1549,6 +1590,10 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
         });
       } catch (error) {
         return toolError(error);
+      } finally {
+        if (!writeSucceeded) {
+          tokenCheck.release();
+        }
       }
     },
   );
@@ -1950,7 +1995,7 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
     {
       description: 'Slett behandlingens livsløp-dokument for det låste etterlevelsesdokumentet. Krever aktiv sesjonslås.',
       inputSchema: {},
-      annotations: writeAnnotations,
+      annotations: destructiveWriteAnnotations,
     },
     async () => {
       const writeGuardError = requireWriteEnabled();

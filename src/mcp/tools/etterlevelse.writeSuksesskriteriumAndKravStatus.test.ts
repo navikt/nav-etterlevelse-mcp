@@ -289,6 +289,76 @@ describe('begin_sk_review / write_suksesskriterium — reviewToken-gate', () => 
     expect(secondResult.isError).toBe(true);
     expect(client.writeSuksesskriterium).toHaveBeenCalledTimes(1);
   });
+
+  it('gjenoppretter reviewToken hvis skrivingen feiler, slik at samme token kan brukes på nytt', async () => {
+    const client = fakeClient({
+      writeSuksesskriterium: vi
+        .fn()
+        .mockRejectedValueOnce(new Error('Midlertidig backend-feil'))
+        .mockResolvedValueOnce({ id: 'etterlevelse-1' }),
+    });
+    const ctx = ctxWithClient(client);
+    const server = fakeServer();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    registerEtterlevelseTools(server as any, ctx);
+    const reviewToken = await beginReview(server, { suksesskriterieId: 1 });
+
+    const failedResult = (await server.invoke('write_suksesskriterium', {
+      etterlevelseDokumentasjonId: 'doc-1',
+      kravNummer: 100,
+      kravVersjon: 1,
+      suksesskriterieId: 1,
+      begrunnelse: 'Første forsøk',
+      suksesskriterieStatus: 'UNDER_ARBEID',
+      reviewToken,
+      brukerGodkjenning: 'G',
+    })) as { isError?: boolean };
+    expect(failedResult.isError).toBe(true);
+
+    // Tokenet skal fortsatt være gyldig — det ble reservert før skrivingen, men gjenopprettet
+    // fordi skrivingen kastet en feil.
+    const retryResult = (await server.invoke('write_suksesskriterium', {
+      etterlevelseDokumentasjonId: 'doc-1',
+      kravNummer: 100,
+      kravVersjon: 1,
+      suksesskriterieId: 1,
+      begrunnelse: 'Andre forsøk',
+      suksesskriterieStatus: 'UNDER_ARBEID',
+      reviewToken,
+      brukerGodkjenning: 'G',
+    })) as { isError?: boolean };
+
+    expect(retryResult.isError).toBeFalsy();
+    expect(client.writeSuksesskriterium).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('begin_sk_review — presentasjon av eksisterende besvarelse', () => {
+  beforeEach(() => {
+    isWriteEnabledMock.mockReturnValue(true);
+  });
+
+  it('viser eksisterende status selv når begrunnelsen er tom', async () => {
+    const client = fakeClient({
+      getEtterlevelse: vi.fn().mockResolvedValue({
+        suksesskriterieBegrunnelser: [{ suksesskriterieId: 2, suksesskriterieStatus: 'IKKE_RELEVANT', begrunnelse: '' }],
+      }),
+    });
+    const ctx = ctxWithClient(client);
+    const server = fakeServer();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    registerEtterlevelseTools(server as any, ctx);
+
+    const result = (await server.invoke('begin_sk_review', {
+      etterlevelseDokumentasjonId: 'doc-1',
+      kravNummer: 100,
+      kravVersjon: 1,
+      suksesskriterieId: 2,
+    })) as { structuredContent: { presentasjon: string } };
+
+    expect(result.structuredContent.presentasjon).toContain('IKKE_RELEVANT');
+    expect(result.structuredContent.presentasjon).not.toContain('Ingen eksisterende besvarelse');
+  });
 });
 
 describe('write_suksesskriterium — sesjonssporet optimistisk låsing (expectedVersion)', () => {
