@@ -70,6 +70,20 @@ function ctxWithClient(client: unknown): SessionContext {
   };
 }
 
+// Henter et gyldig reviewToken via begin_sk_review, som write_suksesskriterium nå krever.
+async function beginReview(
+  server: ReturnType<typeof fakeServer>,
+  overrides: { suksesskriterieId: number } & Record<string, unknown> = { suksesskriterieId: 1 },
+): Promise<string> {
+  const result = (await server.invoke('begin_sk_review', {
+    etterlevelseDokumentasjonId: 'doc-1',
+    kravNummer: 100,
+    kravVersjon: 1,
+    ...overrides,
+  })) as { structuredContent: { reviewToken: string } };
+  return result.structuredContent.reviewToken;
+}
+
 describe('write_suksesskriterium', () => {
   beforeEach(() => {
     isWriteEnabledMock.mockReturnValue(true);
@@ -144,6 +158,7 @@ describe('write_suksesskriterium', () => {
     const server = fakeServer();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     registerEtterlevelseTools(server as any, ctx);
+    const reviewToken = await beginReview(server, { suksesskriterieId: 2 });
 
     await server.invoke('write_suksesskriterium', {
       etterlevelseDokumentasjonId: 'doc-1',
@@ -152,6 +167,8 @@ describe('write_suksesskriterium', () => {
       suksesskriterieId: 2, // behovForBegrunnelse: false
       begrunnelse: 'Denne skal ikke sendes',
       suksesskriterieStatus: 'IKKE_RELEVANT',
+      reviewToken,
+      brukerGodkjenning: 'G',
     });
 
     expect(client.writeSuksesskriterium).toHaveBeenCalledWith(
@@ -165,6 +182,7 @@ describe('write_suksesskriterium', () => {
     const server = fakeServer();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     registerEtterlevelseTools(server as any, ctx);
+    const reviewToken = await beginReview(server, { suksesskriterieId: 1 });
 
     const result = (await server.invoke('write_suksesskriterium', {
       etterlevelseDokumentasjonId: 'doc-1',
@@ -173,6 +191,8 @@ describe('write_suksesskriterium', () => {
       suksesskriterieId: 1,
       begrunnelse: 'Ny begrunnelse for SK1',
       suksesskriterieStatus: 'UNDER_ARBEID',
+      reviewToken,
+      brukerGodkjenning: 'G',
     })) as { structuredContent: { summary: string } };
 
     expect(client.writeSuksesskriterium).toHaveBeenCalledWith(
@@ -181,6 +201,93 @@ describe('write_suksesskriterium', () => {
     // Summary skal vise både gammel og ny begrunnelse for menneskelig gjennomgang
     expect(result.structuredContent.summary).toContain('Gammel tekst');
     expect(result.structuredContent.summary).toContain('Ny begrunnelse for SK1');
+  });
+});
+
+describe('begin_sk_review / write_suksesskriterium — reviewToken-gate', () => {
+  beforeEach(() => {
+    isWriteEnabledMock.mockReturnValue(true);
+  });
+
+  it('avviser skriving uten reviewToken med en lærende feilmelding', async () => {
+    const client = fakeClient();
+    const ctx = ctxWithClient(client);
+    const server = fakeServer();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    registerEtterlevelseTools(server as any, ctx);
+
+    const result = (await server.invoke('write_suksesskriterium', {
+      etterlevelseDokumentasjonId: 'doc-1',
+      kravNummer: 100,
+      kravVersjon: 1,
+      suksesskriterieId: 1,
+      begrunnelse: 'Ny tekst',
+      suksesskriterieStatus: 'UNDER_ARBEID',
+      reviewToken: 'ikke-utstedt-token',
+      brukerGodkjenning: 'G',
+    })) as { isError?: boolean; content: Array<{ text: string }> };
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('begin_sk_review');
+    expect(client.writeSuksesskriterium).not.toHaveBeenCalled();
+  });
+
+  it('avviser skriving når reviewToken gjelder et annet suksesskriterium', async () => {
+    const client = fakeClient();
+    const ctx = ctxWithClient(client);
+    const server = fakeServer();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    registerEtterlevelseTools(server as any, ctx);
+    const reviewToken = await beginReview(server, { suksesskriterieId: 2 });
+
+    const result = (await server.invoke('write_suksesskriterium', {
+      etterlevelseDokumentasjonId: 'doc-1',
+      kravNummer: 100,
+      kravVersjon: 1,
+      suksesskriterieId: 1, // token gjelder SK2, ikke SK1
+      begrunnelse: 'Ny tekst',
+      suksesskriterieStatus: 'UNDER_ARBEID',
+      reviewToken,
+      brukerGodkjenning: 'G',
+    })) as { isError?: boolean; content: Array<{ text: string }> };
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('Tokenet gjelder');
+    expect(client.writeSuksesskriterium).not.toHaveBeenCalled();
+  });
+
+  it('avviser gjenbruk av et allerede konsumert reviewToken', async () => {
+    const client = fakeClient();
+    const ctx = ctxWithClient(client);
+    const server = fakeServer();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    registerEtterlevelseTools(server as any, ctx);
+    const reviewToken = await beginReview(server, { suksesskriterieId: 1 });
+
+    await server.invoke('write_suksesskriterium', {
+      etterlevelseDokumentasjonId: 'doc-1',
+      kravNummer: 100,
+      kravVersjon: 1,
+      suksesskriterieId: 1,
+      begrunnelse: 'Første skriving',
+      suksesskriterieStatus: 'UNDER_ARBEID',
+      reviewToken,
+      brukerGodkjenning: 'G',
+    });
+
+    const secondResult = (await server.invoke('write_suksesskriterium', {
+      etterlevelseDokumentasjonId: 'doc-1',
+      kravNummer: 100,
+      kravVersjon: 1,
+      suksesskriterieId: 1,
+      begrunnelse: 'Forsøk på gjenbruk av samme token',
+      suksesskriterieStatus: 'UNDER_ARBEID',
+      reviewToken,
+      brukerGodkjenning: 'G',
+    })) as { isError?: boolean };
+
+    expect(secondResult.isError).toBe(true);
+    expect(client.writeSuksesskriterium).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -197,18 +304,24 @@ describe('write_suksesskriterium — sesjonssporet optimistisk låsing (expected
   // slik at neste kall sammenlignes mot den ferske versjonen — ikke den opprinnelige
   // lesingen.
   it('bruker oppdatert version fra forrige skriveresultat ved påfølgende skriving mot samme krav', async () => {
+    // currentVersion simulerer backendens fasit — inkrementeres av writeSuksesskriterium,
+    // og enhver getEtterlevelse-lesing (inkl. den begin_sk_review nå også gjør) reflekterer
+    // alltid nåværende backend-version, akkurat som i produksjon.
+    let currentVersion = 5;
     const client = fakeClient({
-      getEtterlevelse: vi.fn().mockResolvedValue({
-        version: 5,
-        suksesskriterieBegrunnelser: [
-          { suksesskriterieId: 1, begrunnelse: 'Gammel tekst' },
-          { suksesskriterieId: 2, begrunnelse: 'Gammel SK2' },
-        ],
+      getEtterlevelse: vi.fn().mockImplementation(() =>
+        Promise.resolve({
+          version: currentVersion,
+          suksesskriterieBegrunnelser: [
+            { suksesskriterieId: 1, begrunnelse: 'Gammel tekst' },
+            { suksesskriterieId: 2, begrunnelse: 'Gammel SK2' },
+          ],
+        }),
+      ),
+      writeSuksesskriterium: vi.fn().mockImplementation(() => {
+        currentVersion += 1;
+        return Promise.resolve({ id: 'etterlevelse-1', version: currentVersion });
       }),
-      writeSuksesskriterium: vi
-        .fn()
-        .mockResolvedValueOnce({ id: 'etterlevelse-1', version: 6 })
-        .mockResolvedValueOnce({ id: 'etterlevelse-1', version: 7 }),
     });
     const ctx = ctxWithClient(client);
     const server = fakeServer();
@@ -230,6 +343,8 @@ describe('write_suksesskriterium — sesjonssporet optimistisk låsing (expected
       suksesskriterieId: 1,
       begrunnelse: 'Ny SK1',
       suksesskriterieStatus: 'UNDER_ARBEID',
+      reviewToken: await beginReview(server, { suksesskriterieId: 1 }),
+      brukerGodkjenning: 'G',
     });
     // Backend har nå inkrementert version til 6 (returnert i writeResult over).
     expect(client.writeSuksesskriterium).toHaveBeenNthCalledWith(
@@ -244,6 +359,8 @@ describe('write_suksesskriterium — sesjonssporet optimistisk låsing (expected
       suksesskriterieId: 2,
       begrunnelse: 'Ny SK2',
       suksesskriterieStatus: 'UNDER_ARBEID',
+      reviewToken: await beginReview(server, { suksesskriterieId: 2 }),
+      brukerGodkjenning: 'G',
     });
     // Andre skriving skal bruke version 6 (fra FØRSTE skriveresultat), ikke den
     // opprinnelige lesingen (5) — ellers ville dette blitt avvist som falsk konflikt.
@@ -276,6 +393,8 @@ describe('write_suksesskriterium — sesjonssporet optimistisk låsing (expected
       suksesskriterieId: 1,
       begrunnelse: 'Ny tekst',
       suksesskriterieStatus: 'UNDER_ARBEID',
+      reviewToken: await beginReview(server, { suksesskriterieId: 1 }),
+      brukerGodkjenning: 'G',
     })) as { isError?: boolean };
 
     expect(result.isError).toBe(true);

@@ -49,6 +49,24 @@ export const pvkOperationsTotal = new Counter({
   registers: [registry],
 });
 
+// --- Per-SK-godkjenning (begin_sk_review / write_suksesskriterium-takting) ---
+
+export const skReviewBeginTotal = new Counter({
+  name: 'sk_review_begin_total',
+  help: 'Antall begin_sk_review-kall (per-SK presentasjon startet, reviewToken utstedt)',
+  registers: [registry],
+});
+
+export const skReviewWriteOutcomeTotal = new Counter({
+  name: 'sk_review_write_outcome_total',
+  help:
+    'Utfall av write_suksesskriterium sett opp mot reviewToken/brukerGodkjenning. ' +
+    'Sammenlign "accepted" mot sk_review_begin_total for å avdekke drift der agenten ' +
+    'skriver uten forutgående presentasjon (skrivinger uten tilhørende review).',
+  labelNames: ['outcome', 'bruker_godkjenning'] as const,
+  registers: [registry],
+});
+
 export const navetReadsTotal = new Counter({
   name: 'navet_reads_total',
   help: 'Lesing fra Navet per fagområde',

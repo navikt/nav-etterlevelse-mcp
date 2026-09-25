@@ -1,9 +1,16 @@
+import { randomBytes } from 'node:crypto';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import * as z from 'zod/v4';
 import { authStore } from '../../auth/store.js';
 import { config } from '../../config.js';
 import { instrumentedRegisterTool } from '../instrumentedRegisterTool.js';
-import { etterlevelseWritesTotal, etterlevelseDocsCreatedTotal, pvkOperationsTotal } from '../../metrics.js';
+import {
+  etterlevelseWritesTotal,
+  etterlevelseDocsCreatedTotal,
+  pvkOperationsTotal,
+  skReviewBeginTotal,
+  skReviewWriteOutcomeTotal,
+} from '../../metrics.js';
 import type { SessionContext } from '../server.js';
 import { isWriteEnabled } from '../../unleash.js';
 
@@ -106,6 +113,16 @@ const writeAnnotations = {
   openWorldHint: false,
 };
 
+// Egne annotasjoner for verktøy som sletter data permanent. MCP-spesifikasjonen
+// definerer annotasjoner som hint, ikke håndhevede sikkerhetsgarantier — men klienter
+// som viser/bruker dem (f.eks. for ekstra bekreftelse) bør få riktig signal her.
+const destructiveWriteAnnotations = {
+  readOnlyHint: false,
+  destructiveHint: true,
+  idempotentHint: true,
+  openWorldHint: false,
+};
+
 const irrelevansForCodes = [
   'PERSONOPPLYSNINGER',
   'INTERN_SKJERMFLATE',
@@ -200,6 +217,97 @@ function recordKnownEtterlevelseVersion(
     ...ctx.tokenData.knownEtterlevelseVersions,
     [key]: record.version,
   };
+}
+
+// Levetid for et reviewToken fra begin_sk_review. Tokenet er engangsbruk (konsumeres av en
+// vellykket write_suksesskriterium), men får en kort utløpstid som hygiene i tilfelle
+// agenten aldri fullfører skrivingen (bruker hopper over, avbryter sesjonen, e.l.).
+const skReviewTokenTtlMs = 45 * 60 * 1000;
+
+// Utsteder et nytt engangs-reviewToken bundet til ETT bestemt suksesskriterium, og lagrer
+// det på sesjonen. Overskriver et evt. ubrukt tidligere token — kun ett aktivt review om
+// gangen per sesjon er meningsfullt, siden gjennomgangen uansett er sekvensiell (ett SK om
+// gangen).
+function issueSkReviewToken(
+  ctx: SessionContext,
+  etterlevelseDokumentasjonId: string,
+  kravNummer: number,
+  kravVersjon: number,
+  suksesskriterieId: number,
+): string {
+  const token = randomBytes(24).toString('base64url');
+  ctx.tokenData.activeSkReviewToken = {
+    token,
+    etterlevelseDokumentasjonId,
+    kravNummer,
+    kravVersjon,
+    suksesskriterieId,
+    expiresAt: Date.now() + skReviewTokenTtlMs,
+  };
+  return token;
+}
+
+// Validerer et reviewToken oppgitt til write_suksesskriterium mot sesjonens aktive token.
+// Returnerer en "lærende" feilmelding (toolError) som forklarer agenten hva som gikk galt
+// og hvordan den kommer videre, i stedet for en generisk avvisning. Konsumerer IKKE tokenet
+// selv — det gjøres eksplisitt av kalleren først når skrivingen faktisk lykkes.
+function validateSkReviewToken(
+  ctx: SessionContext,
+  reviewToken: string,
+  etterlevelseDokumentasjonId: string,
+  kravNummer: number,
+  kravVersjon: number,
+  suksesskriterieId: number,
+): { ok: true } | { ok: false; error: ReturnType<typeof toolError>; outcome: string } {
+  const active = ctx.tokenData.activeSkReviewToken;
+
+  if (!active) {
+    return {
+      ok: false,
+      outcome: 'missing_token',
+      error: toolError(
+        `Kall begin_sk_review(kravNummer=${kravNummer}, kravVersjon=${kravVersjon}, ` +
+          `suksesskriterieId=${suksesskriterieId}) først, vis "presentasjon" til brukeren, ` +
+          'og vent på G/H/R.',
+      ),
+    };
+  }
+
+  if (active.token !== reviewToken || active.expiresAt <= Date.now()) {
+    return {
+      ok: false,
+      outcome: 'invalid_token',
+      error: toolError(
+        'Dette suksesskriteriet er allerede skrevet i denne runden, eller reviewToken er ' +
+          'utløpt/ugyldig. Kall begin_sk_review på nytt hvis brukeren vil (re)vurdere dette SK-et.',
+      ),
+    };
+  }
+
+  if (
+    active.etterlevelseDokumentasjonId !== etterlevelseDokumentasjonId ||
+    active.kravNummer !== kravNummer ||
+    active.kravVersjon !== kravVersjon ||
+    active.suksesskriterieId !== suksesskriterieId
+  ) {
+    return {
+      ok: false,
+      outcome: 'mismatched_sk',
+      error: toolError(
+        `Tokenet gjelder K${active.kravNummer}.${active.kravVersjon} SK${active.suksesskriterieId}, ` +
+          `ikke K${kravNummer}.${kravVersjon} SK${suksesskriterieId}. Kall begin_sk_review for det ` +
+          'suksesskriteriet du faktisk skal skrive.',
+      ),
+    };
+  }
+
+  return { ok: true };
+}
+
+// Konsumerer (fjerner) sesjonens aktive reviewToken. Kalles kun etter en vellykket
+// write_suksesskriterium, slik at samme token ikke kan gjenbrukes til et nytt kall.
+function consumeSkReviewToken(ctx: SessionContext): void {
+  ctx.tokenData.activeSkReviewToken = undefined;
 }
 
 export function requireDocumentLock(ctx: SessionContext, targetDocumentId?: string) {
@@ -888,7 +996,7 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
     {
       description: 'Slett PVK-dokumentet for det låste etterlevelsesdokumentet. Krever aktiv sesjonslås.',
       inputSchema: {},
-      annotations: writeAnnotations,
+      annotations: destructiveWriteAnnotations,
     },
     async () => {
       const writeGuardError = requireWriteEnabled();
@@ -1133,11 +1241,150 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
   );
 
   instrumentedRegisterTool(server,
+    'begin_sk_review',
+    {
+      description:
+        'Start den obligatoriske per-SK-gjennomgangen for ETT bestemt suksesskriterium — kall dette ' +
+        'FØR du presenterer et forslag for brukeren, ett SK om gangen. Returnerer en ferdig formatert ' +
+        '"presentasjon" (kravets hensikt, SK-beskrivelse, eksisterende besvarelse) og et engangs ' +
+        '"reviewToken" som write_suksesskriterium krever for akkurat dette suksesskriteriet. ' +
+        'Krever aktiv sesjonslås (kall lock_document først).',
+      inputSchema: {
+        etterlevelseDokumentasjonId: z
+          .string()
+          .min(1)
+          .describe('UUID for dokumentasjonen — må matche låst dokument'),
+        kravNummer: z.number().int().describe('Kravnummer'),
+        kravVersjon: z.number().int().describe('Kravversjon'),
+        suksesskriterieId: z.number().int().describe('ID for suksesskriteriet som skal presenteres'),
+      },
+      annotations: readOnlyAnnotations,
+    },
+    async ({ etterlevelseDokumentasjonId, kravNummer, kravVersjon, suksesskriterieId }) => {
+      const writeGuardError = requireWriteEnabled();
+      if (writeGuardError) return writeGuardError;
+
+      const guardError = requireDocumentLock(ctx, etterlevelseDokumentasjonId);
+      if (guardError) return guardError;
+
+      try {
+        const [kravRaw, existingRaw] = await Promise.all([
+          client.getKrav(`K${kravNummer}.${kravVersjon}`),
+          client.getEtterlevelse({ etterlevelseDokumentasjonId, kravNummer, kravVersjon }),
+        ]);
+
+        const krav = isRecord(kravRaw) ? kravRaw : {};
+        if (krav.status === 'UTGAATT') {
+          return toolError(
+            `K${kravNummer}.${kravVersjon} har status UTGAATT. ` +
+              'Finn den aktive versjonen via list_krav og bruk den i stedet.',
+          );
+        }
+
+        recordKnownEtterlevelseVersion(ctx, etterlevelseDokumentasjonId, kravNummer, kravVersjon, existingRaw);
+
+        const suksesskriterier = Array.isArray(krav.suksesskriterier)
+          ? (krav.suksesskriterier as Record<string, unknown>[])
+          : [];
+        const def = suksesskriterier.find(
+          (sk) => sk.id === suksesskriterieId || sk.id === String(suksesskriterieId),
+        );
+        if (!def) {
+          return toolError(
+            `Fant ikke suksesskriterium ${suksesskriterieId} på K${kravNummer}.${kravVersjon}. ` +
+              'Sjekk suksesskriterieId mot get_krav_for_gjennomgang.',
+          );
+        }
+
+        const kravNavn = typeof krav.navn === 'string' ? krav.navn : `K${kravNummer}.${kravVersjon}`;
+        const hensikt = typeof krav.hensikt === 'string' ? stripHtml(krav.hensikt) : '';
+        const criterionName =
+          typeof def.navn === 'string' ? stripHtml(def.navn) : `Suksesskriterium ${suksesskriterieId}`;
+        const criterionDescription =
+          typeof def.beskrivelse === 'string' ? stripHtml(def.beskrivelse) : '(Ingen beskrivelse registrert)';
+        const behovForBegrunnelse = def.behovForBegrunnelse === true;
+
+        // getEtterlevelse returnerer ett objekt (ikke en liste) — bruk isRecord, ikke extractArray
+        const existingRecord = isRecord(existingRaw) ? existingRaw : null;
+        const existingSKBs = existingRecord && Array.isArray(existingRecord.suksesskriterieBegrunnelser)
+          ? (existingRecord.suksesskriterieBegrunnelser as Record<string, unknown>[])
+          : [];
+        const existingSKB = existingSKBs.find((e) => Number(e.suksesskriterieId) === suksesskriterieId);
+        const existingStatus =
+          existingSKB && typeof existingSKB.suksesskriterieStatus === 'string'
+            ? existingSKB.suksesskriterieStatus
+            : undefined;
+        const existingBegrunnelse =
+          existingSKB && typeof existingSKB.begrunnelse === 'string' && existingSKB.begrunnelse
+            ? existingSKB.begrunnelse
+            : undefined;
+
+        const W = 76;
+        const lines: string[] = [];
+        lines.push(`K${kravNummer}.${kravVersjon} – ${kravNavn}`);
+        if (hensikt) {
+          lines.push('');
+          lines.push(boxSection('KRAVETS HENSIKT', hensikt, W));
+        }
+        lines.push('');
+        lines.push(
+          boxSection(`SK${suksesskriterieId} – ${criterionName}`, `KRITERIET SPØR\n${criterionDescription}`, W),
+        );
+        lines.push('');
+        lines.push(
+          boxSection(
+            'EKSISTERENDE BESVARELSE',
+            existingBegrunnelse
+              ? `Status: ${existingStatus ?? 'ukjent'}\n${existingBegrunnelse}`
+              : 'Ingen eksisterende besvarelse',
+            W,
+          ),
+        );
+        lines.push('');
+        lines.push(`Behov for begrunnelse: ${behovForBegrunnelse}`);
+
+        const reviewToken = issueSkReviewToken(
+          ctx,
+          etterlevelseDokumentasjonId,
+          kravNummer,
+          kravVersjon,
+          suksesskriterieId,
+        );
+        skReviewBeginTotal.inc();
+
+        return toolResult({
+          presentasjon: lines.join('\n'),
+          reviewToken,
+          instruksjon:
+            'Vis "presentasjon" ordrett til brukeren, avslutt meldingen med nøyaktig ' +
+            '"[G]odkjenn  [H]opp over  [R]ediger", og STOPP. Ikke kall write_suksesskriterium før ' +
+            'brukeren har svart. Ved G: kall write_suksesskriterium med dette reviewToken og ' +
+            'brukerGodkjenning="G" (eller "R" hvis brukeren redigerte forslaget før godkjenning). ' +
+            'Ved H: ikke skriv noe — gå videre til neste SK uten å bruke tokenet. Ved R: la brukeren ' +
+            'redigere forslaget, vis det på nytt, og skriv først når brukeren svarer G.',
+          etterlevelseDokumentasjonId,
+          kravNummer,
+          kravVersjon,
+          suksesskriterieId,
+          suksesskriterieNavn: criterionName,
+          behovForBegrunnelse,
+          eksisterendeStatus: existingStatus ?? null,
+          eksisterendeBegrunnelse: existingBegrunnelse ?? null,
+        });
+      } catch (error) {
+        return toolError(error);
+      }
+    },
+  );
+
+  instrumentedRegisterTool(server,
     'write_suksesskriterium',
     {
       description:
         'Skriv/oppdater begrunnelsen for ETT suksesskriterium om gangen. Krever aktiv sesjonslås ' +
-        '(kall lock_document først). Henter kravets hensikt og eksisterende begrunnelse og returnerer ' +
+        '(kall lock_document først) OG et gyldig reviewToken fra begin_sk_review for akkurat dette ' +
+        'suksesskriteriet — kall begin_sk_review, vis "presentasjon" til brukeren og vent på svar ' +
+        'FØR dette verktøyet kalles. Henter kravets hensikt og eksisterende begrunnelse og returnerer ' +
         'dem i svaret for menneskelig gjennomgang. ' +
         'Bruk write_krav_status for å sette hele kravets status (f.eks. IKKE_RELEVANT) uten å røre ' +
         'suksesskriterie-begrunnelsene. ' +
@@ -1155,6 +1402,20 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
         suksesskriterieStatus: z
           .enum(['UNDER_ARBEID', 'IKKE_RELEVANT', 'IKKE_OPPFYLT'])
           .describe('OPPFYLT settes manuelt i UI etter at suksesskriterieteksten er lest og vurdert.'),
+        reviewToken: z
+          .string()
+          .min(1)
+          .describe(
+            'Engangstoken fra begin_sk_review for akkurat dette suksesskriteriet. Mangler du et ' +
+              'gyldig token, kall begin_sk_review først.',
+          ),
+        brukerGodkjenning: z
+          .enum(['G', 'R'])
+          .describe(
+            '"G" hvis brukeren godkjente forslaget uendret, "R" hvis brukeren redigerte forslaget før ' +
+              'godkjenning. Skal alltid gjenspeile et faktisk mottatt svar fra brukeren — ikke fyll inn ' +
+              'uten å ha spurt.',
+          ),
       },
       annotations: writeAnnotations,
     },
@@ -1165,12 +1426,27 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
       suksesskriterieId,
       begrunnelse,
       suksesskriterieStatus,
+      reviewToken,
+      brukerGodkjenning,
     }) => {
       const writeGuardError = requireWriteEnabled();
       if (writeGuardError) return writeGuardError;
 
       const guardError = requireDocumentLock(ctx, etterlevelseDokumentasjonId);
       if (guardError) return guardError;
+
+      const tokenCheck = validateSkReviewToken(
+        ctx,
+        reviewToken,
+        etterlevelseDokumentasjonId,
+        kravNummer,
+        kravVersjon,
+        suksesskriterieId,
+      );
+      if (!tokenCheck.ok) {
+        skReviewWriteOutcomeTotal.inc({ outcome: tokenCheck.outcome, bruker_godkjenning: brukerGodkjenning });
+        return tokenCheck.error;
+      }
 
       try {
         const [kravRaw, existingRaw] = await Promise.all([
@@ -1212,6 +1488,7 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
           expectedVersion,
         });
         recordKnownEtterlevelseVersion(ctx, etterlevelseDokumentasjonId, kravNummer, kravVersjon, writeResult);
+        consumeSkReviewToken(ctx);
 
         // getEtterlevelse returnerer ett objekt (ikke en liste) — bruk isRecord, ikke extractArray
         const existingRecord = isRecord(existingRaw) ? existingRaw : null;
@@ -1227,6 +1504,7 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
           suksesskriterium_status: String(suksesskriterieStatus),
           write_type: writeType,
         });
+        skReviewWriteOutcomeTotal.inc({ outcome: 'accepted', bruker_godkjenning: brukerGodkjenning });
 
         // Build summary with krav context for human review
         const kravNavn = typeof krav.navn === 'string' ? krav.navn : `K${kravNummer}.${kravVersjon}`;
@@ -1362,7 +1640,7 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
       inputSchema: {
         etterlevelseId: z.string().uuid().describe('UUID for etterlevelsen som skal slettes'),
       },
-      annotations: writeAnnotations,
+      annotations: destructiveWriteAnnotations,
     },
     async ({ etterlevelseId }) => {
       const writeGuardError = requireWriteEnabled();
@@ -2269,7 +2547,7 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
       inputSchema: {
         scenarioId: z.string().uuid().describe('UUID for risikoscenarioet som skal slettes'),
       },
-      annotations: writeAnnotations,
+      annotations: destructiveWriteAnnotations,
     },
     async ({ scenarioId }) => {
       const writeGuardError = requireWriteEnabled();
@@ -2312,7 +2590,7 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
       inputSchema: {
         tiltakId: z.string().uuid().describe('UUID for tiltaket som skal slettes'),
       },
-      annotations: writeAnnotations,
+      annotations: destructiveWriteAnnotations,
     },
     async ({ tiltakId }) => {
       const writeGuardError = requireWriteEnabled();

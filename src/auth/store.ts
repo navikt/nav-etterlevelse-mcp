@@ -43,6 +43,22 @@ export interface McpTokenData {
    * bruker i etterlevelse-frontend — har endret kravet siden sist vi så det.
    */
   knownEtterlevelseVersions?: Record<string, number>;
+  /**
+   * Engangstoken for pågående per-SK-godkjenning, utstedt av begin_sk_review og konsumert
+   * av en vellykket write_suksesskriterium (se bindingSemantics i etterlevelse.ts). Bundet
+   * til ETT suksesskriterium — write_suksesskriterium avviser skriving hvis token mangler,
+   * er utløpt, eller er bundet til et annet krav/SK enn det som skrives. Et nytt
+   * begin_sk_review-kall overskriver et evt. ubrukt tidligere token (agenten byttet fokus
+   * til et annet SK uten å skrive det forrige).
+   */
+  activeSkReviewToken?: {
+    token: string;
+    etterlevelseDokumentasjonId: string;
+    kravNummer: number;
+    kravVersjon: number;
+    suksesskriterieId: number;
+    expiresAt: number;
+  };
 }
 
 export interface ClientRegistration {
