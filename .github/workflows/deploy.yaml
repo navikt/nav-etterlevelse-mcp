@@ -67,7 +67,7 @@ jobs:
         uses: nais/deploy/actions/deploy@fc3eae3edebabdf67f7592102ae16176d5ba3b5f # v2
         env:
           CLUSTER: dev-gcp
-          RESOURCE: .nais/alerts.yaml
+          RESOURCE: .nais/alerts-dev.yaml
       - name: Deploy to dev-gcp
         uses: nais/deploy/actions/deploy@fc3eae3edebabdf67f7592102ae16176d5ba3b5f # v2
         env:
