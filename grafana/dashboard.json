@@ -523,69 +523,19 @@
     },
     {
       "id": 11,
-      "title": "SK-godkjenning vs. faktisk skriving (24t)",
-      "type": "stat",
+      "title": "SK-gjennomgang: startet og skrevet per time",
+      "type": "timeseries",
       "gridPos": {
         "x": 0,
         "y": 26,
-        "w": 6,
-        "h": 4
-      },
-      "description": "Forholdstall mellom antall skrevne suksesskriterier og antall enkeltvis rapporterte sk_reviewed(godkjent)-hendelser. Over 1.2 samsvarer med alarmen EtterlevelseMcpSkGodkjentUtenEnkeltvisGjennomgang og kan indikere batch-godkjenning i strid med prosesskravet om ett SK om gangen.",
-      "targets": [
-        {
-          "expr": "sum(increase(etterlevelse_writes_total{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\"}[24h]))\n/ sum(increase(review_workflow_events_total{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\", event=\"sk_reviewed\", decision=\"godkjent\"}[24h]))",
-          "legendFormat": "skrevet / godkjent",
-          "refId": "A",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${datasource}"
-          }
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "none",
-          "decimals": 2,
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "yellow",
-                "value": 1
-              },
-              {
-                "color": "red",
-                "value": 1.2
-              }
-            ]
-          }
-        }
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      }
-    },
-    {
-      "id": 12,
-      "title": "Gjennomgangs-hendelser (log_review_event)",
-      "type": "timeseries",
-      "gridPos": {
-        "x": 6,
-        "y": 26,
-        "w": 18,
+        "w": 12,
         "h": 8
       },
-      "description": "Selvrapportert telemetri fra etterlevelse-/PVK-skillen: rapport skrevet/godkjent, SK-beslutninger (godkjent/hoppet_over/redigert) og opplastede krav siste 24 timer.",
+      "description": "Antall begin_sk_review og vellykkede write_suksesskriterium i glidende timevinduer. Avbrutte gjennomganger og nye forsøk på skriving kan gi forskjell. Tallene bekrefter ikke at brukeren har godkjent.",
       "targets": [
         {
-          "expr": "sum by (event) (increase(review_workflow_events_total{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\", decision=\"none\"}[24h]))",
-          "legendFormat": "{{event}}",
+          "expr": "sum(increase(sk_review_begin_total{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\"}[1h]))",
+          "legendFormat": "startet",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
@@ -593,8 +543,8 @@
           }
         },
         {
-          "expr": "sum by (decision) (increase(review_workflow_events_total{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\", event=\"sk_reviewed\", decision!=\"none\"}[24h]))",
-          "legendFormat": "sk_reviewed — {{decision}}",
+          "expr": "sum(increase(sk_review_write_outcome_total{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\", outcome=\"accepted\"}[1h]))",
+          "legendFormat": "skrevet",
           "refId": "B",
           "datasource": {
             "type": "prometheus",
@@ -611,10 +561,81 @@
           "custom": {
             "drawStyle": "bars",
             "fillOpacity": 80,
-            "lineWidth": 1,
-            "stacking": {
-              "mode": "normal"
-            }
+            "lineWidth": 1
+          }
+        }
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      }
+    },
+    {
+      "id": 12,
+      "title": "SK-skriving: utfall siste 24 timer",
+      "type": "table",
+      "gridPos": {
+        "x": 12,
+        "y": 26,
+        "w": 12,
+        "h": 8
+      },
+      "description": "Avvisninger per outcome og vellykkede skrivinger per klientoppgitt bruker_godkjenning (G/R). G/R er ikke en uavhengig bekreftelse fra brukeren.",
+      "targets": [
+        {
+          "expr": "sum by (outcome, bruker_godkjenning) (increase(sk_review_write_outcome_total{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\"}[24h]))",
+          "legendFormat": "{{outcome}} / {{bruker_godkjenning}}",
+          "refId": "A",
+          "format": "table",
+          "instant": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        }
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      }
+    },
+    {
+      "id": 13,
+      "title": "Avviste SK-tokenforsøk per time",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 0,
+        "y": 34,
+        "w": 12,
+        "h": 8
+      },
+      "description": "Avviste skriveforsøk per outcome i glidende timevinduer. Dev-varselet teller mismatched_sk og invalid_token samlet (minst 10 siste time i 10 minutter). Avvisninger alene beviser ikke batching.",
+      "targets": [
+        {
+          "expr": "sum by (outcome) (increase(sk_review_write_outcome_total{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\", outcome!=\"accepted\"}[1h]))",
+          "legendFormat": "{{outcome}}",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "short",
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 80,
+            "lineWidth": 1
           }
         }
       },

@@ -41,3 +41,15 @@ spec:
           annotations:
             summary: "Ingen trafikk til nav-etterlevelse-mcp siste 24 timer"
             description: "Enten er løsningen ikke i bruk, eller noe er galt med tilkoblingen. Verifiser at MCP-serveren svarer."
+
+        - alert: EtterlevelseMcpSkReviewTokenAvvisninger
+          expr: |
+            sum(increase(sk_review_write_outcome_total{namespace="dab", app="nav-etterlevelse-mcp", outcome=~"mismatched_sk|invalid_token"}[1h])) >= 10
+          for: 10m
+          labels:
+            severity: warning
+            team: dab
+          annotations:
+            summary: "Minst 10 avviste SK-tokenforsøk siste time i dev"
+            description: "Innsiktsvarsel: mange mismatched_sk/invalid_token ved write_suksesskriterium. Dette er ikke bevis på batching eller manglende brukergodkjenning; bytte av SK, utløpte token og retry kan også gi avvisning."
+            action: "Se utfallene hver for seg i Grafana. Undersøk tokenflyten og juster terskelen når teamet har trafikkdata. Ingen brukerkall blokkeres av alarmen."
