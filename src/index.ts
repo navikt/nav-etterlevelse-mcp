@@ -3,6 +3,7 @@ import { requireMcpBearerToken, type AuthenticatedLocals } from './auth/middlewa
 import { registerOAuthRoutes } from './auth/oauth.js';
 import { config } from './config.js';
 import { handleMcpHttpRequest } from './mcp/server.js';
+import { workSessionTracker } from './mcp/workSessionTracker.js';
 import { registry } from './metrics.js';
 import { initUnleash } from './unleash.js';
 
@@ -68,4 +69,10 @@ app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
 
 app.listen(config.port, () => {
   console.log(`nav-etterlevelse-mcp listening on :${config.port}`);
+});
+
+// Pågående arbeidsøkter ligger i minnet. Logg dem før poden stopper, ellers forsvinner de.
+process.once('SIGTERM', () => {
+  workSessionTracker.endAll('nedstenging');
+  process.exit(0);
 });

@@ -686,6 +686,223 @@
         "type": "prometheus",
         "uid": "${datasource}"
       }
+    },
+    {
+      "id": 15,
+      "title": "Krav per arbeidsøkt (7d)",
+      "type": "bargauge",
+      "gridPos": {
+        "x": 0,
+        "y": 42,
+        "w": 12,
+        "h": 8
+      },
+      "description": "Hvor mange ulike krav som får minst én godkjent SK-skriving eller krav-status i én økt. Én arbeidsøkt er én bruker som jobber med ett dokument, fram til dokumentbytte eller 60 minutter uten aktivitet. Ny låsing av samme dokument fortsetter økta. Økter som avbrytes av pod-stopp, finnes bare i loggen (event=etterlevelse_work_session_ended).",
+      "targets": [
+        {
+          "expr": "sum by (le) (increase(etterlevelse_work_session_krav_bucket{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\"}[7d]))",
+          "legendFormat": "≤ {{le}}",
+          "refId": "A",
+          "format": "heatmap",
+          "instant": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "options": {
+        "orientation": "vertical",
+        "displayMode": "basic",
+        "showUnfilled": false,
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "blue"
+          }
+        }
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      }
+    },
+    {
+      "id": 16,
+      "title": "Suksesskriterier per arbeidsøkt (7d)",
+      "type": "bargauge",
+      "gridPos": {
+        "x": 12,
+        "y": 42,
+        "w": 12,
+        "h": 8
+      },
+      "description": "Hvor mange ulike suksesskriterier som skrives (G/R) i én økt. Skriving skjer ett SK om gangen, så dette er målet for hvor mye man dokumenterer i én runde. Én arbeidsøkt er én bruker som jobber med ett dokument, fram til dokumentbytte eller 60 minutter uten aktivitet. Ny låsing av samme dokument fortsetter økta. Økter som avbrytes av pod-stopp, finnes bare i loggen (event=etterlevelse_work_session_ended).",
+      "targets": [
+        {
+          "expr": "sum by (le) (increase(etterlevelse_work_session_suksesskriterier_bucket{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\"}[7d]))",
+          "legendFormat": "≤ {{le}}",
+          "refId": "A",
+          "format": "heatmap",
+          "instant": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "options": {
+        "orientation": "vertical",
+        "displayMode": "basic",
+        "showUnfilled": false,
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "blue"
+          }
+        }
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      }
+    },
+    {
+      "id": 17,
+      "title": "Arbeidsøkter: antall og median per avslutningsårsak (7d)",
+      "type": "table",
+      "gridPos": {
+        "x": 0,
+        "y": 50,
+        "w": 24,
+        "h": 6
+      },
+      "description": "inaktiv = 60 minutter uten aktivitet, dokumentbytte = brukeren låste et annet dokument. Én arbeidsøkt er én bruker som jobber med ett dokument, fram til dokumentbytte eller 60 minutter uten aktivitet. Ny låsing av samme dokument fortsetter økta. Økter som avbrytes av pod-stopp, finnes bare i loggen (event=etterlevelse_work_session_ended).",
+      "targets": [
+        {
+          "expr": "sum by (end_reason) (increase(etterlevelse_work_session_krav_count{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\"}[7d]))",
+          "legendFormat": "Økter",
+          "refId": "A",
+          "format": "table",
+          "instant": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        },
+        {
+          "expr": "histogram_quantile(0.5, sum by (le, end_reason) (increase(etterlevelse_work_session_krav_bucket{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\"}[7d])))",
+          "legendFormat": "Median krav",
+          "refId": "B",
+          "format": "table",
+          "instant": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        },
+        {
+          "expr": "histogram_quantile(0.5, sum by (le, end_reason) (increase(etterlevelse_work_session_suksesskriterier_bucket{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\"}[7d])))",
+          "legendFormat": "Median SK",
+          "refId": "C",
+          "format": "table",
+          "instant": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        },
+        {
+          "expr": "histogram_quantile(0.5, sum by (le, end_reason) (increase(etterlevelse_work_session_duration_seconds_bucket{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\"}[7d])))",
+          "legendFormat": "Median varighet",
+          "refId": "D",
+          "format": "table",
+          "instant": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "transformations": [
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            },
+            "renameByName": {
+              "end_reason": "Avslutning",
+              "Value #A": "Økter",
+              "Value #B": "Median krav",
+              "Value #C": "Median SK",
+              "Value #D": "Median varighet"
+            }
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 1
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Median varighet"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "s"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Økter"
+            },
+            "properties": [
+              {
+                "id": "decimals",
+                "value": 0
+              }
+            ]
+          }
+        ]
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      }
     }
   ]
 }

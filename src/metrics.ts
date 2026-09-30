@@ -67,6 +67,34 @@ export const skReviewWriteOutcomeTotal = new Counter({
   registers: [registry],
 });
 
+// --- Arbeidsøkter (én bruker × ett dokument, se mcp/workSessionTracker.ts) ---
+// Observeres når økta avsluttes. Siden skriving skjer ett SK om gangen, er dette målet
+// for hvor mye man godkjenner og dokumenterer i én runde.
+
+export const workSessionKrav = new Histogram({
+  name: 'etterlevelse_work_session_krav',
+  help: 'Antall ulike krav med minst én godkjent SK-skriving eller krav-status per arbeidsøkt',
+  labelNames: ['end_reason'] as const,
+  buckets: [1, 2, 3, 5, 8, 13, 20, 30, 50],
+  registers: [registry],
+});
+
+export const workSessionSuksesskriterier = new Histogram({
+  name: 'etterlevelse_work_session_suksesskriterier',
+  help: 'Antall ulike suksesskriterier skrevet (G/R) per arbeidsøkt',
+  labelNames: ['end_reason'] as const,
+  buckets: [1, 2, 3, 5, 10, 20, 40, 80, 150],
+  registers: [registry],
+});
+
+export const workSessionDurationSeconds = new Histogram({
+  name: 'etterlevelse_work_session_duration_seconds',
+  help: 'Tid fra første til siste aktivitet i en arbeidsøkt med minst én skriving',
+  labelNames: ['end_reason'] as const,
+  buckets: [60, 300, 900, 1800, 3600, 7200, 14400, 28800],
+  registers: [registry],
+});
+
 export const navetReadsTotal = new Counter({
   name: 'navet_reads_total',
   help: 'Lesing fra Navet per fagområde',

@@ -12,6 +12,7 @@ import {
   skReviewWriteOutcomeTotal,
 } from '../../metrics.js';
 import type { SessionContext } from '../server.js';
+import { userKeyFor, workSessionTracker } from '../workSessionTracker.js';
 import { isWriteEnabled } from '../../unleash.js';
 
 const etterlevelseFrontendUrl = config.api.etterlevelseFrontendUrl;
@@ -927,6 +928,8 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
           return toolError('Klarte ikke oppdatere sesjonen. Token kan ha utløpt.');
         }
 
+        workSessionTracker.recordLock(userKeyFor(ctx.tokenData), etterlevelseDokumentasjonId);
+
         return toolResult({
           locked: true,
           documentId: etterlevelseDokumentasjonId,
@@ -1408,6 +1411,7 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
           suksesskriterieId,
         );
         skReviewBeginTotal.inc();
+        workSessionTracker.recordActivity(userKeyFor(ctx.tokenData), etterlevelseDokumentasjonId);
 
         return toolResult({
           presentasjon: lines.join('\n'),
@@ -1565,6 +1569,13 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
           write_type: writeType,
         });
         skReviewWriteOutcomeTotal.inc({ outcome: 'accepted', bruker_godkjenning: brukerGodkjenning });
+        workSessionTracker.recordSuksesskriteriumWrite(
+          userKeyFor(ctx.tokenData),
+          etterlevelseDokumentasjonId,
+          kravNummer,
+          kravVersjon,
+          suksesskriterieId,
+        );
 
         // Build summary with krav context for human review
         const kravNavn = typeof krav.navn === 'string' ? krav.navn : `K${kravNummer}.${kravVersjon}`;
@@ -1671,6 +1682,12 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
           expectedVersion,
         });
         recordKnownEtterlevelseVersion(ctx, etterlevelseDokumentasjonId, kravNummer, kravVersjon, writeResult);
+        workSessionTracker.recordKravStatusWrite(
+          userKeyFor(ctx.tokenData),
+          etterlevelseDokumentasjonId,
+          kravNummer,
+          kravVersjon,
+        );
 
         const kravNavn = typeof krav.navn === 'string' ? krav.navn : `K${kravNummer}.${kravVersjon}`;
         const hensikt = typeof krav.hensikt === 'string' ? stripHtml(krav.hensikt) : '';
