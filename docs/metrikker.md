@@ -23,6 +23,7 @@ En arbeidsøkt er én bruker som jobber på ett etterlevelsesdokument. Logikken 
 - Ny låsing av samme dokument fortsetter økta. Låsen må ofte opprettes på nytt, så økta er ikke knyttet til den.
 - Økta slutter når brukeren låser et annet dokument (`end_reason="dokumentbytte"`) eller etter 60 minutter uten aktivitet (`end_reason="inaktiv"`). Grensen er lengre enn reviewToken-TTL-en på 45 minutter.
 - Når økta slutter, observeres de tre histogrammene. Økter uten godkjent skriving blir ikke observert.
+- En sweep avslutter inaktive økter hvert femte minutt. Ny aktivitet etter grensen avslutter den gamle økta først, så to økter blir aldri slått sammen.
 
 Brukeren identifiseres med en hash av e-postadressen. Hashen ligger bare i minnet og brukes aldri som label.
 
@@ -82,7 +83,7 @@ I tillegg til metrikkene under eksporterer appen standardmetrikkene fra `collect
 | Metrikk | Type | Labels | Innhold |
 |---------|------|--------|---------|
 | `etterlevelse_work_session_krav` | histogram | `end_reason` | Ulike krav med minst én godkjent SK-skriving eller krav-status per økt |
-| `etterlevelse_work_session_suksesskriterier` | histogram | `end_reason` | Ulike SK-er skrevet per økt |
+| `etterlevelse_work_session_suksesskriterier` | histogram | `end_reason` | Ulike SK-er skrevet per økt. Bøtta `le="0"` er økter med bare `write_krav_status` |
 | `etterlevelse_work_session_duration_seconds` | histogram | `end_reason` | Tid fra første til siste aktivitet i økta |
 
 ## Kjente begrensninger

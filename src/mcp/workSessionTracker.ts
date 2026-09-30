@@ -50,6 +50,7 @@ export class WorkSessionTracker {
 
   /** lock_document: avslutter brukerens økter på andre dokumenter og teller låsingen. */
   recordLock(userKey: string, documentId: string): void {
+    this.endIdleSessions();
     for (const [key, session] of this.sessions) {
       if (session.userKey === userKey && session.documentId !== documentId) {
         this.end(key, session, 'dokumentbytte');
@@ -104,6 +105,11 @@ export class WorkSessionTracker {
     const key = `${userKey}::${documentId}`;
     const now = this.now();
     let session = this.sessions.get(key);
+    // Sweepen går bare hvert femte minutt. Utløpte økter må avsluttes her, ellers slås to økter sammen.
+    if (session && session.lastActivityAt <= now - this.idleLimitMs) {
+      this.end(key, session, 'inaktiv');
+      session = undefined;
+    }
     if (!session) {
       session = {
         userKey,

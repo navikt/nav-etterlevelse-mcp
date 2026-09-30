@@ -108,6 +108,23 @@ describe('WorkSessionTracker', () => {
     expect(tracker.recordSuksesskriteriumWrite('u1', 'dok-a', 100, 1, 1)).toBe(false);
   });
 
+  it('avslutter en utløpt økt som inaktiv selv om sweepen ikke har kjørt før dokumentbytte', () => {
+    tracker.recordSuksesskriteriumWrite('u1', 'dok-a', 100, 1, 1);
+    klokke = 62 * minutt;
+    tracker.recordLock('u1', 'dok-b');
+
+    expect(avsluttet).toEqual([expect.objectContaining({ endReason: 'inaktiv' })]);
+  });
+
+  it('starter ny økt på samme dokument når aktivitet kommer etter grensen, før sweepen', () => {
+    tracker.recordSuksesskriteriumWrite('u1', 'dok-a', 100, 1, 1);
+    klokke = 62 * minutt;
+
+    expect(tracker.recordSuksesskriteriumWrite('u1', 'dok-a', 100, 1, 1)).toBe(false);
+    expect(avsluttet).toEqual([expect.objectContaining({ endReason: 'inaktiv', suksesskriterieCount: 1 })]);
+    expect(tracker.activeCount).toBe(1);
+  });
+
   it('rapporterer ikke økter uten skriving', () => {
     tracker.recordLock('u1', 'dok-a');
     tracker.recordActivity('u1', 'dok-a');

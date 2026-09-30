@@ -95,7 +95,8 @@ export const workSessionSuksesskriterier = new Histogram({
   name: 'etterlevelse_work_session_suksesskriterier',
   help: 'Antall ulike suksesskriterier skrevet (G/R) per arbeidsøkt',
   labelNames: ['end_reason'] as const,
-  buckets: [1, 2, 3, 5, 10, 20, 40, 80, 150],
+  // 0: økter med bare write_krav_status.
+  buckets: [0, 1, 2, 3, 5, 10, 20, 40, 80, 150],
   registers: [registry],
 });
 

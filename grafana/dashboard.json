@@ -993,7 +993,7 @@
       "description": "Andel skrivinger der SK-et hadde en begrunnelse fra før, også fra UI-et. Blander oppdatering av gammel dokumentasjon og nye forsøk. Vises bare for SK med minst 3 skrivinger.",
       "targets": [
         {
-          "expr": "label_replace(label_replace(sum by (kravnummer, suksesskriterium_id) (increase(etterlevelse_writes_total{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\", write_type=\"revised\"}[30d])) / (sum by (kravnummer, suksesskriterium_id) (increase(etterlevelse_writes_total{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\"}[30d])) >= 3), \"krav\", \"K$1\", \"kravnummer\", \"(.*)\"), \"sk\", \"SK$1\", \"suksesskriterium_id\", \"(.*)\")",
+          "expr": "label_replace(label_replace((sum by (kravnummer, suksesskriterium_id) (increase(etterlevelse_writes_total{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\", write_type=\"revised\"}[30d])) or 0 * sum by (kravnummer, suksesskriterium_id) (increase(etterlevelse_writes_total{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\"}[30d]))) / (sum by (kravnummer, suksesskriterium_id) (increase(etterlevelse_writes_total{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\"}[30d])) >= 3), \"krav\", \"K$1\", \"kravnummer\", \"(.*)\"), \"sk\", \"SK$1\", \"suksesskriterium_id\", \"(.*)\")",
           "refId": "A",
           "format": "table",
           "instant": true,
