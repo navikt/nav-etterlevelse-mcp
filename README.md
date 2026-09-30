@@ -196,6 +196,10 @@ Hvis en agentsesjon feiler med autentiseringsfeil:
 In-memory sesjonsstoren betyr at ett token per pod er gyldige. Av den grunn er
 `replicas.max: 1` i NAIS-manifestet — se kommentar i `.nais/app.yaml` for detaljer.
 
+## Metrikker
+
+Metrikkene, hvilke spørsmål de svarer på og hvordan dashboardet importeres, står i [docs/metrikker.md](docs/metrikker.md).
+
 ## Planlagte utvidelser
 
 Ingen planlagte utvidelser for øyeblikket.
