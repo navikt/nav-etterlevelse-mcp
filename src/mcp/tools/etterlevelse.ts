@@ -8,6 +8,7 @@ import {
   etterlevelseWritesTotal,
   etterlevelseDocsCreatedTotal,
   pvkOperationsTotal,
+  skGjennomgangTotal,
   skReviewBeginTotal,
   skReviewWriteOutcomeTotal,
 } from '../../metrics.js';
@@ -224,6 +225,41 @@ function recordKnownEtterlevelseVersion(
 // vellykket write_suksesskriterium), men får en kort utløpstid som hygiene i tilfelle
 // agenten aldri fullfører skrivingen (bruker hopper over, avbryter sesjonen, e.l.).
 const skReviewTokenTtlMs = 45 * 60 * 1000;
+
+type SkGjennomgangHendelse =
+  | 'presentert'
+  | 'presentert_paa_nytt'
+  | 'forlatt'
+  | 'skrevet_g'
+  | 'skrevet_r'
+  | 'omskrevet_i_okt';
+
+function countSkGjennomgang(kravNummer: number, suksesskriterieId: number, hendelse: SkGjennomgangHendelse): void {
+  skGjennomgangTotal.inc({
+    kravnummer: String(kravNummer),
+    suksesskriterium_id: String(suksesskriterieId),
+    hendelse,
+  });
+}
+
+// Et ubrukt token som erstattes av begin_sk_review, ble aldri skrevet. Gjelder det samme SK,
+// ble SK-et presentert på nytt (ny runde eller utløpt token). Gjelder det et annet SK, ble det
+// forlatt (H, eller brukeren ga opp). Et token som aldri erstattes, telles ikke.
+function countReplacedSkReviewToken(
+  previous: SessionContext['tokenData']['activeSkReviewToken'],
+  etterlevelseDokumentasjonId: string,
+  kravNummer: number,
+  kravVersjon: number,
+  suksesskriterieId: number,
+): void {
+  if (!previous) return;
+  const sameSk =
+    previous.etterlevelseDokumentasjonId === etterlevelseDokumentasjonId &&
+    previous.kravNummer === kravNummer &&
+    previous.kravVersjon === kravVersjon &&
+    previous.suksesskriterieId === suksesskriterieId;
+  countSkGjennomgang(previous.kravNummer, previous.suksesskriterieId, sameSk ? 'presentert_paa_nytt' : 'forlatt');
+}
 
 // Utsteder et nytt engangs-reviewToken bundet til ETT bestemt suksesskriterium, og lagrer
 // det på sesjonen. Overskriver et evt. ubrukt tidligere token — kun ett aktivt review om
@@ -1403,6 +1439,7 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
         lines.push('');
         lines.push(`Behov for begrunnelse: ${behovForBegrunnelse}`);
 
+        const previousToken = ctx.tokenData.activeSkReviewToken;
         const reviewToken = issueSkReviewToken(
           ctx,
           etterlevelseDokumentasjonId,
@@ -1411,6 +1448,8 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
           suksesskriterieId,
         );
         skReviewBeginTotal.inc();
+        countReplacedSkReviewToken(previousToken, etterlevelseDokumentasjonId, kravNummer, kravVersjon, suksesskriterieId);
+        countSkGjennomgang(kravNummer, suksesskriterieId, 'presentert');
         workSessionTracker.recordActivity(userKeyFor(ctx.tokenData), etterlevelseDokumentasjonId);
 
         return toolResult({
@@ -1569,13 +1608,17 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
           write_type: writeType,
         });
         skReviewWriteOutcomeTotal.inc({ outcome: 'accepted', bruker_godkjenning: brukerGodkjenning });
-        workSessionTracker.recordSuksesskriteriumWrite(
+        const omskrevetIOkt = workSessionTracker.recordSuksesskriteriumWrite(
           userKeyFor(ctx.tokenData),
           etterlevelseDokumentasjonId,
           kravNummer,
           kravVersjon,
           suksesskriterieId,
         );
+        countSkGjennomgang(kravNummer, suksesskriterieId, brukerGodkjenning === 'R' ? 'skrevet_r' : 'skrevet_g');
+        if (omskrevetIOkt) {
+          countSkGjennomgang(kravNummer, suksesskriterieId, 'omskrevet_i_okt');
+        }
 
         // Build summary with krav context for human review
         const kravNavn = typeof krav.navn === 'string' ? krav.navn : `K${kravNummer}.${kravVersjon}`;

@@ -23,11 +23,12 @@ describe('WorkSessionTracker', () => {
     tracker.recordSuksesskriteriumWrite('u1', 'dok-a', 200, 2, 1);
     tracker.recordKravStatusWrite('u1', 'dok-a', 300, 1);
 
-    tracker.endAll('nedstenging');
+    klokke += 60 * minutt;
+    tracker.endIdleSessions();
 
     expect(avsluttet).toEqual([
       {
-        endReason: 'nedstenging',
+        endReason: 'inaktiv',
         kravCount: 3,
         suksesskriterieCount: 3,
         writeCount: 5,
@@ -43,7 +44,8 @@ describe('WorkSessionTracker', () => {
     tracker.recordLock('u1', 'dok-a');
     tracker.recordSuksesskriteriumWrite('u1', 'dok-a', 100, 1, 2);
 
-    tracker.endAll('nedstenging');
+    klokke += 60 * minutt;
+    tracker.endIdleSessions();
 
     expect(avsluttet).toHaveLength(1);
     expect(avsluttet[0]).toMatchObject({ lockCount: 2, suksesskriterieCount: 2 });
@@ -87,11 +89,27 @@ describe('WorkSessionTracker', () => {
     expect(avsluttet).toEqual([]);
   });
 
+  it('melder fra når et SK skrives på nytt i samme økt', () => {
+    expect(tracker.recordSuksesskriteriumWrite('u1', 'dok-a', 100, 1, 1)).toBe(false);
+    expect(tracker.recordSuksesskriteriumWrite('u1', 'dok-a', 100, 1, 2)).toBe(false);
+    expect(tracker.recordSuksesskriteriumWrite('u1', 'dok-a', 100, 1, 1)).toBe(true);
+    expect(tracker.recordSuksesskriteriumWrite('u1', 'dok-b', 100, 1, 1)).toBe(false);
+  });
+
+  it('starter iterasjonstellingen på nytt når økta er avsluttet', () => {
+    tracker.recordSuksesskriteriumWrite('u1', 'dok-a', 100, 1, 1);
+    klokke = 60 * minutt;
+    tracker.endIdleSessions();
+
+    expect(tracker.recordSuksesskriteriumWrite('u1', 'dok-a', 100, 1, 1)).toBe(false);
+  });
+
   it('rapporterer ikke økter uten skriving', () => {
     tracker.recordLock('u1', 'dok-a');
     tracker.recordActivity('u1', 'dok-a');
 
-    tracker.endAll('nedstenging');
+    klokke += 60 * minutt;
+    tracker.endIdleSessions();
 
     expect(avsluttet).toEqual([]);
     expect(tracker.activeCount).toBe(0);

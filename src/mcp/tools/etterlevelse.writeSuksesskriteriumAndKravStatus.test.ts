@@ -12,6 +12,7 @@ vi.mock('../../unleash.js', () => ({
 }));
 
 const { registerEtterlevelseTools } = await import('./etterlevelse.js');
+const { skGjennomgangTotal } = await import('../../metrics.js');
 
 function fakeServer() {
   const handlers = new Map<string, (args: unknown) => Promise<unknown>>();
@@ -540,5 +541,88 @@ describe('write_krav_status', () => {
     });
     expect(result.structuredContent.summary).toContain('IKKE_RELEVANT');
     expect(result.structuredContent.summary).toContain('Gjelder ikke oss');
+  });
+});
+
+describe('etterlevelse_sk_gjennomgang_total — iterasjon per krav og SK', () => {
+  // Unikt kravnummer og unik bruker per test, siden metrikken og arbeidsøkt-trackeren er
+  // modul-singletoner som deles mellom testene.
+  async function antall(kravNummer: number, suksesskriterieId: number, hendelse: string): Promise<number> {
+    const metric = await skGjennomgangTotal.get();
+    const match = metric.values.find(
+      (v) =>
+        v.labels.kravnummer === String(kravNummer) &&
+        v.labels.suksesskriterium_id === String(suksesskriterieId) &&
+        v.labels.hendelse === hendelse,
+    );
+    return match?.value ?? 0;
+  }
+
+  function oppsett(userEmail: string) {
+    const client = fakeClient();
+    const ctx = ctxWithClient(client);
+    ctx.tokenData.userEmail = userEmail;
+    const server = fakeServer();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    registerEtterlevelseTools(server as any, ctx);
+    return server;
+  }
+
+  function skriv(
+    server: ReturnType<typeof fakeServer>,
+    kravNummer: number,
+    reviewToken: string,
+    brukerGodkjenning: 'G' | 'R',
+  ) {
+    return server.invoke('write_suksesskriterium', {
+      etterlevelseDokumentasjonId: 'doc-1',
+      kravNummer,
+      kravVersjon: 1,
+      suksesskriterieId: 1,
+      begrunnelse: 'Tekst',
+      suksesskriterieStatus: 'UNDER_ARBEID',
+      reviewToken,
+      brukerGodkjenning,
+    });
+  }
+
+  beforeEach(() => {
+    isWriteEnabledMock.mockReturnValue(true);
+  });
+
+  it('teller forlatt når et ubrukt token erstattes av et annet SK', async () => {
+    const server = oppsett('forlatt@nav.no');
+
+    await beginReview(server, { kravNummer: 901, suksesskriterieId: 1 });
+    await beginReview(server, { kravNummer: 901, suksesskriterieId: 2 });
+
+    expect(await antall(901, 1, 'presentert')).toBe(1);
+    expect(await antall(901, 1, 'forlatt')).toBe(1);
+    expect(await antall(901, 2, 'forlatt')).toBe(0);
+  });
+
+  it('teller presentert_paa_nytt når samme SK presenteres igjen uten skriving', async () => {
+    const server = oppsett('paa-nytt@nav.no');
+
+    await beginReview(server, { kravNummer: 902, suksesskriterieId: 1 });
+    await beginReview(server, { kravNummer: 902, suksesskriterieId: 1 });
+
+    expect(await antall(902, 1, 'presentert')).toBe(2);
+    expect(await antall(902, 1, 'presentert_paa_nytt')).toBe(1);
+    expect(await antall(902, 1, 'forlatt')).toBe(0);
+  });
+
+  it('teller skrevet_g/skrevet_r og omskrevet_i_okt ved ny skriving av samme SK', async () => {
+    const server = oppsett('omskrevet@nav.no');
+
+    await skriv(server, 903, await beginReview(server, { kravNummer: 903, suksesskriterieId: 1 }), 'R');
+    expect(await antall(903, 1, 'skrevet_r')).toBe(1);
+    expect(await antall(903, 1, 'omskrevet_i_okt')).toBe(0);
+
+    await skriv(server, 903, await beginReview(server, { kravNummer: 903, suksesskriterieId: 1 }), 'G');
+    expect(await antall(903, 1, 'skrevet_g')).toBe(1);
+    expect(await antall(903, 1, 'omskrevet_i_okt')).toBe(1);
+    // Tokenet ble brukt før neste begin_sk_review, så det er ikke en ny presentasjon uten skriving.
+    expect(await antall(903, 1, 'presentert_paa_nytt')).toBe(0);
   });
 });

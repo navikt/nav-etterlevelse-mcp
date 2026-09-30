@@ -697,7 +697,7 @@
         "w": 12,
         "h": 8
       },
-      "description": "Hvor mange ulike krav som får minst én godkjent SK-skriving eller krav-status i én økt. Én arbeidsøkt er én bruker som jobber med ett dokument, fram til dokumentbytte eller 60 minutter uten aktivitet. Ny låsing av samme dokument fortsetter økta. Økter som avbrytes av pod-stopp, finnes bare i loggen (event=etterlevelse_work_session_ended).",
+      "description": "Hvor mange ulike krav som får minst én godkjent SK-skriving eller krav-status i én økt. Én arbeidsøkt er én bruker som jobber med ett dokument, fram til dokumentbytte eller 60 minutter uten aktivitet. Ny låsing av samme dokument fortsetter økta.",
       "targets": [
         {
           "expr": "sum by (le) (increase(etterlevelse_work_session_krav_bucket{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\"}[7d]))",
@@ -748,7 +748,7 @@
         "w": 12,
         "h": 8
       },
-      "description": "Hvor mange ulike suksesskriterier som skrives (G/R) i én økt. Skriving skjer ett SK om gangen, så dette er målet for hvor mye man dokumenterer i én runde. Én arbeidsøkt er én bruker som jobber med ett dokument, fram til dokumentbytte eller 60 minutter uten aktivitet. Ny låsing av samme dokument fortsetter økta. Økter som avbrytes av pod-stopp, finnes bare i loggen (event=etterlevelse_work_session_ended).",
+      "description": "Hvor mange ulike suksesskriterier som skrives (G/R) i én økt. Skriving skjer ett SK om gangen, så dette er målet for hvor mye man dokumenterer i én runde. Én arbeidsøkt er én bruker som jobber med ett dokument, fram til dokumentbytte eller 60 minutter uten aktivitet. Ny låsing av samme dokument fortsetter økta.",
       "targets": [
         {
           "expr": "sum by (le) (increase(etterlevelse_work_session_suksesskriterier_bucket{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\"}[7d]))",
@@ -799,7 +799,7 @@
         "w": 24,
         "h": 6
       },
-      "description": "inaktiv = 60 minutter uten aktivitet, dokumentbytte = brukeren låste et annet dokument. Én arbeidsøkt er én bruker som jobber med ett dokument, fram til dokumentbytte eller 60 minutter uten aktivitet. Ny låsing av samme dokument fortsetter økta. Økter som avbrytes av pod-stopp, finnes bare i loggen (event=etterlevelse_work_session_ended).",
+      "description": "inaktiv = 60 minutter uten aktivitet, dokumentbytte = brukeren låste et annet dokument. Én arbeidsøkt er én bruker som jobber med ett dokument, fram til dokumentbytte eller 60 minutter uten aktivitet. Ny låsing av samme dokument fortsetter økta.",
       "targets": [
         {
           "expr": "sum by (end_reason) (increase(etterlevelse_work_session_krav_count{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\"}[7d]))",
@@ -898,6 +898,222 @@
             ]
           }
         ]
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      }
+    },
+    {
+      "id": 18,
+      "title": "Iterasjoner per krav og SK (30d)",
+      "type": "table",
+      "gridPos": {
+        "x": 0,
+        "y": 56,
+        "w": 12,
+        "h": 10
+      },
+      "description": "Sum av tre signaler per SK: presentert på nytt uten skriving, redigert før godkjenning (R) og skrevet på nytt i samme arbeidsøkt. Mørk celle = SK-et krevde flere runder. Tomme celler har ingen iterasjoner.",
+      "targets": [
+        {
+          "expr": "label_replace(label_replace(round(sum by (kravnummer, suksesskriterium_id) (increase(etterlevelse_sk_gjennomgang_total{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\", hendelse=~\"presentert_paa_nytt|skrevet_r|omskrevet_i_okt\"}[30d]))), \"krav\", \"K$1\", \"kravnummer\", \"(.*)\"), \"sk\", \"SK$1\", \"suksesskriterium_id\", \"(.*)\")",
+          "refId": "A",
+          "format": "table",
+          "instant": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "transformations": [
+        {
+          "id": "groupingToMatrix",
+          "options": {
+            "rowField": "krav",
+            "columnField": "sk",
+            "valueField": "Value",
+            "emptyValue": "empty"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "noValue": "",
+          "color": {
+            "mode": "continuous-GrYlRd"
+          },
+          "custom": {
+            "align": "center",
+            "cellOptions": {
+              "type": "color-background",
+              "mode": "basic"
+            }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "krav\\sk"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "auto"
+                }
+              },
+              {
+                "id": "custom.align",
+                "value": "left"
+              }
+            ]
+          }
+        ]
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      }
+    },
+    {
+      "id": 19,
+      "title": "Andel reviderte SK-svar per krav og SK (30d)",
+      "type": "table",
+      "gridPos": {
+        "x": 12,
+        "y": 56,
+        "w": 12,
+        "h": 10
+      },
+      "description": "Andel skrivinger der SK-et hadde en begrunnelse fra før, også fra UI-et. Blander oppdatering av gammel dokumentasjon og nye forsøk. Vises bare for SK med minst 3 skrivinger.",
+      "targets": [
+        {
+          "expr": "label_replace(label_replace(sum by (kravnummer, suksesskriterium_id) (increase(etterlevelse_writes_total{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\", write_type=\"revised\"}[30d])) / (sum by (kravnummer, suksesskriterium_id) (increase(etterlevelse_writes_total{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\"}[30d])) >= 3), \"krav\", \"K$1\", \"kravnummer\", \"(.*)\"), \"sk\", \"SK$1\", \"suksesskriterium_id\", \"(.*)\")",
+          "refId": "A",
+          "format": "table",
+          "instant": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "transformations": [
+        {
+          "id": "groupingToMatrix",
+          "options": {
+            "rowField": "krav",
+            "columnField": "sk",
+            "valueField": "Value",
+            "emptyValue": "empty"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "decimals": 0,
+          "noValue": "",
+          "color": {
+            "mode": "continuous-GrYlRd"
+          },
+          "custom": {
+            "align": "center",
+            "cellOptions": {
+              "type": "color-background",
+              "mode": "basic"
+            }
+          },
+          "min": 0,
+          "max": 1
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "krav\\sk"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "auto"
+                }
+              },
+              {
+                "id": "custom.align",
+                "value": "left"
+              }
+            ]
+          }
+        ]
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      }
+    },
+    {
+      "id": 20,
+      "title": "SK-gjennomgang per krav og SK: alle hendelser (30d)",
+      "type": "table",
+      "gridPos": {
+        "x": 0,
+        "y": 66,
+        "w": 24,
+        "h": 10
+      },
+      "description": "presentert = begin_sk_review. presentert_paa_nytt = samme SK presentert igjen uten skriving. forlatt = ubrukt token erstattet av et annet SK (H eller avbrutt). skrevet_g/skrevet_r = godkjent uendret/redigert. omskrevet_i_okt = SK-et var allerede skrevet i samme arbeidsøkt. Sorter på en kolonne for å finne de mest krevende SK-ene.",
+      "targets": [
+        {
+          "expr": "label_join(label_replace(label_replace(round(sum by (kravnummer, suksesskriterium_id, hendelse) (increase(etterlevelse_sk_gjennomgang_total{namespace=\"$namespace\", app=\"nav-etterlevelse-mcp\"}[30d]))), \"krav\", \"K$1\", \"kravnummer\", \"(.*)\"), \"sk\", \"SK$1\", \"suksesskriterium_id\", \"(.*)\"), \"krav_sk\", \" \", \"krav\", \"sk\")",
+          "refId": "A",
+          "format": "table",
+          "instant": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "transformations": [
+        {
+          "id": "groupingToMatrix",
+          "options": {
+            "rowField": "krav_sk",
+            "columnField": "hendelse",
+            "valueField": "Value",
+            "emptyValue": "zero"
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "indexByName": {
+              "krav_sk\\hendelse": 0,
+              "presentert": 1,
+              "presentert_paa_nytt": 2,
+              "forlatt": 3,
+              "skrevet_g": 4,
+              "skrevet_r": 5,
+              "omskrevet_i_okt": 6
+            },
+            "renameByName": {
+              "krav_sk\\hendelse": "Krav og SK"
+            }
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0
+        }
       },
       "datasource": {
         "type": "prometheus",

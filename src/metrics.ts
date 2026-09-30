@@ -67,6 +67,18 @@ export const skReviewWriteOutcomeTotal = new Counter({
   registers: [registry],
 });
 
+export const skGjennomgangTotal = new Counter({
+  name: 'etterlevelse_sk_gjennomgang_total',
+  help:
+    'Hendelser i per-SK-gjennomgangen per krav og SK, som mål på hvilke SK-er som krever mest iterasjon. ' +
+    'presentert: begin_sk_review. presentert_paa_nytt: begin_sk_review for samme SK mens forrige token ' +
+    'var ubrukt (ny runde eller utløpt token). forlatt: ubrukt token erstattet av et annet SK (H eller ' +
+    'avbrutt). skrevet_g/skrevet_r: godkjent skriving. omskrevet_i_okt: SK-et var allerede skrevet i ' +
+    'samme arbeidsøkt.',
+  labelNames: ['kravnummer', 'suksesskriterium_id', 'hendelse'] as const,
+  registers: [registry],
+});
+
 // --- Arbeidsøkter (én bruker × ett dokument, se mcp/workSessionTracker.ts) ---
 // Observeres når økta avsluttes. Siden skriving skjer ett SK om gangen, er dette målet
 // for hvor mye man godkjenner og dokumenterer i én runde.

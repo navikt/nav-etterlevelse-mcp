@@ -7,11 +7,11 @@ import {
 
 /**
  * Arbeidsøkt = én bruker som jobber med ett etterlevelsesdokument, fram til hen bytter
- * dokument, har vært inaktiv lenge, eller poden stenger. Økta er bevisst ikke knyttet til
+ * dokument eller har vært inaktiv lenge. Pågående økter går tapt ved pod-omstart. Økta er bevisst ikke knyttet til
  * lock_document eller MCP-tokenet: låsen forsvinner ved ny innlogging, og agenten låser ofte
  * samme dokument på nytt. Nøkkelen er derfor hash(bruker) + dokument-ID.
  */
-export type WorkSessionEndReason = 'inaktiv' | 'dokumentbytte' | 'nedstenging';
+export type WorkSessionEndReason = 'inaktiv' | 'dokumentbytte';
 
 export interface WorkSessionSummary {
   endReason: WorkSessionEndReason;
@@ -67,18 +67,22 @@ export class WorkSessionTracker {
     this.touch(userKey, documentId);
   }
 
+  /** Returnerer true hvis SK-et allerede var skrevet i samme økt (ny iterasjon). */
   recordSuksesskriteriumWrite(
     userKey: string,
     documentId: string,
     kravNummer: number,
     kravVersjon: number,
     suksesskriterieId: number,
-  ): void {
+  ): boolean {
     const session = this.touch(userKey, documentId);
     const krav = `K${kravNummer}.${kravVersjon}`;
+    const skKey = `${krav}::${suksesskriterieId}`;
+    const alreadyWritten = session.suksesskriterier.has(skKey);
     session.krav.add(krav);
-    session.suksesskriterier.add(`${krav}::${suksesskriterieId}`);
+    session.suksesskriterier.add(skKey);
     session.writeCount += 1;
+    return alreadyWritten;
   }
 
   recordKravStatusWrite(userKey: string, documentId: string, kravNummer: number, kravVersjon: number): void {
@@ -93,12 +97,6 @@ export class WorkSessionTracker {
       if (session.lastActivityAt <= cutoff) {
         this.end(key, session, 'inaktiv');
       }
-    }
-  }
-
-  endAll(reason: WorkSessionEndReason): void {
-    for (const [key, session] of this.sessions) {
-      this.end(key, session, reason);
     }
   }
 
@@ -147,9 +145,6 @@ function emitWorkSessionSummary(summary: WorkSessionSummary): void {
   workSessionKrav.observe(labels, summary.kravCount);
   workSessionSuksesskriterier.observe(labels, summary.suksesskriterieCount);
   workSessionDurationSeconds.observe(labels, summary.durationSeconds);
-  // Loggen overlever pod-stopp, der histogrammene ikke rekker å bli scrapet.
-  // Inneholder ingen bruker- eller dokumentidentitet.
-  console.log(JSON.stringify({ event: 'etterlevelse_work_session_ended', ...summary }));
 }
 
 export const workSessionTracker = new WorkSessionTracker(emitWorkSessionSummary);
