@@ -1,9 +1,5 @@
 import { createHash } from 'node:crypto';
-import {
-  workSessionDurationSeconds,
-  workSessionKrav,
-  workSessionSuksesskriterier,
-} from '../metrics.js';
+import { workSessionDurationSeconds, workSessionKrav, workSessionSuksesskriterier } from '../metrics.js';
 
 /**
  * Arbeidsøkt = én bruker som jobber med ett etterlevelsesdokument, fram til hen bytter

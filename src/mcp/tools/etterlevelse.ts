@@ -227,12 +227,7 @@ function recordKnownEtterlevelseVersion(
 const skReviewTokenTtlMs = 45 * 60 * 1000;
 
 type SkGjennomgangHendelse =
-  | 'presentert'
-  | 'presentert_paa_nytt'
-  | 'forlatt'
-  | 'skrevet_g'
-  | 'skrevet_r'
-  | 'omskrevet_i_okt';
+  'presentert' | 'presentert_paa_nytt' | 'forlatt' | 'skrevet_g' | 'skrevet_r' | 'omskrevet_i_okt';
 
 function countSkGjennomgang(kravNummer: number, suksesskriterieId: number, hendelse: SkGjennomgangHendelse): void {
   skGjennomgangTotal.inc({
@@ -1448,7 +1443,13 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
           suksesskriterieId,
         );
         skReviewBeginTotal.inc();
-        countReplacedSkReviewToken(previousToken, etterlevelseDokumentasjonId, kravNummer, kravVersjon, suksesskriterieId);
+        countReplacedSkReviewToken(
+          previousToken,
+          etterlevelseDokumentasjonId,
+          kravNummer,
+          kravVersjon,
+          suksesskriterieId,
+        );
         countSkGjennomgang(kravNummer, suksesskriterieId, 'presentert');
         workSessionTracker.recordActivity(userKeyFor(ctx.tokenData), etterlevelseDokumentasjonId);
 

@@ -11,7 +11,11 @@ describe('WorkSessionTracker', () => {
   beforeEach(() => {
     klokke = 0;
     avsluttet = [];
-    tracker = new WorkSessionTracker((s) => avsluttet.push(s), () => klokke, 60 * minutt);
+    tracker = new WorkSessionTracker(
+      (s) => avsluttet.push(s),
+      () => klokke,
+      60 * minutt,
+    );
   });
 
   it('teller ulike krav og SK-er, men alle skrivinger', () => {
