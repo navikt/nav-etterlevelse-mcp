@@ -1040,22 +1040,60 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
       description:
         'Opprett PVK-dokument for det låste etterlevelsesdokumentet. ' +
         'Kall dette i stedet for å be brukeren opprette det manuelt i UI-et. ' +
-        'Etter oppretting oppdateres sesjonen automatisk med pvkDokumentId.',
-      inputSchema: {},
+        'Behovsvurderingen (pvkVurdering) MÅ settes ved opprettelse: et PVK-dokument uten ' +
+        'vurdering låses i UI-et og blir utilgjengelig. Etter oppretting oppdateres sesjonen ' +
+        'automatisk med pvkDokumentId.',
+      inputSchema: {
+        pvkVurdering: z
+          .enum(['SKAL_UTFORE', 'SKAL_IKKE_UTFORE', 'ALLEREDE_UTFORT', 'LEGGE_OVER_EKSISTERENDE'])
+          .describe(
+            'Konklusjonen fra behovsvurderingen ("Vurder behovet for PVK"). ' +
+              'SKAL_UTFORE: PVK skal gjennomføres digitalt i løsningen. ' +
+              'SKAL_IKKE_UTFORE: PVK er ikke nødvendig (oppgi pvkVurderingsBegrunnelse). ' +
+              'ALLEREDE_UTFORT: behold en eksisterende, godkjent PVK i Word (oppgi pvkVurderingsBegrunnelse). ' +
+              'LEGGE_OVER_EKSISTERENDE: legg over en eksisterende, godkjent Word-PVK as-is i løsningen for ' +
+              'digital risikoeier-godkjenning, uten ny PVO-vurdering (oppgi pvkVurderingsBegrunnelse).',
+          ),
+        pvkVurderingsBegrunnelse: z
+          .string()
+          .optional()
+          .describe(
+            'Begrunnelse når pvkVurdering er SKAL_IKKE_UTFORE, ALLEREDE_UTFORT eller LEGGE_OVER_EKSISTERENDE.',
+          ),
+      },
       annotations: writeAnnotations,
     },
-    async () => {
+    async ({ pvkVurdering, pvkVurderingsBegrunnelse }) => {
       const writeGuardError = requireWriteEnabled();
       if (writeGuardError) return writeGuardError;
 
       const guardError = requireDocumentLock(ctx);
       if (guardError) return guardError;
 
+      // Guardrail mot korrupte PVK-data (issue #47): et PVK-dokument uten behovsvurdering fødes
+      // som UNDEFINED, og frontend (skalHaPvkDokument i pvkDokumentUtils.ts) låser da hele
+      // dokumentet slik at det blir utilgjengelig i UI-et. pvkVurdering er derfor påkrevd (håndhevet
+      // av skjemaet), og begrunnelse kreves for alle vurderinger unntatt SKAL_UTFORE — samme regel
+      // som frontend-skjemaet (pvkBehovSchema.ts).
+      if (
+        pvkVurdering !== 'SKAL_UTFORE' &&
+        (!pvkVurderingsBegrunnelse || pvkVurderingsBegrunnelse.trim() === '')
+      ) {
+        return toolError(
+          `pvkVurderingsBegrunnelse er påkrevd når pvkVurdering er "${pvkVurdering}". ` +
+            'Forklar vurderingen (hvorfor PVK ikke skal gjennomføres, allerede er gjennomført, ' +
+            'eller at en eksisterende godkjent Word-PVK legges over as-is).',
+        );
+      }
+
       const lockedDocumentId = ctx.tokenData.lockedDocumentId as string;
       const lockedDocumentTitle = ctx.tokenData.lockedDocumentTitle ?? lockedDocumentId;
 
       try {
-        const result = await client.createPvkDokument(lockedDocumentId);
+        const result = await client.createPvkDokument(lockedDocumentId, {
+          pvkVurdering,
+          ...(pvkVurderingsBegrunnelse !== undefined ? { pvkVurderingsBegrunnelse } : {}),
+        });
         if (!isRecord(result)) {
           return toolError('Uventet svar fra API ved opprettelse av PVK-dokument.');
         }
@@ -1068,8 +1106,9 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
         authStore.updateMcpToken(ctx.mcpAccessToken, { lockedPvkDokumentId: pvkDokumentId });
 
         return toolResult({
-          message: `✅ PVK-dokument opprettet for "${lockedDocumentTitle}".`,
+          message: `✅ PVK-dokument opprettet for "${lockedDocumentTitle}" med vurdering ${pvkVurdering}.`,
           pvkDokumentId,
+          pvkVurdering,
           status: asString(result.status) ?? null,
         });
       } catch (error) {
