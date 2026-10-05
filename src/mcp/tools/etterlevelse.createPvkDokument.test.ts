@@ -131,4 +131,31 @@ describe('create_pvk_dokument', () => {
       pvkVurderingsBegrunnelse: 'Behandler ikke personopplysninger.',
     });
   });
+
+  it('krever begrunnelse når pvkVurdering er LEGGE_OVER_EKSISTERENDE', async () => {
+    const client = fakeClient();
+    const server = setup(client);
+
+    const result = (await server.invoke('create_pvk_dokument', {
+      pvkVurdering: 'LEGGE_OVER_EKSISTERENDE',
+    })) as { isError?: boolean };
+
+    expect(result.isError).toBe(true);
+    expect(client.createPvkDokument).not.toHaveBeenCalled();
+  });
+
+  it('oppretter LEGGE_OVER_EKSISTERENDE (overfør godkjent Word-PVK) med begrunnelse', async () => {
+    const client = fakeClient();
+    const server = setup(client);
+
+    await server.invoke('create_pvk_dokument', {
+      pvkVurdering: 'LEGGE_OVER_EKSISTERENDE',
+      pvkVurderingsBegrunnelse: 'Godkjent PVK fra Word legges over as-is, ref. sak 21/12345.',
+    });
+
+    expect(client.createPvkDokument).toHaveBeenCalledWith('doc-1', {
+      pvkVurdering: 'LEGGE_OVER_EKSISTERENDE',
+      pvkVurderingsBegrunnelse: 'Godkjent PVK fra Word legges over as-is, ref. sak 21/12345.',
+    });
+  });
 });
