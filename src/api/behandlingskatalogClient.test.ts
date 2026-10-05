@@ -138,3 +138,53 @@ describe('BehandlingskatalogClient — D-nummer (DpBehandling)', () => {
     expect(calledUrls[0]).toContain('/process/search/B580');
   });
 });
+
+// Regresjonstest for issue #34: B-nummer (Process) returneres med B-prefiks i number-feltet,
+// i tråd med D-nummer-varianten. Polly sin Process.number er et rent heltall uten prefiks,
+// så prefikset legges på i klienten.
+describe('BehandlingskatalogClient — B-nummer-prefiks (Behandling)', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('searchBehandlinger legger B-prefiks på det rå numeriske number-feltet', async () => {
+    const fetchMock = vi.fn(async () =>
+      jsonResponse([
+        { id: 'proc-uuid-1', number: '580', name: 'Behandling B580', status: 'IN_PROGRESS' },
+      ]),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const client = new BehandlingskatalogClient('fake-token', 'https://test.local/api');
+    const result = await client.searchBehandlinger('B580');
+
+    expect(result).toEqual([
+      {
+        id: 'proc-uuid-1',
+        number: 'B580',
+        name: 'Behandling B580',
+        purposes: [],
+        status: 'IN_PROGRESS',
+      },
+    ]);
+  });
+
+  it('getBehandling matcher på rått nummer, men returnerer number med B-prefiks', async () => {
+    const calledUrls: string[] = [];
+    const fetchMock = vi.fn(async (url: string | URL) => {
+      const urlString = url.toString();
+      calledUrls.push(urlString);
+      if (urlString.includes('/process/search/')) {
+        return jsonResponse([{ id: 'proc-uuid-1', number: '580', name: 'Behandling B580' }]);
+      }
+      return jsonResponse({ id: 'proc-uuid-1', number: '580', name: 'Behandling B580' });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const client = new BehandlingskatalogClient('fake-token', 'https://test.local/api');
+    const result = await client.getBehandling('B580');
+
+    expect(calledUrls[1]).toContain('/process/proc-uuid-1');
+    expect(result).toMatchObject({ id: 'proc-uuid-1', number: 'B580', name: 'Behandling B580' });
+  });
+});

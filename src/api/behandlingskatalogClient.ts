@@ -120,13 +120,19 @@ export class BehandlingskatalogClient {
     const payload = await this.get(`/process/search/${encodeURIComponent(search)}`);
 
     const items = extractArray<Record<string, unknown>>(payload);
-    return items.map((item) => ({
-      id: asString(item.id) ?? '',
-      number: asString(item.number) ?? '',
-      name: asString(item.name) ?? asString(item.navn) ?? 'Uten navn',
-      purposes: extractStringArray(item.purposes ?? item.formaal),
-      status: asString(item.status) ?? '',
-    }));
+    return items.map((item) => {
+      // Polly sin Process.number er et rent heltall (se ProcessResponse.number: int).
+      // B-prefikset er en visningskonvensjon som konsumentene legger på — Pollys egen
+      // frontend gjør 'B' + process.number. Vi speiler dette, i tråd med D-nummer-varianten.
+      const processNumber = asString(item.number);
+      return {
+        id: asString(item.id) ?? '',
+        number: processNumber ? `B${processNumber}` : '',
+        name: asString(item.name) ?? asString(item.navn) ?? 'Uten navn',
+        purposes: extractStringArray(item.purposes ?? item.formaal),
+        status: asString(item.status) ?? '',
+      };
+    });
   }
 
   async getBehandling(id: string): Promise<unknown> {
@@ -218,9 +224,12 @@ export class BehandlingskatalogClient {
   }
 
   private mapBehandling(payload: Record<string, unknown>): Record<string, unknown> {
+    // Polly sin Process.number er et rent heltall uten prefiks (se ProcessResponse.number: int).
+    // B-prefikset legges på her for å matche visningskonvensjonen og D-nummer-varianten.
+    const processNumber = asString(payload.number);
     return {
       id: asString(payload.id) ?? null,
-      number: asString(payload.number) ?? null,
+      number: processNumber ? `B${processNumber}` : null,
       name: asString(payload.name) ?? asString(payload.navn) ?? null,
       purposes: payload.purposes ?? payload.formaal ?? [],
       legalBases: payload.legalBases ?? payload.legalBasis ?? [],
