@@ -680,8 +680,20 @@ export class EtterlevelseClient {
     }
   }
 
-  async createPvkDokument(etterlevelseDokumentasjonId: string): Promise<unknown> {
-    return this.post('/pvkdokument', { etterlevelseDokumentId: etterlevelseDokumentasjonId });
+  async createPvkDokument(
+    etterlevelseDokumentasjonId: string,
+    behovsvurdering: { pvkVurdering: string; pvkVurderingsBegrunnelse?: string },
+  ): Promise<unknown> {
+    // pvkVurdering sendes i POST-body (PvkDokumentRequest.pvkVurdering) slik at dokumentet
+    // aldri fødes som UNDEFINED. Et UNDEFINED-dokument låses i frontend (skalHaPvkDokument i
+    // pvkDokumentUtils.ts) og blir utilgjengelig i UI-et. Se issue #47.
+    return this.post('/pvkdokument', {
+      etterlevelseDokumentId: etterlevelseDokumentasjonId,
+      pvkVurdering: behovsvurdering.pvkVurdering,
+      ...(behovsvurdering.pvkVurderingsBegrunnelse !== undefined
+        ? { pvkVurderingsBegrunnelse: behovsvurdering.pvkVurderingsBegrunnelse }
+        : {}),
+    });
   }
 
   async deletePvkDokument(pvkDokumentId: string): Promise<void> {
