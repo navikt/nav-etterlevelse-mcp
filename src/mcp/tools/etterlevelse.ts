@@ -2944,20 +2944,37 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
             const existing = await client.getTiltak(tiltakId);
             const existingRecord = isRecord(existing) ? existing : {};
 
-            // Skill-gotcha: ansvarlig og ansvarligTeam returneres som objekter fra GET
-            // men MÅ sendes som strenger i PUT — send dem ikke med (settes manuelt i UI)
-            // Strip også changeStamp, version og risikoscenarioIds (read-only i PUT; koblingen
-            // styres via risikoscenario-endepunktene under)
+            // Strip changeStamp, version og risikoscenarioIds (read-only i PUT; koblingen styres
+            // via risikoscenario-endepunktene under).
             const {
               changeStamp: _cs,
               version: _v,
               risikoscenarioIds: _rs,
-              ansvarlig: _a,
-              ansvarligTeam: _at,
+              ansvarlig: eksisterendeAnsvarlig,
+              ansvarligTeam: eksisterendeAnsvarligTeam,
               ...cleanedExisting
             } = existingRecord;
 
-            const merged = { ...cleanedExisting, id: tiltakId, ...request };
+            // Bevar ansvarlig/ansvarligTeam. GET returnerer dem som berikede objekter
+            // (Resource/TeamResponse), men PUT forventer strenger (navIdent / team-id). Backendens
+            // mergeInto erstatter hele objektet, så å droppe dem (som før) nullet ansvarlig ved
+            // hver oppdatering — datatap for en ansvarlig en saksbehandler har satt i UI-et.
+            // Vi konverterer tilbake til string-form og sender med; agenten setter aldri ansvarlig
+            // selv, og navIdent eksponeres ikke i svaret (stripPersonalData).
+            const bevartAnsvarlig = isRecord(eksisterendeAnsvarlig)
+              ? asString(eksisterendeAnsvarlig.navIdent)
+              : asString(eksisterendeAnsvarlig);
+            const bevartAnsvarligTeam = isRecord(eksisterendeAnsvarligTeam)
+              ? asString(eksisterendeAnsvarligTeam.id)
+              : asString(eksisterendeAnsvarligTeam);
+
+            const merged = {
+              ...cleanedExisting,
+              id: tiltakId,
+              ...(bevartAnsvarlig ? { ansvarlig: bevartAnsvarlig } : {}),
+              ...(bevartAnsvarligTeam ? { ansvarligTeam: bevartAnsvarligTeam } : {}),
+              ...request,
+            };
             await client.updateTiltak(tiltakId, merged);
             id = tiltakId;
 
