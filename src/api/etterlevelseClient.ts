@@ -708,6 +708,18 @@ export class EtterlevelseClient {
     return this.get(`/pvkdokument/${pvkDokumentId}`);
   }
 
+  // Henter gyldige koder for en codelist (f.eks. YTTERLIGERE_EGENSKAPER) fra backend.
+  // Codelists er data, ikke kode — verdiene ligger i en admin-redigerbar DB-tabell — så
+  // dette er eneste kilde til sannhet. GET /codelist/{listName} returnerer
+  // [{ list, code, shortName, description, ... }]; vi returnerer kun kodene.
+  async getCodelist(listName: string): Promise<string[]> {
+    const payload = await this.get(`/codelist/${encodeURIComponent(listName)}`);
+    const items = Array.isArray(payload) ? payload : [];
+    return items
+      .map((item) => (isRecord(item) ? asString(item.code) : undefined))
+      .filter((code): code is string => Boolean(code));
+  }
+
   async patchPvkDokument(pvkDokumentId: string, patch: Record<string, unknown>): Promise<unknown> {
     const existing = await this.getPvkDokumentById(pvkDokumentId);
     if (!isRecord(existing)) {

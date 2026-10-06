@@ -156,20 +156,10 @@ const varslingsadresseSchema = z.object({
   type: z.enum(['SLACK', 'SLACK_USER', 'EPOST']).describe('SLACK: kanal, SLACK_USER: enkeltperson, EPOST: e-post'),
 });
 
-const ytterligereEgenskaperCodes = [
-  'SYSTEMATIC_PROFILING',
-  'LARGE_SCALE_PROCESSING',
-  'SYSTEMATIC_MONITORING',
-  'SENSITIVE_DATA',
-  'LARGE_SCALE_SENSITIVE_DATA',
-  'AUTOMATED_DECISIONS',
-  'VULNERABLE_GROUPS',
-  'INNOVATIVE_TECHNOLOGY',
-  'ACCESS_CONTROL_RESTRICTION',
-] as const;
-
 const ytterligereEgenskaperDescription =
-  'Ytterligere DPIA-triggere. Gyldige koder: ' + ytterligereEgenskaperCodes.join(', ');
+  'DPIA-triggende egenskaper (koder fra backend-codelisten YTTERLIGERE_EGENSKAPER). ' +
+  'Kodene valideres mot codelisten ved kall — oppgi gyldige koder derfra. Ved ugyldig kode ' +
+  'returnerer verktøyet de gyldige kodene i feilmeldingen.';
 
 // Nøkkel for sesjonssporet etterlevelse-version — se knownEtterlevelseVersions i McpTokenData.
 function etterlevelseVersionKey(
@@ -2491,7 +2481,7 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
           .optional()
           .describe('Behandlingen er helautomatisert'),
         ytterligereEgenskaper: z
-          .array(z.enum(ytterligereEgenskaperCodes))
+          .array(z.string())
           .optional()
           .describe(ytterligereEgenskaperDescription),
         pvkVurdering: z
@@ -2532,12 +2522,38 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
         );
       }
 
+      // Valider ytterligereEgenskaper dynamisk mot backend-codelisten YTTERLIGERE_EGENSKAPER.
+      // Codelists er data (admin-redigerbare), ikke kode, så en hardkodet enum ville drevet fra
+      // backend. Henter kun når feltet faktisk settes.
+      let validerteEgenskaper: string[] | undefined;
+      if (ytterligereEgenskaper !== undefined) {
+        let gyldigeKoder: string[];
+        try {
+          gyldigeKoder = await client.getCodelist('YTTERLIGERE_EGENSKAPER');
+        } catch (error) {
+          return toolError(
+            'Klarte ikke hente codelisten YTTERLIGERE_EGENSKAPER for validering: ' +
+              (error instanceof Error ? error.message : String(error)),
+          );
+        }
+        const gyldigeSet = new Set(gyldigeKoder);
+        const normaliserte = ytterligereEgenskaper.map((kode: string) => kode.trim().toUpperCase());
+        const ugyldige = normaliserte.filter((kode: string) => !gyldigeSet.has(kode));
+        if (ugyldige.length > 0) {
+          return toolError(
+            `Ugyldige ytterligereEgenskaper-koder: ${ugyldige.join(', ')}. ` +
+              `Gyldige koder fra backend-codelisten YTTERLIGERE_EGENSKAPER: ${gyldigeKoder.join(', ') || '(tom)'}.`,
+          );
+        }
+        validerteEgenskaper = normaliserte;
+      }
+
       const patch = {
         ...(dpProcessProfilering !== undefined ? { dpProcessProfilering } : {}),
         ...(dpProcessHelautomatiskBehandling !== undefined
           ? { dpProcessHelautomatiskBehandling }
           : {}),
-        ...(ytterligereEgenskaper !== undefined ? { ytterligereEgenskaper } : {}),
+        ...(validerteEgenskaper !== undefined ? { ytterligereEgenskaper: validerteEgenskaper } : {}),
         ...(pvkVurdering !== undefined ? { pvkVurdering } : {}),
         ...(pvkVurderingsBegrunnelse !== undefined ? { pvkVurderingsBegrunnelse } : {}),
       };
