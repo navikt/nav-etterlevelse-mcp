@@ -2879,18 +2879,16 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
         tiltakId: z.string().uuid().optional().describe('UUID for tiltaket ved oppdatering'),
         navn: z.string().min(1).describe('Kort navn på tiltaket (ren tekst — markdown vises som tegn)'),
         beskrivelse: z.string().min(1).describe('Beskrivelse av tiltaket (ren tekst — markdown vises som tegn)'),
-        frist: z
-          .string()
-          .regex(/^\d{4}-\d{2}-\d{2}$/)
+        frist: z.iso
+          .date()
           .optional()
           .describe('Frist på format YYYY-MM-DD'),
         iverksatt: z
           .boolean()
           .optional()
           .describe('Sett til true når tiltaket er gjennomført'),
-        iverksattDato: z
-          .string()
-          .regex(/^\d{4}-\d{2}-\d{2}$/)
+        iverksattDato: z.iso
+          .date()
           .optional()
           .describe(
             'Iverksettingsdato på format YYYY-MM-DD. NB: ved oppretting med iverksatt=true setter ' +

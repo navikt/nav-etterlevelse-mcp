@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import * as z from 'zod/v4';
 import type { SessionContext } from '../server.js';
 
 // Issues #44 og #45: write_tiltak kan nå koble et tiltak til flere risikoscenarioer (opprettes
@@ -130,5 +131,53 @@ describe('write_tiltak — scenario-kobling og iverksetting', () => {
     expect(client.addTiltakToRisikoscenario).toHaveBeenCalledTimes(1);
     expect(client.removeTiltakFromRisikoscenario).toHaveBeenCalledWith('rs-1', 't-1');
     expect(client.removeTiltakFromRisikoscenario).toHaveBeenCalledTimes(1);
+  });
+});
+
+// Schema-nivåtest (Copilot-review på #54): handler-testene kaller handleren direkte med ikke-UUID-er,
+// så zod-skjemaet kjøres aldri. Her valideres det registrerte skjemaet direkte, slik at den brytende
+// kontrakten (risikoscenarioIder som påkrevd UUID-array) ikke kan regrese ubemerket.
+describe('write_tiltak — skjema', () => {
+  function captureConfig(): { inputSchema: Record<string, z.ZodType> } {
+    let captured: { inputSchema: Record<string, z.ZodType> } | undefined;
+    const server = {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      registerTool: (name: string, config: any) => {
+        if (name === 'write_tiltak') captured = config;
+      },
+    };
+    const ctx = {
+      mcpAccessToken: 'token',
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      etterlevelseClient: {} as any,
+      tokenData: { lockedDocumentId: 'doc-1', lockedPvkDokumentId: 'pvk-1' },
+    } as unknown as SessionContext;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    registerEtterlevelseTools(server as any, ctx);
+    if (!captured) throw new Error('write_tiltak ble ikke registrert');
+    return captured;
+  }
+
+  const uuid = '00000000-0000-4000-8000-000000000001';
+
+  it('godtar risikoscenarioIder som UUID-array, avviser entall/tom/ugyldig UUID', () => {
+    const schema = z.object(captureConfig().inputSchema);
+    const base = { navn: 'Tiltak', beskrivelse: 'Beskrivelse' };
+
+    expect(schema.safeParse({ ...base, risikoscenarioIder: [uuid] }).success).toBe(true);
+    // Gammelt entallsfelt (uten risikoscenarioIder) mangler påkrevd felt
+    expect(schema.safeParse({ ...base, risikoscenarioId: uuid }).success).toBe(false);
+    // Tom array bryter min(1)
+    expect(schema.safeParse({ ...base, risikoscenarioIder: [] }).success).toBe(false);
+    // Ugyldig UUID
+    expect(schema.safeParse({ ...base, risikoscenarioIder: ['ikke-en-uuid'] }).success).toBe(false);
+  });
+
+  it('avviser ugyldig kalenderdato i iverksattDato', () => {
+    const schema = z.object(captureConfig().inputSchema);
+    const base = { navn: 'Tiltak', beskrivelse: 'Beskrivelse', risikoscenarioIder: [uuid] };
+
+    expect(schema.safeParse({ ...base, iverksattDato: '2026-01-15' }).success).toBe(true);
+    expect(schema.safeParse({ ...base, iverksattDato: '2026-99-99' }).success).toBe(false);
   });
 });

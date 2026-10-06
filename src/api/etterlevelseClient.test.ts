@@ -419,3 +419,31 @@ describe('EtterlevelseClient.getCodelist', () => {
     );
   });
 });
+
+// Issue #44: addTiltakToRisikoscenario kobler et tiltak til ett eller flere scenarioer via
+// PUT /risikoscenario/update/addRelevanteTiltak. Verifiserer path og payload så en skrivefeil fanges.
+describe('EtterlevelseClient.addTiltakToRisikoscenario', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('kaller PUT /risikoscenario/update/addRelevanteTiltak med risikoscenarioId og tiltakIds', async () => {
+    let capturedUrl: string | undefined;
+    let capturedMethod: string | undefined;
+    let capturedBody: unknown;
+    const fetchMock = vi.fn(async (url: string | URL, init?: RequestInit) => {
+      capturedUrl = url.toString();
+      capturedMethod = init?.method;
+      capturedBody = init?.body ? JSON.parse(init.body as string) : undefined;
+      return jsonResponse({ id: 'rs-1' });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const client = new EtterlevelseClient('fake-token', 'https://test.local/api');
+    await client.addTiltakToRisikoscenario('rs-1', ['t-1', 't-2']);
+
+    expect(capturedMethod).toBe('PUT');
+    expect(new URL(capturedUrl!).pathname).toBe('/api/risikoscenario/update/addRelevanteTiltak');
+    expect(capturedBody).toEqual({ risikoscenarioId: 'rs-1', tiltakIds: ['t-1', 't-2'] });
+  });
+});
