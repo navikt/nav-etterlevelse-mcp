@@ -358,19 +358,22 @@ describe('EtterlevelseClient — slettekommentar på delete-endepunkter', () => 
     expect(url.searchParams.get('comment')).toBe('ryddejobb etter test');
   });
 
-  it('deletePvkDokument, deleteRisikoscenario og deleteTiltak sender også comment', async () => {
+  it('deletePvkDokument, deleteBehandlingensLivsloep, deleteRisikoscenario og deleteTiltak sender også comment', async () => {
     const calls = captureDelete();
     await client().deletePvkDokument('pvk-1', 'ikke relevant');
+    await client().deleteBehandlingensLivsloep('lv-1', 'feilregistrert');
     await client().deleteRisikoscenario('rs-1', 'duplikat');
     await client().deleteTiltak('t-1', 'avbrutt');
 
     expect(calls.map((c) => new URL(c.url).searchParams.get('comment'))).toEqual([
       'ikke relevant',
+      'feilregistrert',
       'duplikat',
       'avbrutt',
     ]);
     expect(calls.map((c) => new URL(c.url).pathname)).toEqual([
       '/api/pvkdokument/pvk-1',
+      '/api/behandlingenslivslop/lv-1',
       '/api/risikoscenario/rs-1',
       '/api/tiltak/t-1',
     ]);

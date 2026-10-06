@@ -1810,7 +1810,7 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
         'suksesskriteriebegrunnelser) på det låste dokumentet. Sletter ikke hele ' +
         'etterlevelsesdokumentasjonen. Krever aktiv sesjonslås.',
       inputSchema: {
-        etterlevelseId: z.string().uuid().describe('UUID for etterlevelsen (krav-besvarelsen) som skal slettes'),
+        etterlevelseId: z.string().uuid().describe('UUID for etterlevelsen (kravbesvarelsen) som skal slettes'),
         kommentar: z
           .string()
           .min(1)
