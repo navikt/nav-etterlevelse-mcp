@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import * as z from 'zod/v4';
 import type { SessionContext } from '../server.js';
 
 // Dekker dynamisk codelist-validering (issue #43 Problem 1): write_pvk_egenskaper validerer
@@ -171,5 +172,44 @@ describe('write_pvk_egenskaper — pvkVurdering og begrunnelse', () => {
       'pvk-1',
       expect.objectContaining({ pvkVurdering: 'SKAL_UTFORE' }),
     );
+  });
+});
+
+// Schema-nivåtest (Copilot-review på #53): handler-testene over kaller handleren direkte og
+// hopper over SDK-skjemavalideringen, så de ville passert selv om LEGGE_OVER_EKSISTERENDE ble
+// fjernet fra enumen. Her fanges den registrerte konfigurasjonen og zod-skjemaet valideres direkte.
+describe('write_pvk_egenskaper — pvkVurdering-skjema', () => {
+  function captureConfig(): { inputSchema: Record<string, z.ZodType> } {
+    let captured: { inputSchema: Record<string, z.ZodType> } | undefined;
+    const server = {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      registerTool: (name: string, config: any) => {
+        if (name === 'write_pvk_egenskaper') captured = config;
+      },
+    };
+    const ctx = {
+      mcpAccessToken: 'token',
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      etterlevelseClient: {} as any,
+      tokenData: { lockedDocumentId: 'doc-1', lockedPvkDokumentId: 'pvk-1' },
+    } as unknown as SessionContext;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    registerEtterlevelseTools(server as any, ctx);
+    if (!captured) throw new Error('write_pvk_egenskaper ble ikke registrert');
+    return captured;
+  }
+
+  it('godtar alle fire vurderingene (inkl. LEGGE_OVER_EKSISTERENDE) og avviser ukjent', () => {
+    const schema = z.object(captureConfig().inputSchema);
+
+    for (const vurdering of [
+      'SKAL_UTFORE',
+      'SKAL_IKKE_UTFORE',
+      'ALLEREDE_UTFORT',
+      'LEGGE_OVER_EKSISTERENDE',
+    ]) {
+      expect(schema.safeParse({ pvkVurdering: vurdering }).success).toBe(true);
+    }
+    expect(schema.safeParse({ pvkVurdering: 'FINNES_IKKE' }).success).toBe(false);
   });
 });

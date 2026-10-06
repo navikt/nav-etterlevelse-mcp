@@ -2643,8 +2643,10 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
           .boolean()
           .optional()
           .describe(
-            'Sett til true for å opprette et øvrig risikoscenario (ikke koblet til et spesifikt krav). ' +
-              'Standard er false (krav-koblet scenario).',
+            'true = øvrig risikoscenario uten kravkobling, false = krav-koblet. ' +
+              'Ved OPPRETTING er standard false (krav-koblet) hvis feltet utelates. ' +
+              'Ved OPPDATERING bevares eksisterende verdi hvis feltet utelates — oppgi det ' +
+              'eksplisitt for å endre type.',
           ),
         sannsynlighetsNivaa: z.number().int().min(1).max(5).optional(),
         sannsynlighetsNivaaBegrunnelse: z
