@@ -68,6 +68,7 @@ bevart for auditing.
 | `create_pvk_dokument` | Opprett PVK-dokument for låst etterlevelsesdokument |
 | `delete_pvk_dokument` | Slett PVK-dokumentet |
 | `write_pvk_egenskaper` | Oppdater DPIA-egenskaper og PVK-behovsvurdering (veiviser) |
+| `get_ytterligere_egenskaper_koder` | Hent gyldige ytterligereEgenskaper-koder fra backend-codelisten |
 | `write_pvk_involvering` | Oppdater involveringsfelt i PVK |
 | `write_pvk_risikoeier` | Skriv merknad til risikoeier (lederrettet oppsummering for godkjenning) |
 | `write_pvk_melding_til_pvo` | Skriv utkast til melding til PVO (merknad + endringsnotat) |

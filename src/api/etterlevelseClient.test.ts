@@ -379,3 +379,43 @@ describe('EtterlevelseClient — slettekommentar på delete-endepunkter', () => 
     ]);
   });
 });
+
+// Issue #43: codelists er data, ikke kode. getCodelist henter de faktiske kodene fra backend
+// slik at write_pvk_egenskaper kan validere dynamisk i stedet for mot en hardkodet enum.
+describe('EtterlevelseClient.getCodelist', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('henter kodene for en liste fra /codelist/{listName}', async () => {
+    let capturedUrl: string | undefined;
+    const fetchMock = vi.fn(async (url: string | URL) => {
+      capturedUrl = url.toString();
+      return jsonResponse([
+        { list: 'YTTERLIGERE_EGENSKAPER', code: 'PROFILERING', shortName: 'Profilering' },
+        { list: 'YTTERLIGERE_EGENSKAPER', code: 'TEKNOLOGI', shortName: 'Bruk av teknologi' },
+      ]);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const client = new EtterlevelseClient('fake-token', 'https://test.local/api');
+    const koder = await client.getCodelist('YTTERLIGERE_EGENSKAPER');
+
+    expect(capturedUrl).toContain('/codelist/YTTERLIGERE_EGENSKAPER');
+    expect(koder).toEqual([
+      { code: 'PROFILERING', navn: 'Profilering', beskrivelse: null },
+      { code: 'TEKNOLOGI', navn: 'Bruk av teknologi', beskrivelse: null },
+    ]);
+  });
+
+  it('kaster ved uventet svarform (ikke en liste) i stedet for å returnere tom liste', async () => {
+    const fetchMock = vi.fn(async () => jsonResponse({ error: 'noe gikk galt' }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const client = new EtterlevelseClient('fake-token', 'https://test.local/api');
+
+    await expect(client.getCodelist('YTTERLIGERE_EGENSKAPER')).rejects.toThrow(
+      /Uventet svar fra codelist-endepunktet/,
+    );
+  });
+});
