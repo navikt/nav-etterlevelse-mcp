@@ -132,6 +132,37 @@ describe('write_tiltak — scenario-kobling og iverksetting', () => {
     expect(client.removeTiltakFromRisikoscenario).toHaveBeenCalledWith('rs-1', 't-1');
     expect(client.removeTiltakFromRisikoscenario).toHaveBeenCalledTimes(1);
   });
+
+  it('bevarer ansvarlig/ansvarligTeam (som navIdent/id) og frist ved oppdatering', async () => {
+    const client = fakeClient({
+      getTiltak: vi.fn().mockResolvedValue({
+        id: 't-1',
+        navn: 'Gammelt',
+        beskrivelse: 'Gammelt',
+        frist: '2026-03-01',
+        ansvarlig: { navIdent: 'A123456', givenName: 'Kari', email: 'kari@nav.no' },
+        ansvarligTeam: { id: 'team-uuid', name: 'Team DAB' },
+        risikoscenarioIds: ['rs-1'],
+      }),
+    });
+    const server = setup(client);
+
+    await server.invoke('write_tiltak', {
+      tiltakId: 't-1',
+      risikoscenarioIder: ['rs-1'],
+      navn: 'Oppdatert navn',
+      beskrivelse: 'Oppdatert',
+    });
+
+    const merged = client.updateTiltak.mock.calls[0][1] as Record<string, unknown>;
+    // ansvarlig/ansvarligTeam konverteres fra GET-objektene til string-form og bevares
+    expect(merged.ansvarlig).toBe('A123456');
+    expect(merged.ansvarligTeam).toBe('team-uuid');
+    // flate felter som agenten ikke sendte, bevares
+    expect(merged.frist).toBe('2026-03-01');
+    // felter agenten sendte, overstyrer
+    expect(merged.navn).toBe('Oppdatert navn');
+  });
 });
 
 // Schema-nivåtest (Copilot-review på #54): handler-testene kaller handleren direkte med ikke-UUID-er,
