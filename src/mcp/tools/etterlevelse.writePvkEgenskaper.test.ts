@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import * as z from 'zod/v4';
 import type { SessionContext } from '../server.js';
 
 // Dekker dynamisk codelist-validering (issue #43 Problem 1): write_pvk_egenskaper validerer
@@ -121,5 +122,94 @@ describe('write_pvk_egenskaper — ytterligereEgenskaper mot codelist', () => {
       { code: 'TEKNOLOGI', navn: 'Bruk av teknologi', beskrivelse: null },
       { code: 'SAARBARE_PERSONOPPLYSNING', navn: 'Sårbare registrerte', beskrivelse: null },
     ]);
+  });
+});
+
+// Issue #43 Problem 2: write_pvk_egenskaper samkjørt med create_pvk_dokument — støtter
+// LEGGE_OVER_EKSISTERENDE og krever begrunnelse for alle vurderinger unntatt SKAL_UTFORE.
+describe('write_pvk_egenskaper — pvkVurdering og begrunnelse', () => {
+  beforeEach(() => {
+    isWriteEnabledMock.mockReturnValue(true);
+  });
+
+  it('godtar LEGGE_OVER_EKSISTERENDE med begrunnelse og sender den i patch', async () => {
+    const client = fakeClient();
+    const server = setup(client);
+
+    await server.invoke('write_pvk_egenskaper', {
+      pvkVurdering: 'LEGGE_OVER_EKSISTERENDE',
+      pvkVurderingsBegrunnelse: 'Godkjent Word-PVK legges over as-is.',
+    });
+
+    expect(client.patchPvkDokument).toHaveBeenCalledWith(
+      'pvk-1',
+      expect.objectContaining({
+        pvkVurdering: 'LEGGE_OVER_EKSISTERENDE',
+        pvkVurderingsBegrunnelse: 'Godkjent Word-PVK legges over as-is.',
+      }),
+    );
+  });
+
+  it('avviser LEGGE_OVER_EKSISTERENDE uten begrunnelse', async () => {
+    const client = fakeClient();
+    const server = setup(client);
+
+    const result = (await server.invoke('write_pvk_egenskaper', {
+      pvkVurdering: 'LEGGE_OVER_EKSISTERENDE',
+    })) as { isError?: boolean };
+
+    expect(result.isError).toBe(true);
+    expect(client.patchPvkDokument).not.toHaveBeenCalled();
+  });
+
+  it('godtar SKAL_UTFORE uten begrunnelse', async () => {
+    const client = fakeClient();
+    const server = setup(client);
+
+    await server.invoke('write_pvk_egenskaper', { pvkVurdering: 'SKAL_UTFORE' });
+
+    expect(client.patchPvkDokument).toHaveBeenCalledWith(
+      'pvk-1',
+      expect.objectContaining({ pvkVurdering: 'SKAL_UTFORE' }),
+    );
+  });
+});
+
+// Schema-nivåtest (Copilot-review på #53): handler-testene over kaller handleren direkte og
+// hopper over SDK-skjemavalideringen, så de ville passert selv om LEGGE_OVER_EKSISTERENDE ble
+// fjernet fra enumen. Her fanges den registrerte konfigurasjonen og zod-skjemaet valideres direkte.
+describe('write_pvk_egenskaper — pvkVurdering-skjema', () => {
+  function captureConfig(): { inputSchema: Record<string, z.ZodType> } {
+    let captured: { inputSchema: Record<string, z.ZodType> } | undefined;
+    const server = {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      registerTool: (name: string, config: any) => {
+        if (name === 'write_pvk_egenskaper') captured = config;
+      },
+    };
+    const ctx = {
+      mcpAccessToken: 'token',
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      etterlevelseClient: {} as any,
+      tokenData: { lockedDocumentId: 'doc-1', lockedPvkDokumentId: 'pvk-1' },
+    } as unknown as SessionContext;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    registerEtterlevelseTools(server as any, ctx);
+    if (!captured) throw new Error('write_pvk_egenskaper ble ikke registrert');
+    return captured;
+  }
+
+  it('godtar alle fire vurderingene (inkl. LEGGE_OVER_EKSISTERENDE) og avviser ukjent', () => {
+    const schema = z.object(captureConfig().inputSchema);
+
+    for (const vurdering of [
+      'SKAL_UTFORE',
+      'SKAL_IKKE_UTFORE',
+      'ALLEREDE_UTFORT',
+      'LEGGE_OVER_EKSISTERENDE',
+    ]) {
+      expect(schema.safeParse({ pvkVurdering: vurdering }).success).toBe(true);
+    }
+    expect(schema.safeParse({ pvkVurdering: 'FINNES_IKKE' }).success).toBe(false);
   });
 });
