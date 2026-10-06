@@ -1121,10 +1121,15 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
     'delete_pvk_dokument',
     {
       description: 'Slett PVK-dokumentet for det låste etterlevelsesdokumentet. Krever aktiv sesjonslås.',
-      inputSchema: {},
+      inputSchema: {
+        kommentar: z
+          .string()
+          .min(1)
+          .describe('Kort begrunnelse for slettingen. Lagres i backend sin auditlogg og er påkrevd av etterlevelse-backend.'),
+      },
       annotations: destructiveWriteAnnotations,
     },
-    async () => {
+    async ({ kommentar }) => {
       const writeGuardError = requireWriteEnabled();
       if (writeGuardError) return writeGuardError;
 
@@ -1137,7 +1142,7 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
       }
 
       try {
-        await client.deletePvkDokument(lockedPvkDokumentId);
+        await client.deletePvkDokument(lockedPvkDokumentId, kommentar);
         authStore.updateMcpToken(ctx.mcpAccessToken, { lockedPvkDokumentId: undefined });
         return toolResult({ message: `PVK-dokument ${lockedPvkDokumentId} er slettet.`, pvkDokumentId: lockedPvkDokumentId });
       } catch (error) {
@@ -1798,15 +1803,22 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
   );
 
   instrumentedRegisterTool(server, 
-    'delete_etterlevelse',
+    'delete_krav_besvarelse',
     {
-      description: 'Slett en etterlevelsesbesvarelse for et krav. Krever aktiv sesjonslås.',
+      description:
+        'Slett etterlevelsesbesvarelsen for ETT krav (én etterlevelse-rad med dens ' +
+        'suksesskriteriebegrunnelser) på det låste dokumentet. Sletter ikke hele ' +
+        'etterlevelsesdokumentasjonen. Krever aktiv sesjonslås.',
       inputSchema: {
-        etterlevelseId: z.string().uuid().describe('UUID for etterlevelsen som skal slettes'),
+        etterlevelseId: z.string().uuid().describe('UUID for etterlevelsen (kravbesvarelsen) som skal slettes'),
+        kommentar: z
+          .string()
+          .min(1)
+          .describe('Kort begrunnelse for slettingen. Lagres i backend sin auditlogg og er påkrevd av etterlevelse-backend.'),
       },
       annotations: destructiveWriteAnnotations,
     },
-    async ({ etterlevelseId }) => {
+    async ({ etterlevelseId, kommentar }) => {
       const writeGuardError = requireWriteEnabled();
       if (writeGuardError) return writeGuardError;
 
@@ -1814,7 +1826,7 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
       if (guardError) return guardError;
 
       try {
-        await client.deleteEtterlevelse(etterlevelseId);
+        await client.deleteEtterlevelse(etterlevelseId, kommentar);
         return toolResult({ message: `Etterlevelse ${etterlevelseId} er slettet.`, etterlevelseId });
       } catch (error) {
         return toolError(error);
@@ -2113,10 +2125,15 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
     'delete_behandlingens_livsloep',
     {
       description: 'Slett behandlingens livsløp-dokument for det låste etterlevelsesdokumentet. Krever aktiv sesjonslås.',
-      inputSchema: {},
+      inputSchema: {
+        kommentar: z
+          .string()
+          .min(1)
+          .describe('Kort begrunnelse for slettingen. Lagres i backend sin auditlogg og er påkrevd av etterlevelse-backend.'),
+      },
       annotations: destructiveWriteAnnotations,
     },
-    async () => {
+    async ({ kommentar }) => {
       const writeGuardError = requireWriteEnabled();
       if (writeGuardError) return writeGuardError;
 
@@ -2130,7 +2147,7 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
         if (!existing || !isRecord(existing) || typeof existing.id !== 'string') {
           return toolError('Ingen behandlingens livsløp funnet for dette dokumentet.');
         }
-        await client.deleteBehandlingensLivsloep(existing.id);
+        await client.deleteBehandlingensLivsloep(existing.id, kommentar);
         return toolResult({ message: `Behandlingens livsløp ${existing.id} er slettet.`, livsloepId: existing.id });
       } catch (error) {
         return toolError(error);
@@ -2710,10 +2727,14 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
         'eksplisitt med delete_tiltak først. Dette sikrer bevisst bekreftelse fra bruker.',
       inputSchema: {
         scenarioId: z.string().uuid().describe('UUID for risikoscenarioet som skal slettes'),
+        kommentar: z
+          .string()
+          .min(1)
+          .describe('Kort begrunnelse for slettingen. Lagres i backend sin auditlogg og er påkrevd av etterlevelse-backend.'),
       },
       annotations: destructiveWriteAnnotations,
     },
-    async ({ scenarioId }) => {
+    async ({ scenarioId, kommentar }) => {
       const writeGuardError = requireWriteEnabled();
       if (writeGuardError) return writeGuardError;
 
@@ -2735,7 +2756,7 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
           );
         }
 
-        await client.deleteRisikoscenario(scenarioId);
+        await client.deleteRisikoscenario(scenarioId, kommentar);
         return toolResult({
           message: `Risikoscenario ${scenarioId} er slettet.`,
           scenarioId,
@@ -2753,10 +2774,14 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
       description: 'Slett et tiltak fra PVK-dokumentet. Krever aktiv sesjonslås. Fjerner automatisk koblingen til tilknyttede risikoscenarioer før sletting.',
       inputSchema: {
         tiltakId: z.string().uuid().describe('UUID for tiltaket som skal slettes'),
+        kommentar: z
+          .string()
+          .min(1)
+          .describe('Kort begrunnelse for slettingen. Lagres i backend sin auditlogg og er påkrevd av etterlevelse-backend.'),
       },
       annotations: destructiveWriteAnnotations,
     },
-    async ({ tiltakId }) => {
+    async ({ tiltakId, kommentar }) => {
       const writeGuardError = requireWriteEnabled();
       if (writeGuardError) return writeGuardError;
 
@@ -2774,7 +2799,7 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
           await client.removeTiltakFromRisikoscenario(scenarioId, tiltakId);
         }
 
-        await client.deleteTiltak(tiltakId);
+        await client.deleteTiltak(tiltakId, kommentar);
         return toolResult({
           message: `Tiltak ${tiltakId} er slettet.`,
           tiltakId,
