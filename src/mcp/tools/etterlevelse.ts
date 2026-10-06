@@ -2865,26 +2865,52 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
     'write_tiltak',
     {
       description:
-        'Opprett eller oppdater et tiltak for et risikoscenario. Krever aktiv sesjonslås (kall lock_document først). ' +
+        'Opprett eller oppdater et tiltak, og koble det til ett eller flere risikoscenarioer. ' +
+        'Krever aktiv sesjonslås (kall lock_document først). ' +
         `Ansvarlig person settes manuelt i ${etterlevelseFrontendUrl} (NAVident behandles ikke av agenten).`,
       inputSchema: {
-        risikoscenarioId: z.string().uuid().describe('UUID for risikoscenarioet tiltaket tilhører'),
+        risikoscenarioIder: z
+          .array(z.string().uuid())
+          .min(1)
+          .describe(
+            'UUID-er for risikoscenarioene tiltaket skal kobles til (ett eller flere). Ved ' +
+              'oppdatering synkroniseres koblingene: scenarioer som ikke er med i lista, fjernes.',
+          ),
         tiltakId: z.string().uuid().optional().describe('UUID for tiltaket ved oppdatering'),
         navn: z.string().min(1).describe('Kort navn på tiltaket (ren tekst — markdown vises som tegn)'),
         beskrivelse: z.string().min(1).describe('Beskrivelse av tiltaket (ren tekst — markdown vises som tegn)'),
-        frist: z
-          .string()
-          .regex(/^\d{4}-\d{2}-\d{2}$/)
+        frist: z.iso
+          .date()
           .optional()
           .describe('Frist på format YYYY-MM-DD'),
         iverksatt: z
           .boolean()
           .optional()
           .describe('Sett til true når tiltaket er gjennomført'),
+        iverksattDato: z.iso
+          .date()
+          .optional()
+          .describe(
+            'Iverksettingsdato på format YYYY-MM-DD. NB: ved oppretting med iverksatt=true setter ' +
+              'backend datoen til i dag uavhengig av denne verdien.',
+          ),
+        iverksettingsKommentar: z
+          .string()
+          .optional()
+          .describe('Kommentar om iverksettingen (fritekst).'),
       },
       annotations: writeAnnotations,
     },
-    async ({ risikoscenarioId, tiltakId, navn, beskrivelse, frist, iverksatt }) => {
+    async ({
+      risikoscenarioIder,
+      tiltakId,
+      navn,
+      beskrivelse,
+      frist,
+      iverksatt,
+      iverksattDato,
+      iverksettingsKommentar,
+    }) => {
       const writeGuardError = requireWriteEnabled();
       if (writeGuardError) return writeGuardError;
 
@@ -2900,24 +2926,28 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
         );
       }
 
+      const scenarioIder = risikoscenarioIder as string[];
+
       const request = {
         pvkDokumentId: lockedPvkDokumentId,
-        risikoscenarioId,
         navn,
         beskrivelse,
         ...(frist !== undefined ? { frist } : {}),
         ...(iverksatt !== undefined ? { iverksatt } : {}),
+        ...(iverksattDato !== undefined ? { iverksattDato } : {}),
+        ...(iverksettingsKommentar !== undefined ? { iverksettingsKommentar } : {}),
       };
 
         try {
-          let result: unknown;
+          let id: string;
           if (tiltakId) {
             const existing = await client.getTiltak(tiltakId);
             const existingRecord = isRecord(existing) ? existing : {};
 
             // Skill-gotcha: ansvarlig og ansvarligTeam returneres som objekter fra GET
             // men MÅ sendes som strenger i PUT — send dem ikke med (settes manuelt i UI)
-            // Strip også changeStamp, version og risikoscenarioIds (read-only i PUT)
+            // Strip også changeStamp, version og risikoscenarioIds (read-only i PUT; koblingen
+            // styres via risikoscenario-endepunktene under)
             const {
               changeStamp: _cs,
               version: _v,
@@ -2928,11 +2958,37 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
             } = existingRecord;
 
             const merged = { ...cleanedExisting, id: tiltakId, ...request };
-            result = await client.updateTiltak(tiltakId, merged);
-        } else {
-          result = await client.createTiltak(risikoscenarioId, request);
-        }
-        const tiltak = normalizeTiltak(isRecord(result) ? result : { id: tiltakId, ...request });
+            await client.updateTiltak(tiltakId, merged);
+            id = tiltakId;
+
+            // Synkroniser scenario-koblingene mot ønsket sett: legg til nye, fjern fjernede.
+            const naavaerende = Array.isArray(existingRecord.risikoscenarioIds)
+              ? (existingRecord.risikoscenarioIds as unknown[]).filter(
+                  (s): s is string => typeof s === 'string',
+                )
+              : [];
+            for (const scenarioId of scenarioIder.filter((s) => !naavaerende.includes(s))) {
+              await client.addTiltakToRisikoscenario(scenarioId, [id]);
+            }
+            for (const scenarioId of naavaerende.filter((s) => !scenarioIder.includes(s))) {
+              await client.removeTiltakFromRisikoscenario(scenarioId, id);
+            }
+          } else {
+            // Opprett under det første scenarioet, koble deretter til de øvrige.
+            const created = await client.createTiltak(scenarioIder[0], request);
+            const createdId = isRecord(created) ? asString(created.id) : undefined;
+            if (!createdId) {
+              return toolError('Tiltak ble opprettet men mangler ID i responsen.');
+            }
+            id = createdId;
+            for (const scenarioId of scenarioIder.slice(1)) {
+              await client.addTiltakToRisikoscenario(scenarioId, [id]);
+            }
+          }
+
+          // Hent oppdatert tiltak så svaret viser alle scenario-koblingene.
+          const result = await client.getTiltak(id);
+          const tiltak = normalizeTiltak(isRecord(result) ? result : { id, ...request });
 
         pvkOperationsTotal.inc({ operation: tiltakId ? 'update_tiltak' : 'create_tiltak', status: 'ok' });
 

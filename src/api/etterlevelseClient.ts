@@ -922,6 +922,12 @@ export class EtterlevelseClient {
     return this.post(`/tiltak/risikoscenario/${risikoscenarioId}`, request);
   }
 
+  // Kobler et eksisterende tiltak til ett eller flere risikoscenarioer. Relasjonen håndteres via
+  // risikoscenario-endepunktene (parallelt til addRelevantKrav), ikke via tiltak-body.
+  async addTiltakToRisikoscenario(risikoscenarioId: string, tiltakIds: string[]): Promise<unknown> {
+    return this.put('/risikoscenario/update/addRelevanteTiltak', { risikoscenarioId, tiltakIds });
+  }
+
   async getTiltakForPvkDokument(pvkDokumentId: string): Promise<any[]> {
     const payload = await this.get(`/tiltak/pvkdokument/${pvkDokumentId}`, { pageSize: 200 });
     return extractArray(payload);
