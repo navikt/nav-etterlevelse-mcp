@@ -2505,18 +2505,23 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
           .optional()
           .describe(ytterligereEgenskaperDescription),
         pvkVurdering: z
-          .enum(['SKAL_UTFORE', 'SKAL_IKKE_UTFORE', 'ALLEREDE_UTFORT'])
+          .enum(['SKAL_UTFORE', 'SKAL_IKKE_UTFORE', 'ALLEREDE_UTFORT', 'LEGGE_OVER_EKSISTERENDE'])
           .optional()
           .describe(
             'Konklusjon fra PVK-behovsvurderingen. ' +
-              'SKAL_UTFORE: PVK skal gjennomføres. ' +
+              'SKAL_UTFORE: PVK skal gjennomføres digitalt i løsningen. ' +
               'SKAL_IKKE_UTFORE: PVK er ikke nødvendig (oppgi pvkVurderingsBegrunnelse). ' +
-              'ALLEREDE_UTFORT: PVK er allerede gjennomført (oppgi pvkVurderingsBegrunnelse).',
+              'ALLEREDE_UTFORT: behold eksisterende, godkjent PVK i Word (oppgi pvkVurderingsBegrunnelse). ' +
+              'LEGGE_OVER_EKSISTERENDE: legg over en eksisterende, godkjent Word-PVK as-is for digital ' +
+              'risikoeier-godkjenning, uten ny PVO-vurdering (oppgi pvkVurderingsBegrunnelse).',
           ),
         pvkVurderingsBegrunnelse: z
           .string()
           .optional()
-          .describe('Begrunnelse for pvkVurdering når denne er SKAL_IKKE_UTFORE eller ALLEREDE_UTFORT.'),
+          .describe(
+            'Begrunnelse for pvkVurdering. Påkrevd for alle vurderinger unntatt SKAL_UTFORE ' +
+              '(SKAL_IKKE_UTFORE, ALLEREDE_UTFORT, LEGGE_OVER_EKSISTERENDE).',
+          ),
       },
       annotations: writeAnnotations,
     },
@@ -2585,12 +2590,14 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
 
       const effectivePvkVurdering = pvkVurdering ?? (patch as Record<string, unknown>).pvkVurdering;
       if (
-        (effectivePvkVurdering === 'SKAL_IKKE_UTFORE' || effectivePvkVurdering === 'ALLEREDE_UTFORT') &&
+        effectivePvkVurdering !== undefined &&
+        effectivePvkVurdering !== 'SKAL_UTFORE' &&
         (!pvkVurderingsBegrunnelse || pvkVurderingsBegrunnelse.trim() === '')
       ) {
         return toolError(
           `pvkVurderingsBegrunnelse er påkrevd når pvkVurdering er "${effectivePvkVurdering}". ` +
-            'Forklar hvorfor PVK ikke skal gjennomføres eller allerede er gjennomført.',
+            'Forklar vurderingen (hvorfor PVK ikke skal gjennomføres, allerede er gjennomført, ' +
+            'eller at en eksisterende godkjent Word-PVK legges over as-is).',
         );
       }
 
@@ -2712,7 +2719,10 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
         pvkDokumentId: lockedPvkDokumentId,
         navn,
         beskrivelse,
-        generelScenario: generelScenario ?? false,
+        // #46: generelScenario er betinget slik at en oppdatering som utelater feltet bevarer
+        // eksisterende verdi (via merged nedenfor), i stedet for å tvinge det til false. Default
+        // false settes kun på create-stien.
+        ...(generelScenario !== undefined ? { generelScenario } : {}),
         ...(sannsynlighetsNivaa !== undefined ? { sannsynlighetsNivaa } : {}),
         ...(sannsynlighetsNivaaBegrunnelse !== undefined
           ? { sannsynlighetsNivaaBegrunnelse }
@@ -2734,7 +2744,9 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
           const merged = { ...(isRecord(existing) ? existing : {}), id: scenarioId, ...request };
           result = await client.updateRisikoscenario(scenarioId, merged);
         } else {
-          result = await client.createRisikoscenario(request);
+          // Nye scenarioer er kravkoblede som standard (generelScenario=false). Ved oppdatering
+          // bevares eksisterende verdi via merged over.
+          result = await client.createRisikoscenario({ generelScenario: false, ...request });
         }
         const scenario = normalizeRisikoscenario(
           isRecord(result) ? result : { id: scenarioId, ...request },

@@ -123,3 +123,53 @@ describe('write_pvk_egenskaper — ytterligereEgenskaper mot codelist', () => {
     ]);
   });
 });
+
+// Issue #43 Problem 2: write_pvk_egenskaper samkjørt med create_pvk_dokument — støtter
+// LEGGE_OVER_EKSISTERENDE og krever begrunnelse for alle vurderinger unntatt SKAL_UTFORE.
+describe('write_pvk_egenskaper — pvkVurdering og begrunnelse', () => {
+  beforeEach(() => {
+    isWriteEnabledMock.mockReturnValue(true);
+  });
+
+  it('godtar LEGGE_OVER_EKSISTERENDE med begrunnelse og sender den i patch', async () => {
+    const client = fakeClient();
+    const server = setup(client);
+
+    await server.invoke('write_pvk_egenskaper', {
+      pvkVurdering: 'LEGGE_OVER_EKSISTERENDE',
+      pvkVurderingsBegrunnelse: 'Godkjent Word-PVK legges over as-is.',
+    });
+
+    expect(client.patchPvkDokument).toHaveBeenCalledWith(
+      'pvk-1',
+      expect.objectContaining({
+        pvkVurdering: 'LEGGE_OVER_EKSISTERENDE',
+        pvkVurderingsBegrunnelse: 'Godkjent Word-PVK legges over as-is.',
+      }),
+    );
+  });
+
+  it('avviser LEGGE_OVER_EKSISTERENDE uten begrunnelse', async () => {
+    const client = fakeClient();
+    const server = setup(client);
+
+    const result = (await server.invoke('write_pvk_egenskaper', {
+      pvkVurdering: 'LEGGE_OVER_EKSISTERENDE',
+    })) as { isError?: boolean };
+
+    expect(result.isError).toBe(true);
+    expect(client.patchPvkDokument).not.toHaveBeenCalled();
+  });
+
+  it('godtar SKAL_UTFORE uten begrunnelse', async () => {
+    const client = fakeClient();
+    const server = setup(client);
+
+    await server.invoke('write_pvk_egenskaper', { pvkVurdering: 'SKAL_UTFORE' });
+
+    expect(client.patchPvkDokument).toHaveBeenCalledWith(
+      'pvk-1',
+      expect.objectContaining({ pvkVurdering: 'SKAL_UTFORE' }),
+    );
+  });
+});
