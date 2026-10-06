@@ -407,4 +407,15 @@ describe('EtterlevelseClient.getCodelist', () => {
       { code: 'TEKNOLOGI', navn: 'Bruk av teknologi', beskrivelse: null },
     ]);
   });
+
+  it('kaster ved uventet svarform (ikke en liste) i stedet for å returnere tom liste', async () => {
+    const fetchMock = vi.fn(async () => jsonResponse({ error: 'noe gikk galt' }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const client = new EtterlevelseClient('fake-token', 'https://test.local/api');
+
+    await expect(client.getCodelist('YTTERLIGERE_EGENSKAPER')).rejects.toThrow(
+      /Uventet svar fra codelist-endepunktet/,
+    );
+  });
 });
