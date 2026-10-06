@@ -399,9 +399,12 @@ describe('EtterlevelseClient.getCodelist', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     const client = new EtterlevelseClient('fake-token', 'https://test.local/api');
-    const codes = await client.getCodelist('YTTERLIGERE_EGENSKAPER');
+    const koder = await client.getCodelist('YTTERLIGERE_EGENSKAPER');
 
     expect(capturedUrl).toContain('/codelist/YTTERLIGERE_EGENSKAPER');
-    expect(codes).toEqual(['PROFILERING', 'TEKNOLOGI']);
+    expect(koder).toEqual([
+      { code: 'PROFILERING', navn: 'Profilering', beskrivelse: null },
+      { code: 'TEKNOLOGI', navn: 'Bruk av teknologi', beskrivelse: null },
+    ]);
   });
 });

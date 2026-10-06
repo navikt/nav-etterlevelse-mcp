@@ -708,16 +708,24 @@ export class EtterlevelseClient {
     return this.get(`/pvkdokument/${pvkDokumentId}`);
   }
 
-  // Henter gyldige koder for en codelist (f.eks. YTTERLIGERE_EGENSKAPER) fra backend.
-  // Codelists er data, ikke kode — verdiene ligger i en admin-redigerbar DB-tabell — så
-  // dette er eneste kilde til sannhet. GET /codelist/{listName} returnerer
-  // [{ list, code, shortName, description, ... }]; vi returnerer kun kodene.
-  async getCodelist(listName: string): Promise<string[]> {
+  // Henter en codelist (f.eks. YTTERLIGERE_EGENSKAPER) fra backend. Codelists er data, ikke
+  // kode — verdiene ligger i en admin-redigerbar DB-tabell — så dette er eneste kilde til
+  // sannhet. GET /codelist/{listName} returnerer [{ list, code, shortName, description, ... }].
+  // Returnerer kode + etikett (navn/beskrivelse) så kallere kan vise meningsfulle valg, ikke
+  // bare rå koder.
+  async getCodelist(
+    listName: string,
+  ): Promise<Array<{ code: string; navn: string | null; beskrivelse: string | null }>> {
     const payload = await this.get(`/codelist/${encodeURIComponent(listName)}`);
     const items = Array.isArray(payload) ? payload : [];
     return items
-      .map((item) => (isRecord(item) ? asString(item.code) : undefined))
-      .filter((code): code is string => Boolean(code));
+      .filter(isRecord)
+      .map((item) => ({
+        code: asString(item.code) ?? '',
+        navn: asString(item.shortName) ?? null,
+        beskrivelse: asString(item.description) ?? null,
+      }))
+      .filter((entry) => entry.code !== '');
   }
 
   async patchPvkDokument(pvkDokumentId: string, patch: Record<string, unknown>): Promise<unknown> {

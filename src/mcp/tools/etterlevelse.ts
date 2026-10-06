@@ -158,8 +158,8 @@ const varslingsadresseSchema = z.object({
 
 const ytterligereEgenskaperDescription =
   'DPIA-triggende egenskaper (koder fra backend-codelisten YTTERLIGERE_EGENSKAPER). ' +
-  'Kodene valideres mot codelisten ved kall — oppgi gyldige koder derfra. Ved ugyldig kode ' +
-  'returnerer verktøyet de gyldige kodene i feilmeldingen.';
+  'Hent de gyldige kodene med get_ytterligere_egenskaper_koder før du setter feltet — kodene ' +
+  'er data i backend og kan ikke antas. Ugyldig kode gir de gyldige kodene i feilmeldingen.';
 
 // Nøkkel for sesjonssporet etterlevelse-version — se knownEtterlevelseVersions i McpTokenData.
 function etterlevelseVersionKey(
@@ -2466,6 +2466,26 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
   );
 
   instrumentedRegisterTool(server, 
+    'get_ytterligere_egenskaper_koder',
+    {
+      description:
+        'Hent gyldige koder for ytterligereEgenskaper (DPIA-triggere) fra backend-codelisten ' +
+        'YTTERLIGERE_EGENSKAPER. Kall denne før write_pvk_egenskaper for å vite hvilke koder som ' +
+        'er gyldige — kodene er data i backend og kan ikke antas. Returnerer code, navn og beskrivelse.',
+      inputSchema: {},
+      annotations: readOnlyAnnotations,
+    },
+    async () => {
+      try {
+        const koder = await client.getCodelist('YTTERLIGERE_EGENSKAPER');
+        return toolResult({ koder });
+      } catch (error) {
+        return toolError(error);
+      }
+    },
+  );
+
+  instrumentedRegisterTool(server, 
     'write_pvk_egenskaper',
     {
       description:
@@ -2529,7 +2549,8 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
       if (ytterligereEgenskaper !== undefined) {
         let gyldigeKoder: string[];
         try {
-          gyldigeKoder = await client.getCodelist('YTTERLIGERE_EGENSKAPER');
+          const codelist = await client.getCodelist('YTTERLIGERE_EGENSKAPER');
+          gyldigeKoder = codelist.map((entry) => entry.code);
         } catch (error) {
           return toolError(
             'Klarte ikke hente codelisten YTTERLIGERE_EGENSKAPER for validering: ' +

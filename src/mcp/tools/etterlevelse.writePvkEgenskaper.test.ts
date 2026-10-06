@@ -28,9 +28,11 @@ function fakeServer() {
 
 function fakeClient(overrides: Record<string, unknown> = {}) {
   return {
-    getCodelist: vi
-      .fn()
-      .mockResolvedValue(['PROFILERING', 'TEKNOLOGI', 'SAARBARE_PERSONOPPLYSNING']),
+    getCodelist: vi.fn().mockResolvedValue([
+      { code: 'PROFILERING', navn: 'Profilering', beskrivelse: null },
+      { code: 'TEKNOLOGI', navn: 'Bruk av teknologi', beskrivelse: null },
+      { code: 'SAARBARE_PERSONOPPLYSNING', navn: 'Sårbare registrerte', beskrivelse: null },
+    ]),
     patchPvkDokument: vi.fn().mockResolvedValue({ id: 'pvk-1', ytterligereEgenskaper: [] }),
     ...overrides,
   };
@@ -103,5 +105,21 @@ describe('write_pvk_egenskaper — ytterligereEgenskaper mot codelist', () => {
 
     expect(client.getCodelist).not.toHaveBeenCalled();
     expect(client.patchPvkDokument).toHaveBeenCalled();
+  });
+
+  it('get_ytterligere_egenskaper_koder returnerer kodene med etikett fra codelisten', async () => {
+    const client = fakeClient();
+    const server = setup(client);
+
+    const result = (await server.invoke('get_ytterligere_egenskaper_koder', {})) as {
+      structuredContent: { koder: Array<{ code: string; navn: string | null }> };
+    };
+
+    expect(client.getCodelist).toHaveBeenCalledWith('YTTERLIGERE_EGENSKAPER');
+    expect(result.structuredContent.koder).toEqual([
+      { code: 'PROFILERING', navn: 'Profilering', beskrivelse: null },
+      { code: 'TEKNOLOGI', navn: 'Bruk av teknologi', beskrivelse: null },
+      { code: 'SAARBARE_PERSONOPPLYSNING', navn: 'Sårbare registrerte', beskrivelse: null },
+    ]);
   });
 });
