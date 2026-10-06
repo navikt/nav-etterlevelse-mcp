@@ -233,8 +233,12 @@ export class EtterlevelseClient {
     return bodyText ? (JSON.parse(bodyText) as unknown) : null;
   }
 
-  private async delete(path: string): Promise<void> {
+  private async delete(path: string, comment: string): Promise<void> {
+    // Backend krever en slettekommentar som query-param `comment` på alle delete-endepunkter
+    // (DeleteCommentFilter i etterlevelse-backend). Uten den svarer API-et 500 «Delete comment
+    // is required».
     const url = new URL(`${this.baseUrl}${path}`);
+    url.searchParams.set('comment', comment);
     const response = await fetch(url, {
       method: 'DELETE',
       headers: {
@@ -666,8 +670,8 @@ export class EtterlevelseClient {
     );
   }
 
-  async deleteEtterlevelse(id: string): Promise<void> {
-    await this.delete(`/etterlevelse/${id}`);
+  async deleteEtterlevelse(id: string, comment: string): Promise<void> {
+    await this.delete(`/etterlevelse/${id}`, comment);
   }
   async getPvkDokument(etterlevelseDokumentasjonId: string): Promise<unknown | null> {
     try {
@@ -696,8 +700,8 @@ export class EtterlevelseClient {
     });
   }
 
-  async deletePvkDokument(pvkDokumentId: string): Promise<void> {
-    await this.delete(`/pvkdokument/${pvkDokumentId}`);
+  async deletePvkDokument(pvkDokumentId: string, comment: string): Promise<void> {
+    await this.delete(`/pvkdokument/${pvkDokumentId}`, comment);
   }
 
   async getPvkDokumentById(pvkDokumentId: string): Promise<unknown> {
@@ -747,8 +751,8 @@ export class EtterlevelseClient {
     }
   }
 
-  async deleteBehandlingensLivsloep(livsloepId: string): Promise<void> {
-    await this.delete(`/behandlingenslivslop/${livsloepId}`);
+  async deleteBehandlingensLivsloep(livsloepId: string, comment: string): Promise<void> {
+    await this.delete(`/behandlingenslivslop/${livsloepId}`, comment);
   }
 
   async upsertBehandlingensLivsloep(
@@ -875,8 +879,8 @@ export class EtterlevelseClient {
     return this.put(`/risikoscenario/${id}`, request);
   }
 
-  async deleteRisikoscenario(id: string): Promise<void> {
-    await this.delete(`/risikoscenario/${id}`);
+  async deleteRisikoscenario(id: string, comment: string): Promise<void> {
+    await this.delete(`/risikoscenario/${id}`, comment);
   }
 
   async removeTiltakFromRisikoscenario(scenarioId: string, tiltakId: string): Promise<void> {
@@ -900,8 +904,8 @@ export class EtterlevelseClient {
     return this.put(`/tiltak/${id}`, request);
   }
 
-  async deleteTiltak(id: string): Promise<void> {
-    await this.delete(`/tiltak/${id}`);
+  async deleteTiltak(id: string, comment: string): Promise<void> {
+    await this.delete(`/tiltak/${id}`, comment);
   }
 
   async getTiltak(id: string): Promise<unknown | null> {

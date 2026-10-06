@@ -326,3 +326,53 @@ describe('EtterlevelseClient.writeKravStatus', () => {
     expect(capturedPostBody!.statusBegrunnelse).toBe('');
   });
 });
+
+// Regresjonstest for issue #42: alle delete-endepunkter må sende slettekommentar som
+// query-param `comment`. Uten den svarer etterlevelse-backend (DeleteCommentFilter) 500
+// «Delete comment is required».
+describe('EtterlevelseClient — slettekommentar på delete-endepunkter', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  function captureDelete() {
+    const calls: Array<{ url: string; method?: string }> = [];
+    const fetchMock = vi.fn(async (url: string | URL, init?: RequestInit) => {
+      calls.push({ url: url.toString(), method: init?.method });
+      return new Response(null, { status: 200 });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    return calls;
+  }
+
+  const client = () => new EtterlevelseClient('fake-token', 'https://test.local/api');
+
+  it('deleteEtterlevelse sender comment som query-param', async () => {
+    const calls = captureDelete();
+    await client().deleteEtterlevelse('e-1', 'ryddejobb etter test');
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0].method).toBe('DELETE');
+    const url = new URL(calls[0].url);
+    expect(url.pathname).toBe('/api/etterlevelse/e-1');
+    expect(url.searchParams.get('comment')).toBe('ryddejobb etter test');
+  });
+
+  it('deletePvkDokument, deleteRisikoscenario og deleteTiltak sender også comment', async () => {
+    const calls = captureDelete();
+    await client().deletePvkDokument('pvk-1', 'ikke relevant');
+    await client().deleteRisikoscenario('rs-1', 'duplikat');
+    await client().deleteTiltak('t-1', 'avbrutt');
+
+    expect(calls.map((c) => new URL(c.url).searchParams.get('comment'))).toEqual([
+      'ikke relevant',
+      'duplikat',
+      'avbrutt',
+    ]);
+    expect(calls.map((c) => new URL(c.url).pathname)).toEqual([
+      '/api/pvkdokument/pvk-1',
+      '/api/risikoscenario/rs-1',
+      '/api/tiltak/t-1',
+    ]);
+  });
+});
