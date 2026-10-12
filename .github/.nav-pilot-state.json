@@ -1,29 +1,34 @@
 {
   "collection": "nav-pilot",
-  "version": "2026.09.28-080217-2bcca02",
+  "version": "2026.10.11-201029-b998fab",
   "scope": "repo",
-  "source_sha": "2bcca023aa8a946e41ff8713921b39230d6d7130",
+  "source_sha": "89bcf22fc67f78c008c4419770b8e4bddd279198",
   "installed_at": "2026-06-12T12:31:30Z",
   "files": [
     {
       "path": ".github/agents/accessibility.agent.md",
-      "hash": "4ad090f6791eb845"
+      "hash": "03d2ec6ccc4a2101",
+      "revision": "89bcf22fc67f78c008c4419770b8e4bddd279198"
     },
     {
       "path": ".github/agents/aksel.agent.md",
-      "hash": "eb6688100005e57f"
+      "hash": "700721ce34d631f5",
+      "revision": "89bcf22fc67f78c008c4419770b8e4bddd279198"
     },
     {
       "path": ".github/agents/code-review.agent.md",
-      "hash": "5a019cbf3eda9ce2"
+      "hash": "811b2a6765ff86de",
+      "revision": "89bcf22fc67f78c008c4419770b8e4bddd279198"
     },
     {
       "path": ".github/agents/forfatter.agent.md",
-      "hash": "7647c85972f59fa7"
+      "hash": "81d4560449214a21",
+      "revision": "89bcf22fc67f78c008c4419770b8e4bddd279198"
     },
     {
       "path": ".github/agents/kafka.agent.md",
-      "hash": "c2616223f6228f8e"
+      "hash": "743153095326cb24",
+      "revision": "89bcf22fc67f78c008c4419770b8e4bddd279198"
     },
     {
       "path": ".github/agents/local-worker.agent.md",
@@ -35,8 +40,8 @@
     },
     {
       "path": ".github/agents/nav-pilot.agent.md",
-      "hash": "7c5e22547febef94",
-      "revision": "2bcca023aa8a946e41ff8713921b39230d6d7130"
+      "hash": "8c6cbe9101b541c5",
+      "revision": "89bcf22fc67f78c008c4419770b8e4bddd279198"
     },
     {
       "path": ".github/agents/research.agent.md",
@@ -44,12 +49,17 @@
     },
     {
       "path": ".github/agents/rust.agent.md",
-      "hash": "877fab8c93fa0ae6"
+      "hash": "e1cb55806cd87d8c",
+      "revision": "89bcf22fc67f78c008c4419770b8e4bddd279198"
     },
     {
       "path": ".github/agents/security-champion.agent.md",
-      "hash": "09850437ed89c7bb",
-      "revision": "2bcca023aa8a946e41ff8713921b39230d6d7130"
+      "hash": "65fed295fcdd5bd1",
+      "revision": "89bcf22fc67f78c008c4419770b8e4bddd279198"
+    },
+    {
+      "path": ".github/agents/worker.agent.md",
+      "hash": "43c860f99cd1337e"
     },
     {
       "path": ".github/hooks/ask-first-aria.py",
@@ -61,7 +71,8 @@
     },
     {
       "path": ".github/hooks/klarsprak-gate.py",
-      "hash": "2286fb0b5b5926d0"
+      "hash": "ecc2bc6b2d637131",
+      "revision": "89bcf22fc67f78c008c4419770b8e4bddd279198"
     },
     {
       "path": ".github/instructions/accessibility.instructions.md",
@@ -100,7 +111,8 @@
     },
     {
       "path": ".github/instructions/norwegian-text.instructions.md",
-      "hash": "acc8fd7c93f48b85"
+      "hash": "25ee167a83661c64",
+      "revision": "89bcf22fc67f78c008c4419770b8e4bddd279198"
     },
     {
       "path": ".github/instructions/output-style.instructions.md",
@@ -143,7 +155,8 @@
     },
     {
       "path": ".github/skills/ai-news-research/",
-      "hash": "16f2d476983b8ba0"
+      "hash": "3cd92cbaef53b201",
+      "revision": "89bcf22fc67f78c008c4419770b8e4bddd279198"
     },
     {
       "path": ".github/skills/aksel-builder/",
@@ -163,7 +176,8 @@
     },
     {
       "path": ".github/skills/deliberate-ai-use/",
-      "hash": "51a1a4b387485996"
+      "hash": "81fe98e25424c81c",
+      "revision": "89bcf22fc67f78c008c4419770b8e4bddd279198"
     },
     {
       "path": ".github/skills/flyway-migration/",
@@ -183,7 +197,8 @@
     },
     {
       "path": ".github/skills/klarsprak/",
-      "hash": "c54427bb60f1c6e1"
+      "hash": "28545e8d5ed779fe",
+      "revision": "89bcf22fc67f78c008c4419770b8e4bddd279198"
     },
     {
       "path": ".github/skills/kotlin-app-config/",
@@ -212,7 +227,8 @@
     },
     {
       "path": ".github/skills/nav-dekoratoren/",
-      "hash": "fd8cf68c2c9bfbc5"
+      "hash": "4b5d432477529d66",
+      "revision": "89bcf22fc67f78c008c4419770b8e4bddd279198"
     },
     {
       "path": ".github/skills/nav-plan/",
