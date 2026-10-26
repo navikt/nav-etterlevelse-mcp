@@ -66,8 +66,17 @@ async function getAppTokenViaTexas(targetScope: string): Promise<string | null> 
   }
 }
 
+/**
+ * Øvre grense for antall array-elementer og objektnøkler i argumentene til ett verktøykall.
+ * Tetter GHSA-46jr-4wx8-v453: uten grense kunne én forespørsel innenfor størrelsesgrensen bruke
+ * opp minnet under validering. Den største inputen vi har, er lister med ID-er (under 50 elementer
+ * i praksis). Filvedlegg er base64-strenger og teller ikke. Et kall over grensen får isError: true.
+ * Størrelsesgrensen på selve forespørselen settes i express.json() i index.ts.
+ */
+export const MAX_TOOL_INPUT_ELEMENTS = 1_000;
+
 export function createMcpServer(ctx: SessionContext, behandlingskatalogClient: BehandlingskatalogClient, navetClient: NavetClient | null): McpServer {
-  const server = new McpServer(mcpServerInfo);
+  const server = new McpServer(mcpServerInfo, { maxToolInputElements: MAX_TOOL_INPUT_ELEMENTS });
 
   registerEtterlevelseTools(server, ctx);
   registerBehandlingskatalogTools(server, behandlingskatalogClient);
