@@ -1,0 +1,20 @@
+# Byggekonteksten. Dockerfile kopierer bare navngitte filer, så dette handler om hva som sendes
+# til byggeren, ikke om hva som havner i imaget.
+.git
+.github
+.nais
+node_modules
+dist
+.pnpm-home-local
+.pnpm-store
+.idea
+.venv
+.DS_Store
+.env*
+*.md
+docs
+grafana
+coverage
+src/**/*.test.ts
+vitest.config.ts
+vitest.setup.ts

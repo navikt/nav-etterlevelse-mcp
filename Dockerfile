@@ -1,3 +1,5 @@
+# Byggesteget kjører på Alpine. Det havner ikke i runtime-imaget, og ingen prod-avhengigheter
+# har native binærfiler, så det er trygt å bygge med musl og kjøre på glibc (Chainguard).
 FROM node:22-alpine AS builder
 ENV PNPM_HOME=/pnpm
 ENV PATH=$PNPM_HOME:$PATH
@@ -8,18 +10,17 @@ RUN pnpm install --frozen-lockfile
 COPY tsconfig.json ./
 COPY src ./src
 RUN pnpm run build
-# Installer kun prod-avhengigheter for kopiering til runtime
-RUN pnpm install --frozen-lockfile --prod
+# Installer kun prod-avhengigheter for kopiering til runtime. node_modules slettes først:
+# pnpm install --prod fjerner bare lenkene, mens pakkene blir liggende i node_modules/.pnpm
+# og ville blitt med i imaget.
+RUN rm -rf node_modules && pnpm install --frozen-lockfile --prod
 
-# Runtime: kun Node.js + dist/ + prod node_modules — ingen pnpm, npm eller tar
-FROM node:22-alpine
-RUN addgroup -S appgroup && adduser -S appuser -G appgroup \
-    # Fjern npm og npx for å redusere angrepsflate og eliminere npm/tar-sårbarheter
-    && rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
+# Runtime: Chainguard Node fra Navs registry. Kjører som non-root og har verken npm eller pnpm.
+FROM europe-north1-docker.pkg.dev/cgr-nav/pull-through/nav.no/node:22-slim
+ENV NODE_ENV=production
 WORKDIR /app
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist
 COPY package.json ./
-USER appuser
 EXPOSE 8080
-CMD ["node", "dist/index.js"]
+CMD ["dist/index.js"]
