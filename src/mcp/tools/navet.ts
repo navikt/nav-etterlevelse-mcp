@@ -21,6 +21,15 @@ const FAGOMRAADER = {
 
 type Fagomrade = keyof typeof FAGOMRAADER;
 
+// Navet-verktøyene leser bare. Uten annotasjon skal en MCP-klient anta readOnlyHint: false,
+// altså at verktøyet kan skrive.
+const readOnlyAnnotations = {
+  readOnlyHint: true,
+  destructiveHint: false,
+  idempotentHint: true,
+  openWorldHint: false,
+};
+
 function toolError(message: string) {
   return {
     content: [{ type: 'text' as const, text: `Feil: ${message}` }],
@@ -54,6 +63,7 @@ export function registerNavetTools(server: McpServer, navetClient: NavetClient):
           .optional()
           .describe('Filtrer på sidetittel, f.eks. "personvern" eller "rutiner"'),
       },
+      annotations: readOnlyAnnotations,
     },
     async ({ fagomrade, filter }: { fagomrade: Fagomrade; filter?: string }) => {
       try {
@@ -92,6 +102,7 @@ export function registerNavetTools(server: McpServer, navetClient: NavetClient):
           .describe('Fagområdet siden tilhører'),
         pageId: z.string().min(1).describe('Side-ID fra list_navet_pages'),
       },
+      annotations: readOnlyAnnotations,
     },
     async ({ fagomrade, pageId }: { fagomrade: Fagomrade; pageId: string }) => {
       try {
