@@ -1,8 +1,9 @@
 import express, { type NextFunction, type Request, type Response } from 'express';
+import { createGatewayAuthMiddleware, type GatewayLocals } from './auth/gateway.js';
 import { requireMcpBearerToken, type AuthenticatedLocals } from './auth/middleware.js';
 import { registerOAuthRoutes } from './auth/oauth.js';
 import { config } from './config.js';
-import { handleMcpHttpRequest } from './mcp/server.js';
+import { handleGatewayMcpRequest, handleMcpHttpRequest } from './mcp/server.js';
 import { registry } from './metrics.js';
 import { initUnleash } from './unleash.js';
 
@@ -50,11 +51,45 @@ app.delete('/mcp', requireMcpBearerToken, (_req, res) => {
   res.status(204).end();
 });
 
+const requireGatewayBearerToken = createGatewayAuthMiddleware();
+
+app.post('/mcp/gw', requireGatewayBearerToken, (req, res, next) => {
+  const { tokenData } = res.locals as GatewayLocals;
+  void handleGatewayMcpRequest(req, res, tokenData).catch(next);
+});
+
+app.get('/mcp/gw', requireGatewayBearerToken, (_req, res) => {
+  res.setHeader('Allow', 'POST');
+  res.status(405).json({ error: 'method_not_allowed' });
+});
+
+app.delete('/mcp/gw', requireGatewayBearerToken, (_req, res) => {
+  res.setHeader('Allow', 'POST');
+  res.status(405).json({ error: 'method_not_allowed' });
+});
+
 app.use((req, res) => {
   res.status(404).json({ error: 'not_found', path: req.path });
 });
 
-app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
+app.use((error: unknown, req: Request, res: Response, _next: NextFunction) => {
+  if (
+    error instanceof SyntaxError &&
+    'status' in error &&
+    (error as { status?: number }).status === 400
+  ) {
+    if (req.path === '/mcp/gw') {
+      res.status(400).json({
+        jsonrpc: '2.0',
+        id: null,
+        error: { code: -32700, message: 'Parse error' },
+      });
+      return;
+    }
+    res.status(400).json({ error: 'invalid_json', message: 'Invalid JSON request body' });
+    return;
+  }
+
   console.log('Unhandled application error', error);
   if (res.headersSent) {
     return;

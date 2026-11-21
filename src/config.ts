@@ -12,6 +12,9 @@ const NAV_ETTERLEVELSE_MCP_SCOPE =
 // Texas token-exchange sidecar (NAIS-injisert, kun tilgjengelig i cluster)
 const TEXAS_TOKEN_EXCHANGE_URL =
   process.env.NAIS_TOKEN_EXCHANGE_ENDPOINT ?? 'http://localhost:7164/api/v1/token/exchange';
+// Texas token-introspection sidecar (NAIS-injisert, brukes for OBO-tokens fra fleet-gateway)
+const TEXAS_TOKEN_INTROSPECTION_URL =
+  process.env.NAIS_TOKEN_INTROSPECTION_ENDPOINT ?? 'http://localhost:7164/api/v1/introspect';
 // Texas machine-to-machine token endpoint
 const TEXAS_TOKEN_URL =
   process.env.NAIS_TOKEN_ENDPOINT ?? 'http://localhost:7164/api/v1/token';
@@ -54,6 +57,7 @@ export const config = {
     etterlevelseBaseUrl: ETTERLEVELSE_API_BASE_URL,
     behandlingskatalogBaseUrl: BEHANDLINGSKATALOG_API_BASE_URL,
     texasTokenExchangeUrl: TEXAS_TOKEN_EXCHANGE_URL,
+    texasTokenIntrospectionUrl: TEXAS_TOKEN_INTROSPECTION_URL,
     texasTokenUrl: TEXAS_TOKEN_URL,
     etterlevelseFrontendUrl: ETTERLEVELSE_FRONTEND_URL,
   },

@@ -7,6 +7,7 @@ import { NavetClient } from '../api/navetClient.js';
 import { config, mcpServerInfo } from '../config.js';
 import { type McpTokenData } from '../auth/store.js';
 import { texasOboErrorsTotal, upstreamErrorsTotal, mcpActiveSessions } from '../metrics.js';
+import { handleStatelessMcpRequest, type StatelessMcpServerBundle } from './mcp2026.js';
 import { registerBehandlingskatalogTools } from './tools/behandlingskatalog.js';
 import { registerEtterlevelseTools } from './tools/etterlevelse.js';
 import { registerNavetTools } from './tools/navet.js';
@@ -85,6 +86,153 @@ export function createMcpServer(ctx: SessionContext, behandlingskatalogClient: B
   }
 
   return server;
+}
+
+export type GatewayToolBackend = 'etterlevelse' | 'behandlingskatalog' | 'navet';
+
+/**
+ * Oppretter en McpServer for gateway-stien (/mcp/gw) der kun leseverktøy (readOnlyHint === true)
+ * registreres. Skriveverktøy og lock_document filtreres bort ved registrering slik at de verken
+ * vises i tools/list eller kan kalles via gatewayen.
+ */
+export function createGatewayMcpServer(
+  ctx: SessionContext,
+  behandlingskatalogClient: BehandlingskatalogClient,
+  navetClient: NavetClient | null,
+): StatelessMcpServerBundle & { toolBackends: ReadonlyMap<string, GatewayToolBackend> } {
+  const server = new McpServer(mcpServerInfo, { maxToolInputElements: MAX_TOOL_INPUT_ELEMENTS });
+  const allowedToolNames = new Set<string>();
+  const blockedWriteToolNames = new Set<string>();
+  const toolBackends = new Map<string, GatewayToolBackend>();
+  let currentBackend: GatewayToolBackend = 'etterlevelse';
+
+  const originalRegisterTool = server.registerTool.bind(server);
+  const filteringServer = new Proxy(server, {
+    get(target, prop, receiver) {
+      if (prop === 'registerTool') {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        return (name: string, toolConfig: any, handler: any) => {
+          if (toolConfig?.annotations?.readOnlyHint === true) {
+            allowedToolNames.add(name);
+            toolBackends.set(name, currentBackend);
+            return originalRegisterTool(name, toolConfig, handler);
+          }
+          blockedWriteToolNames.add(name);
+          return undefined;
+        };
+      }
+      return Reflect.get(target, prop, receiver);
+    },
+  });
+
+  currentBackend = 'etterlevelse';
+  registerEtterlevelseTools(filteringServer, ctx);
+  currentBackend = 'behandlingskatalog';
+  registerBehandlingskatalogTools(filteringServer, behandlingskatalogClient);
+  if (navetClient) {
+    currentBackend = 'navet';
+    registerNavetTools(filteringServer, navetClient);
+  }
+
+  return { server, allowedToolNames, blockedWriteToolNames, toolBackends };
+}
+
+export async function handleGatewayMcpRequest(
+  req: Request,
+  res: Response,
+  tokenData: McpTokenData,
+): Promise<void> {
+  const userToken = tokenData.userToken;
+
+  const placeholderCtx: SessionContext = {
+    tokenData,
+    mcpAccessToken: '',
+    etterlevelseClient: new EtterlevelseClient(''),
+  };
+
+  mcpActiveSessions.inc();
+  try {
+    // Registrer verktøykatalogen uten å veksle nedstrømstokens på forhånd, slik at
+    // server/discover, tools/list og header-validering ikke avhenger av Texas OBO.
+    const bundle = createGatewayMcpServer(
+      placeholderCtx,
+      new BehandlingskatalogClient(null),
+      new NavetClient(''),
+    );
+
+    bundle.resolveServerForToolCall = async (toolName: string) => {
+      const backend = bundle.toolBackends.get(toolName) ?? 'etterlevelse';
+
+      if (backend === 'behandlingskatalog') {
+        const bkToken = await exchangeViaTexas(userToken, config.azure.behandlingskatalogScope);
+        if (!bkToken) {
+          return {
+            ok: false,
+            status: 502,
+            message: 'Kunne ikke hente behandlingskatalog-token via Texas OBO',
+          };
+        }
+        const liveBundle = createGatewayMcpServer(
+          placeholderCtx,
+          new BehandlingskatalogClient(bkToken),
+          null,
+        );
+        return { ok: true, server: liveBundle.server };
+      }
+
+      if (backend === 'navet') {
+        const navetToken = await getAppTokenViaTexas('https://graph.microsoft.com/.default');
+        if (!navetToken) {
+          return {
+            ok: false,
+            status: 502,
+            message: 'Kunne ikke hente Navet-token via Texas',
+          };
+        }
+        const liveBundle = createGatewayMcpServer(
+          placeholderCtx,
+          new BehandlingskatalogClient(null),
+          new NavetClient(navetToken),
+        );
+        return { ok: true, server: liveBundle.server };
+      }
+
+      const etterlevelseToken = await exchangeViaTexas(userToken, config.azure.etterlevelseScope);
+      if (!etterlevelseToken) {
+        return {
+          ok: false,
+          status: 502,
+          message: 'Kunne ikke hente etterlevelse-token via Texas OBO',
+        };
+      }
+
+      const liveCtx: SessionContext = {
+        tokenData,
+        mcpAccessToken: '',
+        etterlevelseClient: new EtterlevelseClient(etterlevelseToken),
+      };
+      const liveBundle = createGatewayMcpServer(
+        liveCtx,
+        new BehandlingskatalogClient(null),
+        null,
+      );
+      return { ok: true, server: liveBundle.server };
+    };
+
+    await handleStatelessMcpRequest(req, res, bundle);
+  } catch (error) {
+    console.log('Error while handling gateway MCP request', error);
+    upstreamErrorsTotal.inc({ backend: 'mcp-server' });
+    if (!res.headersSent) {
+      res.status(500).json({
+        jsonrpc: '2.0',
+        error: { code: -32603, message: 'Internal server error' },
+        id: null,
+      });
+    }
+  } finally {
+    mcpActiveSessions.dec();
+  }
 }
 
 export async function handleMcpHttpRequest(

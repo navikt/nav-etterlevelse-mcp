@@ -251,7 +251,7 @@ export class EtterlevelseClient {
     }
   }
 
-  private async graphql(query: string): Promise<unknown> {
+  private async graphql(query: string, variables?: Record<string, unknown>): Promise<unknown> {
     const url = new URL(`${this.baseUrl.replace(/\/api\/?$/, '')}/graphql`);
     const response = await fetch(url, {
       method: 'POST',
@@ -260,7 +260,7 @@ export class EtterlevelseClient {
         Accept: 'application/json',
         Authorization: `Bearer ${this.accessToken}`,
       },
-      body: JSON.stringify({ query }),
+      body: JSON.stringify(variables ? { query, variables } : { query }),
     });
 
     const bodyText = await response.text();
@@ -336,21 +336,26 @@ export class EtterlevelseClient {
 
   async getEtterlevelseDokumentasjon(id: string): Promise<unknown> {
     const data = await this.graphql(
-      `{ etterlevelseDokumentasjon(filter: {id: "${id}"}) { content {
-          id title etterlevelseNummer teams
-          beskrivelse behandlerPersonopplysninger
-          irrelevansFor { code }
-          behandlingIds
-          prioritertKravNummer
-          behandlinger { id navn }
-          etterlevelser {
-            id kravNummer kravVersjon etterleves status statusBegrunnelse
-            suksesskriterieBegrunnelser {
-              suksesskriterieId begrunnelse suksesskriterieStatus
-              veiledning veiledningsTekst veiledningsTekst2
+      `query GetEtterlevelseDokumentasjon($id: ID!) {
+        etterlevelseDokumentasjon(filter: { id: $id }) {
+          content {
+            id title etterlevelseNummer teams
+            beskrivelse behandlerPersonopplysninger
+            irrelevansFor { code }
+            behandlingIds
+            prioritertKravNummer
+            behandlinger { id navn }
+            etterlevelser {
+              id kravNummer kravVersjon etterleves status statusBegrunnelse
+              suksesskriterieBegrunnelser {
+                suksesskriterieId begrunnelse suksesskriterieStatus
+                veiledning veiledningsTekst veiledningsTekst2
+              }
             }
           }
-        } } }`,
+        }
+      }`,
+      { id },
     );
     if (isRecord(data) && isRecord(data['etterlevelseDokumentasjon'])) {
       const content = extractArray(data['etterlevelseDokumentasjon']['content']);
@@ -361,19 +366,24 @@ export class EtterlevelseClient {
 
   async getEtterlevelseDokumentasjonStatus(id: string): Promise<unknown> {
     const data = await this.graphql(
-      `{ etterlevelseDokumentasjon(filter: {id: "${id}"}) { content {
-          id title etterlevelseNummer teams
-          behandlerPersonopplysninger
-          irrelevansFor { code }
-          behandlingIds
-          prioritertKravNummer
-          etterlevelser {
-            kravNummer kravVersjon etterleves status
-            suksesskriterieBegrunnelser {
-              suksesskriterieId suksesskriterieStatus
+      `query GetEtterlevelseDokumentasjonStatus($id: ID!) {
+        etterlevelseDokumentasjon(filter: { id: $id }) {
+          content {
+            id title etterlevelseNummer teams
+            behandlerPersonopplysninger
+            irrelevansFor { code }
+            behandlingIds
+            prioritertKravNummer
+            etterlevelser {
+              kravNummer kravVersjon etterleves status
+              suksesskriterieBegrunnelser {
+                suksesskriterieId suksesskriterieStatus
+              }
             }
           }
-        } } }`,
+        }
+      }`,
+      { id },
     );
     if (isRecord(data) && isRecord(data['etterlevelseDokumentasjon'])) {
       const content = extractArray(data['etterlevelseDokumentasjon']['content']);
@@ -397,17 +407,23 @@ export class EtterlevelseClient {
     tagger?: string[];
   }): Promise<unknown[]> {
     if (input.etterlevelseDokumentasjonId) {
-      const filterParts = [
-        'gjeldendeKrav: true',
-        `etterlevelseDokumentasjonId: "${input.etterlevelseDokumentasjonId}"`,
-        ...(input.tagger && input.tagger.length > 0
-          ? [`tagger: [${input.tagger.map((tag) => `"${tag}"`).join(', ')}]`]
-          : []),
-      ].join(', ');
-      const query = `{ krav(filter: {${filterParts}}) {
-          content { kravNummer kravVersjon navn status tagger relevansFor { code shortName } }
-        } }`;
-      const data = await this.graphql(query);
+      const hasTagger = Boolean(input.tagger && input.tagger.length > 0);
+      const query = hasTagger
+        ? `query ListKrav($etterlevelseDokumentasjonId: ID!, $tagger: [String!]) {
+            krav(filter: { gjeldendeKrav: true, etterlevelseDokumentasjonId: $etterlevelseDokumentasjonId, tagger: $tagger }) {
+              content { kravNummer kravVersjon navn status tagger relevansFor { code shortName } }
+            }
+          }`
+        : `query ListKrav($etterlevelseDokumentasjonId: ID!) {
+            krav(filter: { gjeldendeKrav: true, etterlevelseDokumentasjonId: $etterlevelseDokumentasjonId }) {
+              content { kravNummer kravVersjon navn status tagger relevansFor { code shortName } }
+            }
+          }`;
+      const variables: Record<string, unknown> = {
+        etterlevelseDokumentasjonId: input.etterlevelseDokumentasjonId,
+        ...(hasTagger ? { tagger: input.tagger } : {}),
+      };
+      const data = await this.graphql(query, variables);
       if (isRecord(data) && isRecord(data['krav'])) {
         return extractArray<Record<string, unknown>>(data['krav']['content'])
           .filter((item) => matchesJsonFilter(item.relevansFor, input.relevansFor));
@@ -675,7 +691,9 @@ export class EtterlevelseClient {
   }
   async getPvkDokument(etterlevelseDokumentasjonId: string): Promise<unknown | null> {
     try {
-      return await this.get(`/pvkdokument/etterlevelsedokument/${etterlevelseDokumentasjonId}`);
+      return await this.get(
+        `/pvkdokument/etterlevelsedokument/${encodeURIComponent(etterlevelseDokumentasjonId)}`,
+      );
     } catch (error) {
       if (isNotFoundError(error)) {
         return null;
@@ -769,7 +787,9 @@ export class EtterlevelseClient {
 
   async getBehandlingensLivsloep(etterlevelseDokumentasjonId: string): Promise<unknown | null> {
     try {
-      return await this.get(`/behandlingenslivslop/etterlevelsedokument/${etterlevelseDokumentasjonId}`);
+      return await this.get(
+        `/behandlingenslivslop/etterlevelsedokument/${encodeURIComponent(etterlevelseDokumentasjonId)}`,
+      );
     } catch (error) {
       if (isNotFoundError(error)) {
         return null;
@@ -880,7 +900,9 @@ export class EtterlevelseClient {
   }
 
   async getRisikoscenarioer(pvkDokumentId: string): Promise<unknown[]> {
-    const payload = await this.get(`/risikoscenario/pvkdokument/${pvkDokumentId}/ALL`);
+    const payload = await this.get(
+      `/risikoscenario/pvkdokument/${encodeURIComponent(pvkDokumentId)}/ALL`,
+    );
     // Merk: backend-GET-endepunktet populerer ikke relevanteKravNummer (kravkoblinger).
     // Kravkoblinger er synlige i responsen fra addRelevantKrav (link_krav_to_risikoscenario),
     // men ikke fra list- eller enkelt-GET-endepunktene.
@@ -929,7 +951,10 @@ export class EtterlevelseClient {
   }
 
   async getTiltakForPvkDokument(pvkDokumentId: string): Promise<any[]> {
-    const payload = await this.get(`/tiltak/pvkdokument/${pvkDokumentId}`, { pageSize: 200 });
+    const payload = await this.get(
+      `/tiltak/pvkdokument/${encodeURIComponent(pvkDokumentId)}`,
+      { pageSize: 200 },
+    );
     return extractArray(payload);
   }
 
