@@ -968,33 +968,44 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
     'get_pvk_dokument',
     {
       description:
-        'Hent PVK-dokumentet knyttet til det låste etterlevelsesdokumentet. Returnerer pvkDokumentId, status og nøkkelfelter.',
-      inputSchema: {},
+        'Hent PVK-dokumentet knyttet til et etterlevelsesdokument. Returnerer pvkDokumentId, status og nøkkelfelter. ' +
+        'Oppgi etterlevelseDokumentasjonId, eller utelat feltet for å bruke låst dokument fra lock_document.',
+      inputSchema: {
+        etterlevelseDokumentasjonId: z
+          .string()
+          .min(1)
+          .optional()
+          .describe('UUID for etterlevelsesdokumentasjonen. Valgfri hvis et dokument er låst med lock_document.'),
+      },
       annotations: readOnlyAnnotations,
     },
-    async () => {
-      const guardError = requireDocumentLock(ctx);
-      if (guardError) {
-        return guardError;
+    async ({ etterlevelseDokumentasjonId }) => {
+      const documentId = etterlevelseDokumentasjonId ?? ctx.tokenData.lockedDocumentId;
+      if (!documentId) {
+        return toolError(
+          'Oppgi etterlevelseDokumentasjonId, eller lås et dokument med lock_document først.',
+        );
       }
 
-      const lockedDocumentId = ctx.tokenData.lockedDocumentId as string;
-      const lockedDocumentTitle = ctx.tokenData.lockedDocumentTitle ?? lockedDocumentId;
+      const documentTitle =
+        etterlevelseDokumentasjonId && etterlevelseDokumentasjonId !== ctx.tokenData.lockedDocumentId
+          ? documentId
+          : (ctx.tokenData.lockedDocumentTitle ?? documentId);
 
       try {
-        const pvkDokument = await client.getPvkDokument(lockedDocumentId);
+        const pvkDokument = await client.getPvkDokument(documentId);
         if (!pvkDokument || !isRecord(pvkDokument)) {
           return toolResult({
             preview:
-              `Ingen PVK-dokument funnet for "${lockedDocumentTitle}". ` +
+              `Ingen PVK-dokument funnet for "${documentTitle}". ` +
               'Kall create_pvk_dokument for å opprette det.',
             found: false,
-            etterlevelseDokumentasjonId: lockedDocumentId,
+            etterlevelseDokumentasjonId: documentId,
           });
         }
 
         const summaryLines = [
-          formatField('Etterlevelsesdokument', lockedDocumentTitle),
+          formatField('Etterlevelsesdokument', documentTitle),
           formatField('PVK-dokumentId', pvkDokument.id),
           formatField('Status', pvkDokument.status),
           formatField('PVK-vurdering', pvkDokument.pvkVurdering),
@@ -1013,7 +1024,7 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
         return toolResult({
           preview: boxSection('PVK-DOKUMENT', summaryLines.join('\n')),
           found: true,
-          etterlevelseDokumentasjonId: lockedDocumentId,
+          etterlevelseDokumentasjonId: documentId,
           pvkDokumentId: asString(pvkDokument.id) ?? null,
           status: asString(pvkDokument.status) ?? null,
           pvkDokument,
@@ -1141,29 +1152,81 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
     },
   );
 
+  async function resolvePvkDokumentId(input: {
+    pvkDokumentId?: string;
+    etterlevelseDokumentasjonId?: string;
+  }): Promise<{ ok: true; pvkDokumentId: string } | { ok: false; error: ReturnType<typeof toolError> }> {
+    if (input.pvkDokumentId) {
+      return { ok: true, pvkDokumentId: input.pvkDokumentId };
+    }
+    if (input.etterlevelseDokumentasjonId) {
+      const pvkDokument = await client.getPvkDokument(input.etterlevelseDokumentasjonId);
+      const id = isRecord(pvkDokument) ? asString(pvkDokument.id) : undefined;
+      if (!id) {
+        return {
+          ok: false,
+          error: toolError(
+            `Ingen PVK-dokument funnet for etterlevelsesdokumentasjon ${input.etterlevelseDokumentasjonId}. ` +
+              `Opprett PVK-dokument i ${etterlevelseFrontendUrl} først.`,
+          ),
+        };
+      }
+      return { ok: true, pvkDokumentId: id };
+    }
+    if (ctx.tokenData.lockedPvkDokumentId) {
+      return { ok: true, pvkDokumentId: ctx.tokenData.lockedPvkDokumentId };
+    }
+    if (ctx.tokenData.lockedDocumentId) {
+      return {
+        ok: false,
+        error: toolError(
+          `Ingen PVK-dokument funnet for dette etterlevelsesdokumentet. Opprett PVK-dokument i ${etterlevelseFrontendUrl} først.`,
+        ),
+      };
+    }
+    return {
+      ok: false,
+      error: toolError(
+        'Oppgi pvkDokumentId (eller etterlevelseDokumentasjonId), eller lås et dokument med lock_document først.',
+      ),
+    };
+  }
+
   instrumentedRegisterTool(server, 
     'get_behandlingens_livsloep',
     {
-      description: 'Hent behandlingens livsløp-dokument for det låste dokumentet.',
-      inputSchema: {},
+      description:
+        'Hent behandlingens livsløp-dokument for et etterlevelsesdokument. ' +
+        'Oppgi etterlevelseDokumentasjonId, eller utelat feltet for å bruke låst dokument fra lock_document.',
+      inputSchema: {
+        etterlevelseDokumentasjonId: z
+          .string()
+          .min(1)
+          .optional()
+          .describe('UUID for etterlevelsesdokumentasjonen. Valgfri hvis et dokument er låst med lock_document.'),
+      },
       annotations: readOnlyAnnotations,
     },
-    async () => {
-      const guardError = requireDocumentLock(ctx);
-      if (guardError) {
-        return guardError;
+    async ({ etterlevelseDokumentasjonId }) => {
+      const documentId = etterlevelseDokumentasjonId ?? ctx.tokenData.lockedDocumentId;
+      if (!documentId) {
+        return toolError(
+          'Oppgi etterlevelseDokumentasjonId, eller lås et dokument med lock_document først.',
+        );
       }
 
-      const lockedDocumentId = ctx.tokenData.lockedDocumentId as string;
-      const lockedDocumentTitle = ctx.tokenData.lockedDocumentTitle ?? lockedDocumentId;
+      const documentTitle =
+        etterlevelseDokumentasjonId && etterlevelseDokumentasjonId !== ctx.tokenData.lockedDocumentId
+          ? documentId
+          : (ctx.tokenData.lockedDocumentTitle ?? documentId);
 
       try {
-        const behandlingensLivsloep = await client.getBehandlingensLivsloep(lockedDocumentId);
+        const behandlingensLivsloep = await client.getBehandlingensLivsloep(documentId);
         if (!behandlingensLivsloep || !isRecord(behandlingensLivsloep)) {
           return toolResult({
-            preview: `Ingen behandlingens livsløp funnet for "${lockedDocumentTitle}".`,
+            preview: `Ingen behandlingens livsløp funnet for "${documentTitle}".`,
             found: false,
-            etterlevelseDokumentasjonId: lockedDocumentId,
+            etterlevelseDokumentasjonId: documentId,
           });
         }
 
@@ -1174,7 +1237,7 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
             behandlingensLivsloep.vedlegg,
         );
         const summaryLines = [
-          formatField('Etterlevelsesdokument', lockedDocumentTitle),
+          formatField('Etterlevelsesdokument', documentTitle),
           formatField('Status', behandlingensLivsloep.status),
           `Beskrivelse: ${truncateText(beskrivelse || '(tom)', 200)}`,
           `Antall filer: ${filer.length}`,
@@ -1183,7 +1246,7 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
         return toolResult({
           preview: boxSection('BEHANDLINGENS LIVSLØP', summaryLines.join('\n')),
           found: true,
-          etterlevelseDokumentasjonId: lockedDocumentId,
+          etterlevelseDokumentasjonId: documentId,
           status: asString(behandlingensLivsloep.status) ?? null,
           fileCount: filer.length,
           behandlingensLivsloep,
@@ -1197,39 +1260,46 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
   instrumentedRegisterTool(server, 
     'list_risikoscenarioer',
     {
-      description: 'List alle risikoscenarioer for det låste PVK-dokumentet.',
-      inputSchema: {},
+      description:
+        'List alle risikoscenarioer for et PVK-dokument. ' +
+        'Oppgi pvkDokumentId (eller etterlevelseDokumentasjonId), eller utelat feltene for å bruke låst dokument fra lock_document.',
+      inputSchema: {
+        pvkDokumentId: z
+          .string()
+          .min(1)
+          .optional()
+          .describe('UUID for PVK-dokumentet (hentes med get_pvk_dokument). Valgfri hvis et dokument er låst med lock_document.'),
+        etterlevelseDokumentasjonId: z
+          .string()
+          .min(1)
+          .optional()
+          .describe('Alternativt UUID for etterlevelsesdokumentasjonen — slår opp tilhørende PVK-dokument automatisk.'),
+      },
       annotations: readOnlyAnnotations,
     },
-    async () => {
-      const guardError = requireDocumentLock(ctx);
-      if (guardError) {
-        return guardError;
-      }
-
-      const { lockedPvkDokumentId } = ctx.tokenData;
-      if (!lockedPvkDokumentId) {
-        return toolError(
-          `Ingen PVK-dokument funnet for dette etterlevelsesdokumentet. Opprett PVK-dokument i ${etterlevelseFrontendUrl} først.`,
-        );
-      }
-
+    async ({ pvkDokumentId, etterlevelseDokumentasjonId }) => {
       try {
-        const scenariosRaw = await client.getRisikoscenarioer(lockedPvkDokumentId);
+        const resolved = await resolvePvkDokumentId({ pvkDokumentId, etterlevelseDokumentasjonId });
+        if (!resolved.ok) {
+          return resolved.error;
+        }
+
+        const targetPvkDokumentId = resolved.pvkDokumentId;
+        const scenariosRaw = await client.getRisikoscenarioer(targetPvkDokumentId);
         const scenarios = scenariosRaw.map((scenario) => normalizeRisikoscenario(scenario));
         const preview =
           scenarios.length > 0
             ? [
-                `PVK-dokumentId: ${lockedPvkDokumentId}`,
+                `PVK-dokumentId: ${targetPvkDokumentId}`,
                 `Antall risikoscenarioer: ${scenarios.length}`,
                 '',
                 ...scenarios.map((scenario, index) => formatRisikoscenarioSection(scenario, index + 1)),
               ].join('\n\n')
-            : `PVK-dokument ${lockedPvkDokumentId} har ingen risikoscenarioer enda.`;
+            : `PVK-dokument ${targetPvkDokumentId} har ingen risikoscenarioer enda.`;
 
         return toolResult({
           preview,
-          pvkDokumentId: lockedPvkDokumentId,
+          pvkDokumentId: targetPvkDokumentId,
           count: scenarios.length,
           scenarios,
         });
@@ -1242,37 +1312,46 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
   instrumentedRegisterTool(server, 
     'list_tiltak',
     {
-      description: 'List alle tiltak for det låste PVK-dokumentet.',
-      inputSchema: {},
+      description:
+        'List alle tiltak for et PVK-dokument. ' +
+        'Oppgi pvkDokumentId (eller etterlevelseDokumentasjonId), eller utelat feltene for å bruke låst dokument fra lock_document.',
+      inputSchema: {
+        pvkDokumentId: z
+          .string()
+          .min(1)
+          .optional()
+          .describe('UUID for PVK-dokumentet (hentes med get_pvk_dokument). Valgfri hvis et dokument er låst med lock_document.'),
+        etterlevelseDokumentasjonId: z
+          .string()
+          .min(1)
+          .optional()
+          .describe('Alternativt UUID for etterlevelsesdokumentasjonen — slår opp tilhørende PVK-dokument automatisk.'),
+      },
       annotations: readOnlyAnnotations,
     },
-    async () => {
-      const guardError = requireDocumentLock(ctx);
-      if (guardError) {
-        return guardError;
-      }
-
-      const { lockedPvkDokumentId } = ctx.tokenData;
-      if (!lockedPvkDokumentId) {
-        return toolError(`Ingen PVK-dokument funnet for dette etterlevelsesdokumentet. Opprett PVK-dokument i ${etterlevelseFrontendUrl} først.`);
-      }
-
+    async ({ pvkDokumentId, etterlevelseDokumentasjonId }) => {
       try {
-        const tiltakRaw = await client.getTiltakForPvkDokument(lockedPvkDokumentId);
+        const resolved = await resolvePvkDokumentId({ pvkDokumentId, etterlevelseDokumentasjonId });
+        if (!resolved.ok) {
+          return resolved.error;
+        }
+
+        const targetPvkDokumentId = resolved.pvkDokumentId;
+        const tiltakRaw = await client.getTiltakForPvkDokument(targetPvkDokumentId);
         const tiltak = tiltakRaw.map((item) => normalizeTiltak(item));
         const preview =
           tiltak.length > 0
             ? [
-                `PVK-dokumentId: ${lockedPvkDokumentId}`,
+                `PVK-dokumentId: ${targetPvkDokumentId}`,
                 `Antall tiltak: ${tiltak.length}`,
                 '',
                 ...tiltak.map((item, index) => formatTiltakSection(item, index + 1)),
               ].join('\n\n')
-            : `PVK-dokument ${lockedPvkDokumentId} har ingen tiltak enda.`;
+            : `PVK-dokument ${targetPvkDokumentId} har ingen tiltak enda.`;
 
         return toolResult({
           preview,
-          pvkDokumentId: lockedPvkDokumentId,
+          pvkDokumentId: targetPvkDokumentId,
           count: tiltak.length,
           tiltak,
         });

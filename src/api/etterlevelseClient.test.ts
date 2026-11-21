@@ -447,3 +447,65 @@ describe('EtterlevelseClient.addTiltakToRisikoscenario', () => {
     expect(capturedBody).toEqual({ risikoscenarioId: 'rs-1', tiltakIds: ['t-1', 't-2'] });
   });
 });
+
+// Issue #59: GraphQL-spørringer skal bruke variabler, aldri tekstinnsetting av ID-er eller tagger.
+describe('EtterlevelseClient — parametriserte GraphQL-spørringer', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  function captureGraphql(responseData: unknown) {
+    let capturedBody: { query?: string; variables?: Record<string, unknown> } | undefined;
+    const fetchMock = vi.fn(async (_url: string | URL, init?: RequestInit) => {
+      capturedBody = JSON.parse(init?.body as string) as { query?: string; variables?: Record<string, unknown> };
+      return jsonResponse({ data: responseData });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    return () => capturedBody;
+  }
+
+  it('getEtterlevelseDokumentasjon sender id som GraphQL-variabel uten tekstinnsetting', async () => {
+    const getBody = captureGraphql({ etterlevelseDokumentasjon: { content: [{ id: 'doc-1' }] } });
+    const client = new EtterlevelseClient('fake-token', 'https://test.local/api');
+    const hostileId = 'doc-1"}) { content { id } } #';
+
+    await client.getEtterlevelseDokumentasjon(hostileId);
+
+    const body = getBody();
+    expect(body?.query).toContain('$id: ID!');
+    expect(body?.query).not.toContain(hostileId);
+    expect(body?.variables).toEqual({ id: hostileId });
+  });
+
+  it('getEtterlevelseDokumentasjonStatus sender id som GraphQL-variabel uten tekstinnsetting', async () => {
+    const getBody = captureGraphql({ etterlevelseDokumentasjon: { content: [{ id: 'doc-2' }] } });
+    const client = new EtterlevelseClient('fake-token', 'https://test.local/api');
+    const hostileId = 'doc-2" injection';
+
+    await client.getEtterlevelseDokumentasjonStatus(hostileId);
+
+    const body = getBody();
+    expect(body?.query).toContain('$id: ID!');
+    expect(body?.query).not.toContain(hostileId);
+    expect(body?.variables).toEqual({ id: hostileId });
+  });
+
+  it('listKrav sender etterlevelseDokumentasjonId og tagger som GraphQL-variabler', async () => {
+    const getBody = captureGraphql({ krav: { content: [] } });
+    const client = new EtterlevelseClient('fake-token', 'https://test.local/api');
+    const docId = 'doc-3"';
+    const tags = ['Personvernkonsekvensvurdering', 'tag"injection'];
+
+    await client.listKrav({ etterlevelseDokumentasjonId: docId, tagger: tags });
+
+    const body = getBody();
+    expect(body?.query).toContain('$etterlevelseDokumentasjonId: ID!');
+    expect(body?.query).toContain('$tagger: [String!]');
+    expect(body?.query).not.toContain(docId);
+    expect(body?.query).not.toContain('tag"injection');
+    expect(body?.variables).toEqual({
+      etterlevelseDokumentasjonId: docId,
+      tagger: tags,
+    });
+  });
+});

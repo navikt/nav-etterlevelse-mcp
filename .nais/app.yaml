@@ -48,7 +48,13 @@ spec:
       value: api://prod-gcp.dab.nav-etterlevelse-mcp/.default
     - name: ETTERLEVELSE_FRONTEND_URL
       value: https://etterlevelse.ansatt.nav.no
+    - name: MCP_LEGACY_PROTOCOL_UNTIL
+      value: "2028-12-31"
   accessPolicy:
+    inbound:
+      rules:
+        - application: fleet-gateway
+          namespace: copilot
     outbound:
       rules:
         - application: etterlevelse-backend
