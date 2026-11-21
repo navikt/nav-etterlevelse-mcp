@@ -1,4 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { SessionContext } from '../server.js';
 
 vi.mock('../../unleash.js', () => ({
@@ -146,6 +149,55 @@ describe('stateless leseverktøy uten dokumentlås (issue #59)', () => {
     for (const tool of ['get_pvk_dokument', 'get_behandlingens_livsloep', 'list_risikoscenarioer', 'list_tiltak']) {
       const res = (await server.invoke(tool, {})) as { isError?: boolean };
       expect(res.isError).toBe(true);
+    }
+  });
+
+  it('avviser ../ og %2e%2e som ugyldige UUID-er i inputSchema uten å kalle backend', async () => {
+    const client = fakeClient();
+    const ctx: SessionContext = {
+      mcpAccessToken: '',
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      etterlevelseClient: client as any,
+      tokenData: {
+        userToken: 'user-token',
+        refreshToken: null,
+        azureExpiresAt: 0,
+        userEmail: 'bruker@nav.no',
+        userName: 'Bruker',
+        userGroups: [],
+      },
+    };
+    const mcpServer = new McpServer({ name: 'test', version: '0.0.0' });
+    registerEtterlevelseTools(mcpServer, ctx);
+
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    const mcpClient = new Client({ name: 'test-client', version: '0.0.0' });
+    await Promise.all([mcpServer.connect(serverTransport), mcpClient.connect(clientTransport)]);
+
+    try {
+      const payloads = ['../admin', '%2e%2e/admin', '%2e%2e'];
+      const cases: Array<{ name: string; key: string }> = [
+        { name: 'get_pvk_dokument', key: 'etterlevelseDokumentasjonId' },
+        { name: 'get_behandlingens_livsloep', key: 'etterlevelseDokumentasjonId' },
+        { name: 'list_risikoscenarioer', key: 'pvkDokumentId' },
+        { name: 'list_risikoscenarioer', key: 'etterlevelseDokumentasjonId' },
+        { name: 'list_tiltak', key: 'pvkDokumentId' },
+        { name: 'list_tiltak', key: 'etterlevelseDokumentasjonId' },
+      ];
+
+      for (const { name, key } of cases) {
+        for (const payload of payloads) {
+          const result = await mcpClient.callTool({ name, arguments: { [key]: payload } });
+          expect(result.isError).toBe(true);
+        }
+      }
+
+      expect(client.getPvkDokument).not.toHaveBeenCalled();
+      expect(client.getBehandlingensLivsloep).not.toHaveBeenCalled();
+      expect(client.getRisikoscenarioer).not.toHaveBeenCalled();
+      expect(client.getTiltakForPvkDokument).not.toHaveBeenCalled();
+    } finally {
+      await Promise.allSettled([mcpClient.close(), mcpServer.close()]);
     }
   });
 });

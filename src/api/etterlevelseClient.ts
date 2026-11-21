@@ -691,7 +691,9 @@ export class EtterlevelseClient {
   }
   async getPvkDokument(etterlevelseDokumentasjonId: string): Promise<unknown | null> {
     try {
-      return await this.get(`/pvkdokument/etterlevelsedokument/${etterlevelseDokumentasjonId}`);
+      return await this.get(
+        `/pvkdokument/etterlevelsedokument/${encodeURIComponent(etterlevelseDokumentasjonId)}`,
+      );
     } catch (error) {
       if (isNotFoundError(error)) {
         return null;
@@ -785,7 +787,9 @@ export class EtterlevelseClient {
 
   async getBehandlingensLivsloep(etterlevelseDokumentasjonId: string): Promise<unknown | null> {
     try {
-      return await this.get(`/behandlingenslivslop/etterlevelsedokument/${etterlevelseDokumentasjonId}`);
+      return await this.get(
+        `/behandlingenslivslop/etterlevelsedokument/${encodeURIComponent(etterlevelseDokumentasjonId)}`,
+      );
     } catch (error) {
       if (isNotFoundError(error)) {
         return null;
@@ -896,7 +900,9 @@ export class EtterlevelseClient {
   }
 
   async getRisikoscenarioer(pvkDokumentId: string): Promise<unknown[]> {
-    const payload = await this.get(`/risikoscenario/pvkdokument/${pvkDokumentId}/ALL`);
+    const payload = await this.get(
+      `/risikoscenario/pvkdokument/${encodeURIComponent(pvkDokumentId)}/ALL`,
+    );
     // Merk: backend-GET-endepunktet populerer ikke relevanteKravNummer (kravkoblinger).
     // Kravkoblinger er synlige i responsen fra addRelevantKrav (link_krav_to_risikoscenario),
     // men ikke fra list- eller enkelt-GET-endepunktene.
@@ -945,7 +951,10 @@ export class EtterlevelseClient {
   }
 
   async getTiltakForPvkDokument(pvkDokumentId: string): Promise<any[]> {
-    const payload = await this.get(`/tiltak/pvkdokument/${pvkDokumentId}`, { pageSize: 200 });
+    const payload = await this.get(
+      `/tiltak/pvkdokument/${encodeURIComponent(pvkDokumentId)}`,
+      { pageSize: 200 },
+    );
     return extractArray(payload);
   }
 

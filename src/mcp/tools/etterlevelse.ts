@@ -973,7 +973,7 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
       inputSchema: {
         etterlevelseDokumentasjonId: z
           .string()
-          .min(1)
+          .uuid()
           .optional()
           .describe('UUID for etterlevelsesdokumentasjonen. Valgfri hvis et dokument er låst med lock_document.'),
       },
@@ -1201,7 +1201,7 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
       inputSchema: {
         etterlevelseDokumentasjonId: z
           .string()
-          .min(1)
+          .uuid()
           .optional()
           .describe('UUID for etterlevelsesdokumentasjonen. Valgfri hvis et dokument er låst med lock_document.'),
       },
@@ -1266,12 +1266,12 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
       inputSchema: {
         pvkDokumentId: z
           .string()
-          .min(1)
+          .uuid()
           .optional()
           .describe('UUID for PVK-dokumentet (hentes med get_pvk_dokument). Valgfri hvis et dokument er låst med lock_document.'),
         etterlevelseDokumentasjonId: z
           .string()
-          .min(1)
+          .uuid()
           .optional()
           .describe('Alternativt UUID for etterlevelsesdokumentasjonen — slår opp tilhørende PVK-dokument automatisk.'),
       },
@@ -1318,12 +1318,12 @@ export function registerEtterlevelseTools(server: McpServer, ctx: SessionContext
       inputSchema: {
         pvkDokumentId: z
           .string()
-          .min(1)
+          .uuid()
           .optional()
           .describe('UUID for PVK-dokumentet (hentes med get_pvk_dokument). Valgfri hvis et dokument er låst med lock_document.'),
         etterlevelseDokumentasjonId: z
           .string()
-          .min(1)
+          .uuid()
           .optional()
           .describe('Alternativt UUID for etterlevelsesdokumentasjonen — slår opp tilhørende PVK-dokument automatisk.'),
       },

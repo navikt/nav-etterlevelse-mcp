@@ -9,6 +9,7 @@ export const MCP_LEGACY_VERSIONS = ['2025-11-25', '2025-06-18', '2025-03-26', '2
 
 export const MCP_CODE_HEADER_MISMATCH = -32020;
 export const MCP_CODE_UNSUPPORTED_VERSION = -32022;
+export const MCP_CODE_INVALID_REQUEST = -32600;
 export const MCP_CODE_METHOD_NOT_FOUND = -32601;
 export const MCP_CODE_INVALID_PARAMS = -32602;
 export const MCP_CODE_PARSE_ERROR = -32700;
@@ -34,6 +35,10 @@ interface JsonRpcEnvelope {
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isValidJsonRpcId(value: unknown): value is string | number {
+  return typeof value === 'string' || (typeof value === 'number' && Number.isFinite(value));
 }
 
 function getMeta(env: JsonRpcEnvelope): Record<string, unknown> | undefined {
@@ -254,15 +259,38 @@ export async function handleStatelessMcpRequest(
   now: Date = new Date(),
 ): Promise<void> {
   const body = req.body as unknown;
-  if (!isPlainObject(body) || typeof body.method !== 'string' || !body.method) {
-    writeMcpError(res, 400, null, { code: MCP_CODE_PARSE_ERROR, message: 'Parse error' });
+  if (!isPlainObject(body)) {
+    writeMcpError(res, 400, null, { code: MCP_CODE_INVALID_REQUEST, message: 'Invalid Request' });
     return;
   }
 
   const env = body as JsonRpcEnvelope;
-  const method = env.method as string;
   const hasId = 'id' in env && env.id !== undefined;
-  const id = hasId ? env.id : undefined;
+  const validId = hasId && isValidJsonRpcId(env.id);
+  const responseId = validId ? (env.id as string | number) : null;
+
+  if (
+    env.jsonrpc !== '2.0' ||
+    typeof env.method !== 'string' ||
+    !env.method ||
+    ('params' in env && env.params !== undefined && !isPlainObject(env.params))
+  ) {
+    writeMcpError(res, 400, responseId, { code: MCP_CODE_INVALID_REQUEST, message: 'Invalid Request' });
+    return;
+  }
+
+  if (hasId && !validId) {
+    writeMcpError(res, 400, null, { code: MCP_CODE_INVALID_REQUEST, message: 'Invalid Request' });
+    return;
+  }
+
+  const method = env.method;
+  if (!hasId && !method.startsWith('notifications/')) {
+    writeMcpError(res, 400, null, { code: MCP_CODE_INVALID_REQUEST, message: 'Invalid Request' });
+    return;
+  }
+
+  const id = validId ? (env.id as string | number) : undefined;
 
   if (!isLegacyMcpRequest(req, env)) {
     const validationError = validateModernMcpRequest(req, env, now);
@@ -330,8 +358,7 @@ export async function handleStatelessMcpRequest(
     return;
   }
 
-  const isLegacyNotification = !hasId || id === null;
-  if (method.startsWith('notifications/') && isLegacyNotification) {
+  if (method.startsWith('notifications/') && !hasId) {
     res.status(202).end();
     return;
   }

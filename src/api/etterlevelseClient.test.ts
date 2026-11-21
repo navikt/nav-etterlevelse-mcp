@@ -509,3 +509,34 @@ describe('EtterlevelseClient — parametriserte GraphQL-spørringer', () => {
     });
   });
 });
+
+describe('EtterlevelseClient — URL-koding av sti-parametere', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('URL-koder ../ og %2e%2e i lesestier slik at stitraversering ikke skjer', async () => {
+    const requestedUrls: string[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string | URL) => {
+        requestedUrls.push(url.toString());
+        return jsonResponse([]);
+      }),
+    );
+
+    const client = new EtterlevelseClient('fake-token', 'https://test.local/api');
+
+    await client.getPvkDokument('../admin');
+    await client.getBehandlingensLivsloep('%2e%2e/admin');
+    await client.getRisikoscenarioer('../secret');
+    await client.getTiltakForPvkDokument('%2e%2e');
+
+    expect(requestedUrls).toEqual([
+      'https://test.local/api/pvkdokument/etterlevelsedokument/..%2Fadmin',
+      'https://test.local/api/behandlingenslivslop/etterlevelsedokument/%252e%252e%2Fadmin',
+      'https://test.local/api/risikoscenario/pvkdokument/..%2Fsecret/ALL',
+      'https://test.local/api/tiltak/pvkdokument/%252e%252e?pageSize=200',
+    ]);
+  });
+});

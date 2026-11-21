@@ -88,6 +88,8 @@ export function createMcpServer(ctx: SessionContext, behandlingskatalogClient: B
   return server;
 }
 
+export type GatewayToolBackend = 'etterlevelse' | 'behandlingskatalog' | 'navet';
+
 /**
  * Oppretter en McpServer for gateway-stien (/mcp/gw) der kun leseverktøy (readOnlyHint === true)
  * registreres. Skriveverktøy og lock_document filtreres bort ved registrering slik at de verken
@@ -97,10 +99,12 @@ export function createGatewayMcpServer(
   ctx: SessionContext,
   behandlingskatalogClient: BehandlingskatalogClient,
   navetClient: NavetClient | null,
-): StatelessMcpServerBundle {
+): StatelessMcpServerBundle & { toolBackends: ReadonlyMap<string, GatewayToolBackend> } {
   const server = new McpServer(mcpServerInfo, { maxToolInputElements: MAX_TOOL_INPUT_ELEMENTS });
   const allowedToolNames = new Set<string>();
   const blockedWriteToolNames = new Set<string>();
+  const toolBackends = new Map<string, GatewayToolBackend>();
+  let currentBackend: GatewayToolBackend = 'etterlevelse';
 
   const originalRegisterTool = server.registerTool.bind(server);
   const filteringServer = new Proxy(server, {
@@ -110,6 +114,7 @@ export function createGatewayMcpServer(
         return (name: string, toolConfig: any, handler: any) => {
           if (toolConfig?.annotations?.readOnlyHint === true) {
             allowedToolNames.add(name);
+            toolBackends.set(name, currentBackend);
             return originalRegisterTool(name, toolConfig, handler);
           }
           blockedWriteToolNames.add(name);
@@ -120,13 +125,16 @@ export function createGatewayMcpServer(
     },
   });
 
+  currentBackend = 'etterlevelse';
   registerEtterlevelseTools(filteringServer, ctx);
+  currentBackend = 'behandlingskatalog';
   registerBehandlingskatalogTools(filteringServer, behandlingskatalogClient);
   if (navetClient) {
+    currentBackend = 'navet';
     registerNavetTools(filteringServer, navetClient);
   }
 
-  return { server, allowedToolNames, blockedWriteToolNames };
+  return { server, allowedToolNames, blockedWriteToolNames, toolBackends };
 }
 
 export async function handleGatewayMcpRequest(
@@ -152,13 +160,44 @@ export async function handleGatewayMcpRequest(
       new NavetClient(''),
     );
 
-    bundle.resolveServerForToolCall = async () => {
-      const [etterlevelseToken, bkToken, navetToken] = await Promise.all([
-        exchangeViaTexas(userToken, config.azure.etterlevelseScope),
-        exchangeViaTexas(userToken, config.azure.behandlingskatalogScope),
-        getAppTokenViaTexas('https://graph.microsoft.com/.default'),
-      ]);
+    bundle.resolveServerForToolCall = async (toolName: string) => {
+      const backend = bundle.toolBackends.get(toolName) ?? 'etterlevelse';
 
+      if (backend === 'behandlingskatalog') {
+        const bkToken = await exchangeViaTexas(userToken, config.azure.behandlingskatalogScope);
+        if (!bkToken) {
+          return {
+            ok: false,
+            status: 502,
+            message: 'Kunne ikke hente behandlingskatalog-token via Texas OBO',
+          };
+        }
+        const liveBundle = createGatewayMcpServer(
+          placeholderCtx,
+          new BehandlingskatalogClient(bkToken),
+          null,
+        );
+        return { ok: true, server: liveBundle.server };
+      }
+
+      if (backend === 'navet') {
+        const navetToken = await getAppTokenViaTexas('https://graph.microsoft.com/.default');
+        if (!navetToken) {
+          return {
+            ok: false,
+            status: 502,
+            message: 'Kunne ikke hente Navet-token via Texas',
+          };
+        }
+        const liveBundle = createGatewayMcpServer(
+          placeholderCtx,
+          new BehandlingskatalogClient(null),
+          new NavetClient(navetToken),
+        );
+        return { ok: true, server: liveBundle.server };
+      }
+
+      const etterlevelseToken = await exchangeViaTexas(userToken, config.azure.etterlevelseScope);
       if (!etterlevelseToken) {
         return {
           ok: false,
@@ -174,8 +213,8 @@ export async function handleGatewayMcpRequest(
       };
       const liveBundle = createGatewayMcpServer(
         liveCtx,
-        new BehandlingskatalogClient(bkToken),
-        navetToken ? new NavetClient(navetToken) : null,
+        new BehandlingskatalogClient(null),
+        null,
       );
       return { ok: true, server: liveBundle.server };
     };

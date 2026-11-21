@@ -79,7 +79,8 @@ describe('createGatewayAuthMiddleware', () => {
 
   function mockTexas(claims: Record<string, unknown>, status = 200) {
     const fetchMock = vi.fn(async (url: string | URL, init?: RequestInit) => {
-      if (url.toString().startsWith('http://texas.local')) {
+      const parsedUrl = url instanceof URL ? url : new URL(url);
+      if (parsedUrl.hostname === 'texas.local') {
         const parsed = JSON.parse(init?.body as string) as Record<string, string>;
         expect(parsed.identity_provider).toBe('entra_id');
         expect(parsed.token).toBe('tok');

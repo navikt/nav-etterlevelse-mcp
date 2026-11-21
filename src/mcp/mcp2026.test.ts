@@ -5,7 +5,9 @@ import {
   handleStatelessMcpRequest,
   MCP_CODE_HEADER_MISMATCH,
   MCP_CODE_INVALID_PARAMS,
+  MCP_CODE_INVALID_REQUEST,
   MCP_CODE_METHOD_NOT_FOUND,
+  MCP_CODE_PARSE_ERROR,
   MCP_CODE_UNSUPPORTED_VERSION,
   MCP_LEGACY_UNTIL_ENV,
   MCP_META_CLIENT_CAPABILITIES,
@@ -91,6 +93,20 @@ function buildTestApp() {
   app.delete('/mcp/gw', (_req, res) => {
     res.setHeader('Allow', 'POST');
     res.status(405).json({ error: 'method_not_allowed' });
+  });
+
+  app.use((error: unknown, req: express.Request, res: express.Response, next: express.NextFunction) => {
+    if (error instanceof SyntaxError && 'status' in error && (error as { status?: number }).status === 400) {
+      if (req.path === '/mcp/gw') {
+        res.status(400).json({
+          jsonrpc: '2.0',
+          id: null,
+          error: { code: MCP_CODE_PARSE_ERROR, message: 'Parse error' },
+        });
+        return;
+      }
+    }
+    next(error);
   });
 
   return app;
@@ -428,5 +444,79 @@ describe('MCP 2026-07-28 compliance på /mcp/gw', () => {
     const delRes = await callGateway(app, 'DELETE');
     expect(delRes.status).toBe(405);
     expect(delRes.allow).toBe('POST');
+  });
+
+  it('validerer JSON-RPC 2.0-konvolutt og id-type med -32600, og reserverer -32700 for ugyldig JSON', async () => {
+    const wrongVersion = await callGateway(
+      app,
+      'POST',
+      { ...modernBody('server/discover'), jsonrpc: '1.0' },
+      modernHeaders('server/discover'),
+    );
+    expect(wrongVersion.status).toBe(400);
+    expect((wrongVersion.json.error as { code: number }).code).toBe(MCP_CODE_INVALID_REQUEST);
+
+    for (const badId of [null, {}, true, [1]]) {
+      const res = await callGateway(
+        app,
+        'POST',
+        { ...modernBody('server/discover'), id: badId },
+        modernHeaders('server/discover'),
+      );
+      expect(res.status).toBe(400);
+      expect(res.json.id).toBeNull();
+      expect((res.json.error as { code: number }).code).toBe(MCP_CODE_INVALID_REQUEST);
+    }
+
+    // ID-løse ikke-notifikasjoner skal gi -32600, ikke 200 eller 202
+    const { id: _listId, ...toolsListWithoutId } = modernBody('tools/list');
+    const idlessList = await callGateway(app, 'POST', toolsListWithoutId, modernHeaders('tools/list'));
+    expect(idlessList.status).toBe(400);
+    expect((idlessList.json.error as { code: number }).code).toBe(MCP_CODE_INVALID_REQUEST);
+
+    // notifications/* med id: null er ugyldig i både moderne og legacy-modus (ikke 202)
+    const nullIdNotifModern = await callGateway(
+      app,
+      'POST',
+      { ...modernBody('notifications/initialized'), id: null },
+      modernHeaders('notifications/initialized'),
+    );
+    expect(nullIdNotifModern.status).toBe(400);
+    expect((nullIdNotifModern.json.error as { code: number }).code).toBe(MCP_CODE_INVALID_REQUEST);
+
+    process.env[MCP_LEGACY_UNTIL_ENV] = '2999-01-01';
+    const nullIdNotifLegacy = await callGateway(
+      app,
+      'POST',
+      { jsonrpc: '2.0', id: null, method: 'notifications/initialized' },
+    );
+    expect(nullIdNotifLegacy.status).toBe(400);
+    expect((nullIdNotifLegacy.json.error as { code: number }).code).toBe(MCP_CODE_INVALID_REQUEST);
+
+    const legacyNotif = await callGateway(
+      app,
+      'POST',
+      { jsonrpc: '2.0', method: 'notifications/initialized' },
+    );
+    expect(legacyNotif.status).toBe(202);
+    expect(legacyNotif.json).toEqual({});
+
+    // Ugyldig JSON-tekst skal gi -32700 Parse error
+    const server = await new Promise<ReturnType<express.Express['listen']>>((resolve) => {
+      const srv = app.listen(0, '127.0.0.1', () => resolve(srv));
+    });
+    try {
+      const { port } = server.address() as AddressInfo;
+      const rawRes = await fetch(`http://127.0.0.1:${port}/mcp/gw`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{invalid-json',
+      });
+      const parsed = (await rawRes.json()) as { error: { code: number } };
+      expect(rawRes.status).toBe(400);
+      expect(parsed.error.code).toBe(MCP_CODE_PARSE_ERROR);
+    } finally {
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
   });
 });
